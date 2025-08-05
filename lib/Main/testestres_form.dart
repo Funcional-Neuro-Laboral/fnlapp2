@@ -5,7 +5,6 @@ import 'dart:convert';
 import 'package:fnlapp/SharedPreferences/sharedpreference.dart';
 import 'package:fnlapp/Main/cargarprograma.dart';
 import 'package:fnlapp/config.dart';
-import 'package:fnlapp/SharedPreferences/sharedpreference.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../Preguntas/questions_data.dart';
 import 'package:fnlapp/Main/home.dart';
