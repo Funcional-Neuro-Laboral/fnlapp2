@@ -28,8 +28,6 @@ class _FinalStepScreenState extends State<FinalStepScreen> {
     });
   }
 
-  
-
   Future<void> _sendData() async {
 
     int caritaValue = 2; // Valor por defecto, carita feliz

@@ -498,7 +498,7 @@ class PlanScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProgramInfo() {
+  Widget _buildProgramInfo() { //Futuro usar value
     return Row(
       children: const [
         Text(

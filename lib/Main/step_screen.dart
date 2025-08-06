@@ -6,7 +6,6 @@ import 'package:fnlapp/Main/finalstepscreen.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-import 'dart:typed_data';
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -22,370 +21,733 @@ class StepScreen extends StatefulWidget {
   final int tecnicaId; // Nuevo: tecnica_id
   final String url_img;
 
-  StepScreen({
+  const StepScreen({
+    Key? key,
     required this.steps,
     required this.tecnicaNombre,
     required this.dia,
-    required this.userId, // Nuevo: user_id
-    required this.tecnicaId, // Nuevo: tecnica_id
-    required this.url_img, // Nuevo: url_img
-  });
+    required this.userId,
+    required this.tecnicaId,
+    required this.url_img,
+  }) : super(key: key);
 
   @override
-  _StepScreenState createState() => _StepScreenState();
+  State<StepScreen> createState() => _StepScreenState();
 }
 
 class _StepScreenState extends State<StepScreen> {
-  int currentStep = 0; // Índice del paso actual
-  FlutterTts flutterTts = FlutterTts(); // Instancia de FlutterTts
-  bool isPlaying = false; // Para controlar si se está reproduciendo el audio
-  TextEditingController commentController =
-      TextEditingController(); // Controlador del input de comentario
-  double _rating = 0; // Valor inicial para el rating de estrellas
-
-  // No es necesario declarar steps aquí, ya que widget.steps es directamente la lista
-  // List<dynamic> steps = []; // Lista de pasos decodificados del JSON
+  int currentStep = 0;
+  FlutterTts? flutterTts;
+  bool isPlaying = false;
+  bool isLoading = false;
+  final TextEditingController commentController = TextEditingController();
+  double rating = 0;
+  double textSize = 18.0;
 
   @override
   void initState() {
     super.initState();
-    // No es necesario decodificar, ya que widget.steps ya es una lista
-    // steps = json.decode(widget.steps); // Elimina esta línea
-    flutterTts.setCompletionHandler(() {
-      setState(() {
-        isPlaying = false; // Cambia el estado a no reproduciendo
-      });
-    });
+    _initializeTts();
   }
 
-  // Función para leer el texto
-  Future<void> _speak(String text) async {
-    await flutterTts.setLanguage("es-ES"); // Establecer el idioma español
-    await flutterTts.setPitch(1.0); // Tono de voz normal
-    await flutterTts.speak(text); // Leer el texto
-
-    setState(() {
-      isPlaying = true; // Cambia el estado a reproduciendo
-    });
-  }
-
-  // Función para detener la lectura
-  Future<void> _stop() async {
-    await flutterTts.stop(); // Detiene la lectura
-    setState(() {
-      isPlaying = false; // Cambia el estado a detenido
+  void _initializeTts() {
+    flutterTts = FlutterTts();
+    flutterTts?.setCompletionHandler(() {
+      if (mounted) {
+        setState(() {
+          isPlaying = false;
+        });
+      }
     });
   }
 
   @override
   void dispose() {
-    // Asegúrate de detener la lectura cuando el widget se elimine
-    flutterTts.stop();
-    commentController.dispose(); // Libera el controlador del input
+    flutterTts?.stop();
+    commentController.dispose();
     super.dispose();
   }
 
-  // Función para enviar el comentario
-  void _sendComment() {
-    // Aquí puedes manejar el envío del comentario, por ahora simplemente hace pop
-    Navigator.pop(context); // Volver al home
-    print('Rating: $_rating'); // Verificar el valor del rating
-  }
-
   Future<void> _playAudioFromAPI(String text) async {
+    if (isPlaying) return;
+
+    setState(() {
+      isPlaying = true;
+    });
+
     try {
       final url = Uri.parse('${Config.apiUrl}/voice/texttovoice/?text=$text&voiceId=Joanna');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
-        Uint8List audioBytes = response.bodyBytes;
-        AudioPlayer player = AudioPlayer();
+        final audioBytes = response.bodyBytes;
+        final player = AudioPlayer();
 
         if (kIsWeb) {
-          // Reproducir en la web
           await player.play(BytesSource(audioBytes));
         } else {
-          // Reproducir en móvil/escritorio
           final tempDir = await getTemporaryDirectory();
-          final audioFile = File('${tempDir.path}/speech.mp3');
+          final audioFile = File('${tempDir.path}/speech_${DateTime.now().millisecondsSinceEpoch}.mp3');
           await audioFile.writeAsBytes(audioBytes);
           await player.play(DeviceFileSource(audioFile.path));
         }
-      } else {
-        print("Error al obtener audio: ${response.statusCode}");
+
+        // Escuchar cuando termine la reproducción
+        player.onPlayerStateChanged.listen((state) {
+          if (state == PlayerState.completed && mounted) {
+            setState(() {
+              isPlaying = false;
+            });
+          }
+        });
       }
     } catch (e) {
-      print("Error en la reproducción de audio: $e");
+      debugPrint("Error en la reproducción de audio: $e");
+      if (mounted) {
+        setState(() {
+          isPlaying = false;
+        });
+      }
     }
   }
 
-  @override
-Widget build(BuildContext context) {
-  int maxSteps = widget.steps.length; // Usar widget.steps directamente
+  Future<void> _stopAudio() async {
+    await flutterTts?.stop();
+    setState(() {
+      isPlaying = false;
+    });
+  }
 
-  return Scaffold(
-    backgroundColor: Colors.transparent, // Fondo transparente para el Scaffold
-    appBar: AppBar(
-      backgroundColor: Colors.black.withOpacity(0.5),
-      elevation: 0,
-      leading: IconButton(
-        icon: Icon(Icons.arrow_back, color: const Color.fromARGB(255, 255, 255, 255)),
-        onPressed: () {
-          Navigator.pop(context);
-        },
-      ),
-      centerTitle: true,
-      title: Text(
-        'Mi plan diario',
-        style: GoogleFonts.poppins(fontSize: 16.0, color: Colors.white),
-      ),
-    ),
-    body: Container(
-      decoration: BoxDecoration(
-        image: DecorationImage(
-          image: NetworkImage(widget.url_img), // Usar la URL de la imagen
-          fit: BoxFit.cover, // Asegura que la imagen cubra toda la pantalla
-        ),
-      ),
-      child: Container(
-        // Añadimos una capa oscura sobre la imagen para mejorar la visibilidad del texto
-        color: Colors.black.withOpacity(0.5), // Ajusta la opacidad según sea necesario
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Texto en el centro de la pantalla
-              Expanded(
-                child: Center(
-                  child: currentStep < maxSteps
-                      ? Text(
-                          widget.steps[currentStep], // Usar widget.steps
-                          style: GoogleFonts.poppins(
-                              fontSize: 22.0,
-                              color: Colors.white,
-                              height: 1.5),
-                          textAlign: TextAlign.center,
-                        )
-                      : Container(), // Evita error si intentamos acceder a un paso inexistente
+  Future<void> _handleNextStep() async {
+    if (currentStep < widget.steps.length - 1) {
+      setState(() {
+        currentStep++;
+      });
+      if (isPlaying) {
+        await _stopAudio();
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+      await _playAudioFromAPI(widget.steps[currentStep]);
+    } else {
+      await _navigateToNextScreen();
+    }
+  }
+
+  Future<void> _navigateToNextScreen() async {
+    if (isPlaying) {
+      await _stopAudio();
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final response = await http.get(
+        Uri.parse('${Config.apiUrl}/userprograma/${widget.userId}/act/${widget.dia}'),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        if (responseData['isCompleted'] == true) {
+          if (mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CompletedDiaScreen(),
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => FinalStepScreen(
+                  userId: widget.userId,
+                  tecnicaId: widget.tecnicaId,
                 ),
               ),
-              // Texto del día y la técnica
-              if (currentStep < maxSteps)
-                Column(
+            );
+          }
+        }
+      } else {
+        throw Exception('Error en la respuesta del servidor');
+      }
+    } catch (e) {
+      debugPrint("Error al verificar el estado del día: $e");
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FinalStepScreen(
+              userId: widget.userId,
+              tecnicaId: widget.tecnicaId,
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _handlePreviousStep() {
+    if (currentStep > 0) {
+      setState(() {
+        currentStep--;
+      });
+      if (isPlaying) {
+        _stopAudio();
+      }
+    }
+  }
+
+  Future<void> _sendComment() async {
+    // Implementar envío de comentario
+    debugPrint('Rating: $rating');
+    debugPrint('Comentario: ${commentController.text}');
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLastStep = currentStep >= widget.steps.length;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            _buildProgressIndicator(),
+            Expanded(
+              child: isLastStep ? _buildRatingView() : _buildStepContent(),
+            ),
+            if (!isLastStep) _buildControls(),
+            if (isLastStep) _buildSubmitSection(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            child: IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.black,
+                size: 20,
+              ),
+              padding: EdgeInsets.zero,
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: Text(
+                'Día ${widget.dia.toString().padLeft(2, '0')}',
+                style: TextStyle(
+                  color: const Color(0xFF4320AD),
+                  fontSize: 18,
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: 32), // Para balancear el icono de back
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressIndicator() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), // Aumenté el margen vertical
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Lado izquierdo con la información
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Día ${widget.dia.toString().padLeft(2, '0')}',
-                      style: GoogleFonts.poppins(
-                          fontSize: 14.0, color: Colors.white),
+                    // Fila con tiempo y tipo de relajación
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.access_time,
+                          size: 16,
+                          color: const Color(0xFF212121),
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          '10 min',
+                          style: TextStyle(
+                            color: const Color(0xFF212121),
+                            fontSize: 14,
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: ShapeDecoration(
+                            color: const Color(0xFFB7B7B7),
+                            shape: OvalBorder(),
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Relajación',
+                          style: TextStyle(
+                            color: const Color(0xFF212121),
+                            fontSize: 14,
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
                     ),
+                    SizedBox(height: 12),
+
+                    // Nombre del programa
                     Text(
                       widget.tecnicaNombre,
-                      style: GoogleFonts.poppins(
-                          fontSize: 16.0,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: const Color(0xFF5027D0),
+                        fontSize: 17,
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
-              SizedBox(height: 20),
+              ),
 
-              // Si es la última vista, mostrar el input y el botón "Enviar"
-              if (currentStep == maxSteps)
-                Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center, // Centra verticalmente
-                    children: [
-                      // Título y Rating
-                      Text(
-                        "Califica tu experiencia con las técnicas de relajación",
-                        style: GoogleFonts.poppins(
-                            fontSize: 16.0, color: Colors.white),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: 10),
-                      RatingBar.builder(
-                        initialRating: 0,
-                        minRating: 1,
-                        direction: Axis.horizontal,
-                        allowHalfRating: false,
-                        itemCount: 5,
-                        itemPadding: EdgeInsets.symmetric(horizontal: 4.0),
-                        itemBuilder: (context, _) => Icon(
-                          Icons.star,
-                          color: Colors.amber,
-                        ),
-                        onRatingUpdate: (rating) {
-                          setState(() {
-                            _rating = rating;
-                          });
-                        },
-                      ),
-                      SizedBox(height: 30),
-                      // Input para el comentario
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: TextField(
-                          controller: commentController,
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.white,
-                            hintText: "Deja un comentario sobre la técnica",
-                            hintStyle: GoogleFonts.poppins(color: Colors.grey),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10.0),
-                            ),
-                          ),
-                          maxLines: 3,
-                        ),
-                      ),
-                      SizedBox(height: 20),
-                      // Botón "Enviar"
-                      ElevatedButton(
-                        onPressed: _sendComment, // Llama a la función para enviar el comentario
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Color.fromARGB(255, 75, 21, 141),
-                        ),
-                        child: Text(
-                          'Enviar',
-                          style: GoogleFonts.poppins(
-                              fontSize: 16.0, color: Colors.white),
-                        ),
-                      ),
-                    ],
+              // Botón de voz a la derecha con sombra
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0x28000000),
+                      blurRadius: 5,
+                      offset: Offset(0, 4),
+                      spreadRadius: 0,
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  onPressed: () async {
+                    if (isPlaying) {
+                      await _stopAudio();
+                    } else {
+                      await _playAudioFromAPI(widget.steps[currentStep]);
+                    }
+                  },
+                  icon: Icon(
+                    isPlaying ? Icons.volume_off : Icons.volume_up,
+                    size: 24,
+                    color: Colors.black,
+                  ),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.all(8),
                   ),
                 ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-              // Botones de navegación y audio solo si es mensaje
-              if (currentStep < maxSteps)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildStepContent() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          // Imagen con bordes redondeados
+          Expanded(
+            flex: 3,
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.network(
+                  widget.url_img,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      color: Colors.grey[200],
+                      child: const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey[200],
+                      child: const Icon(
+                        Icons.image_not_supported,
+                        size: 50,
+                        color: Colors.grey,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Título de tamaño de texto
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Tamaño de texto',
+              style: TextStyle(
+                color: const Color(0xFF212121),
+                fontSize: 14,
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Control deslizante de tamaño de texto
+          Row(
+            children: [
+              // Botón de disminuir tamaño
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (textSize > 18.0) { // Cambié de 16.0 a 18.0
+                      textSize = textSize == 22.0 ? 20.0 : 18.0; // Cambié los valores
+                    }
+                  });
+                },
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  child: Icon(
+                    Icons.remove,
+                    size: 30,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+              SizedBox(width: 12),
+
+              // Slider de tamaño
+              Expanded(
+                child: Column(
                   children: [
-                    // Botón anterior (solo si no es la primera vista)
-                    if (currentStep > 0)
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Color.fromARGB(255, 75, 21, 141), // Fondo circular
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: Icon(Icons.skip_previous, color: Colors.white),
-                          iconSize: 28, // Tamaño del ícono ajustado
-                          onPressed: () {
-                            setState(() {
-                              if (currentStep > 0) {
-                                currentStep--;
-                                if (isPlaying) {
-                                  _stop();
-                                }
-                              }
-                            });
-                          },
-                        ),
-                      ),
-                    SizedBox(width: 20), // Separador
-
-                    // Botón siguiente (modificado)
-                    if (currentStep < maxSteps)
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Color.fromARGB(255, 75, 21, 141), // Fondo circular
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: Icon(Icons.skip_next, color: Colors.white),
-                          iconSize: 28, // Tamaño del ícono ajustado
-                          onPressed: () async {
-                            if (currentStep < maxSteps - 1) {
-                              currentStep++;
-                              if (isPlaying) {
-                                await _stop();
-                                await Future.delayed(Duration(milliseconds: 800));
-                              }
-                              await _playAudioFromAPI(widget.steps[currentStep]);
-                            } else {
-                              if (isPlaying) {
-                                await _stop();
-                              }
-
-                              // Llamada a la API para verificar si el día fue completado
-                              final response = await http.get(
-                                Uri.parse('${Config.apiUrl}/userprograma/${widget.userId}/act/${widget.dia}')
-                              );
-
-                              if (response.statusCode == 200) {
-                                // Si el día fue completado
-                                final responseData = json.decode(response.body);
-                                if (responseData['isCompleted'] == true) {
-                                  // Si el día fue completado, navega a la pantalla CompletedDiaScreen
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => CompletedDiaScreen(),
-                                    ),
-                                  );
-                                } else {
-                                  // Si no ha sido completado, continúa con la lógica original
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => FinalStepScreen(
-                                        userId: widget.userId, // Pasa el user_id
-                                        tecnicaId: widget.tecnicaId, // Pasa el tecnica_id
-                                      ),
-                                    ),
-                                  );
-                                }
-                              } else {
-                                // Maneja el caso en que la API no responda correctamente
-                                print("Error al verificar el estado del día");
-                                // Continúa con la lógica original si la API falla
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => FinalStepScreen(
-                                      userId: widget.userId,
-                                      tecnicaId: widget.tecnicaId,
-                                    ),
-                                  ),
-                                );
-                              }
-                            }
-                            // Actualizamos la vista
-                            setState(() {});
-                          },
-                        ),
-                      ),
-                    SizedBox(width: 20), // Separador
-
-                    // Botón de audio (opcional para leer el texto en voz alta)
                     Container(
-                      decoration: BoxDecoration(
-                        color: Color.fromARGB(255, 75, 21, 141), // Fondo circular
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        icon: Icon(isPlaying ? Icons.stop : Icons.volume_up, color: Colors.white),
-                        iconSize: 28, // Tamaño del ícono ajustado
-                        onPressed: () async {
-                          if (isPlaying) {
-                            await _stop();
-                          } else {
-                            setState(() {
-                              isPlaying = true; // Cambia el estado a "reproduciendo"
-                            });
-                            await _playAudioFromAPI(widget.steps[currentStep]);
-                          }
-                        },
+                      height: 8,
+                      child: Stack(
+                        children: [
+                          // Track del slider
+                          Container(
+                            width: double.infinity,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: Color(0xFFCECECE),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          // Parte activa del slider
+                          FractionallySizedBox(
+                            widthFactor: (textSize - 18.0) / 4.0, // Cambié de 16.0 a 18.0
+                            child: Container(
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF4320AD),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                          // Botón deslizante
+                          Positioned(
+                            left: ((textSize - 18.0) / 4.0) * (MediaQuery.of(context).size.width - 120) - 6, // Cambié de 16.0 a 18.0
+                            top: -2,
+                            child: GestureDetector(
+                              onPanUpdate: (details) {
+                                RenderBox renderBox = context.findRenderObject() as RenderBox;
+                                double localX = details.localPosition.dx;
+                                double sliderWidth = MediaQuery.of(context).size.width - 120;
+                                double percentage = (localX / sliderWidth).clamp(0.0, 1.0);
+
+                                setState(() {
+                                  double newSize = 18.0 + (percentage * 4.0);
+                                  if (newSize <= 19.0) {
+                                    textSize = 18.0;
+                                  } else if (newSize <= 21.0) {
+                                    textSize = 20.0;
+                                  } else {
+                                    textSize = 22.0;
+                                  }
+                                });
+                              },
+                              child: Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF4320AD),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
+              ),
+
+              SizedBox(width: 12),
+
+              // Botón de aumentar tamaño
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (textSize < 22.0) {
+                      textSize = textSize == 18.0 ? 20.0 : 22.0;
+                    }
+                  });
+                },
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  child: Icon(
+                    Icons.add,
+                    size: 30,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
             ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // Línea divisoria
+          Container(
+            height: 1,
+            width: double.infinity,
+            color: Colors.black,
+          ),
+          const SizedBox(height: 20),
+
+          // Contenido del paso
+          Expanded(
+            flex: 2,
+            child: SingleChildScrollView(
+              child: Text(
+                widget.steps[currentStep],
+                style: TextStyle(
+                  fontSize: textSize,
+                  color: const Color(0xFF212121),
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControls() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Botón anterior
+          _buildControlButton(
+            icon: Icons.skip_previous,
+            onPressed: currentStep > 0 ? _handlePreviousStep : null, // null deshabilita el botón
+            isSecondary: true,
+          ),
+          const SizedBox(width: 16),
+
+          // Botón de reproducir/pausar
+          _buildControlButton(
+            icon: isPlaying ? Icons.pause : Icons.play_arrow,
+            onPressed: () async {
+              if (isPlaying) {
+                await _stopAudio();
+              } else {
+                await _playAudioFromAPI(widget.steps[currentStep]);
+              }
+            },
+            isPrimary: true,
+          ),
+
+          const SizedBox(width: 16),
+
+          // Botón siguiente
+          _buildControlButton(
+            icon: currentStep == widget.steps.length - 1
+                ? Icons.check
+                : Icons.skip_next,
+            onPressed: isLoading ? null : _handleNextStep,
+            isSecondary: true,
+            isLoading: isLoading,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControlButton({
+    required IconData icon,
+    required VoidCallback? onPressed,
+    bool isPrimary = false,
+    bool isSecondary = false,
+    bool isLoading = false,
+  }) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isPrimary ? const Color(0xFF8A6FE0) : const Color(0xFFCCCCCC),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        minimumSize: Size(114, 72),
+      ),
+      child: isLoading
+          ? const SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+        ),
+      )
+          : Icon(
+        icon,
+        size: 40,
+        color: isPrimary ? Colors.white : Colors.black,
+      ),
+    );
+  }
+
+  Widget _buildRatingView() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            "Califica tu experiencia con las técnicas de relajación",
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              color: Colors.white,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          RatingBar.builder(
+            initialRating: 0,
+            minRating: 1,
+            direction: Axis.horizontal,
+            allowHalfRating: false,
+            itemCount: 5,
+            itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
+            itemBuilder: (context, _) => const Icon(
+              Icons.star,
+              color: Colors.amber,
+            ),
+            onRatingUpdate: (newRating) {
+              setState(() {
+                rating = newRating;
+              });
+            },
+          ),
+          const SizedBox(height: 30),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: TextField(
+              controller: commentController,
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.white,
+                hintText: "Deja un comentario sobre la técnica",
+                hintStyle: GoogleFonts.poppins(color: Colors.grey),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+              ),
+              maxLines: 3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubmitSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: ElevatedButton(
+        onPressed: _sendComment,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color.fromARGB(255, 75, 21, 141),
+        ),
+        child: Text(
+          'Enviar',
+          style: GoogleFonts.poppins(
+            fontSize: 16.0,
+            color: Colors.white,
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
