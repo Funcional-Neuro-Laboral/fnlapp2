@@ -141,7 +141,7 @@ class _FinalStepScreenState extends State<FinalStepScreen>
       decoration: const BoxDecoration(
         image: DecorationImage(
           image: NetworkImage(
-              'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/login.png'
+              'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/fondo_rese%C3%B1a.png'
           ),
           fit: BoxFit.cover,
         ),
@@ -205,18 +205,12 @@ class _FinalStepScreenState extends State<FinalStepScreen>
           allowHalfRating: false,
           itemCount: 5,
           itemSize: 64,
-          itemPadding: const EdgeInsets.symmetric(horizontal: 2.0), // Cambié de 4.0 a 2.0
+          itemPadding: const EdgeInsets.symmetric(horizontal: 2.0),
           glowColor: const Color(0xFFF1D93E).withOpacity(0.3),
           unratedColor: const Color(0xFFB7B7B7),
           itemBuilder: (context, index) => Icon(
             Icons.star_rounded,
             color: const Color(0xFFF1D93E),
-            shadows: [
-              Shadow(
-                color: const Color(0xFFF1D93E).withOpacity(0.5),
-                blurRadius: 8,
-              ),
-            ],
           ),
           onRatingUpdate: (rating) {
             setState(() {
@@ -303,12 +297,13 @@ class _FinalStepScreenState extends State<FinalStepScreen>
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(12),
+        width: 56,
+        height: 56,
         decoration: BoxDecoration(
           color: isSelected
               ? mood.color.withOpacity(0.2)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(50),
+          borderRadius: BorderRadius.circular(28),
           border: Border.all(
             color: isSelected ? mood.color : Colors.transparent,
             width: 2,
@@ -346,7 +341,7 @@ class _FinalStepScreenState extends State<FinalStepScreen>
 
   Widget _buildSubmitButton() {
     return Padding(
-      padding: const EdgeInsets.only(top: 8), // Cambié de symmetric vertical: 12 a solo top: 8
+      padding: const EdgeInsets.only(top: 8, bottom: 64),
       child: SizedBox(
         width: 240,
         height: 56,

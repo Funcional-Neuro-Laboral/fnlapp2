@@ -23,7 +23,7 @@ class AppColors {
   static const Color textPrimary = Color(0xFF212121);
   static const Color textSecondary = Color(0xFF4A4A4A);
   static const Color cardBackground = Colors.white;
-  static const Color lockedBackground = Color(0xFF6e848e);
+  static const Color lockedBackground = Color(0xFFFFFFFF);
   static const Color badgeBackground = Color(0xFFDCD4F6);
   static const Color badgeText = Color(0xFF10082A);
   static const Color progressBackground = Color(0xFFEFEFEF);
@@ -364,18 +364,19 @@ class PlanScreen extends StatelessWidget {
   }
 
   Widget _buildCardImage(Programa programa, bool isUnlocked) {
-    Widget imageWidget = ClipRRect(
+
+    const String lockedImageUrl = 'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/imagen_bloqueada.png'; // Imagen de bloqueo
+
+    return ClipRRect(
       borderRadius: const BorderRadius.only(
         topLeft: Radius.circular(AppConstants.cardBorderRadius),
         topRight: Radius.circular(AppConstants.cardBorderRadius),
       ),
       child: Image.network(
-        programa.urlImg ?? '',
+        isUnlocked ? (programa.urlImg ?? '') : lockedImageUrl,
         width: double.infinity,
         height: AppConstants.cardImageHeight,
         fit: BoxFit.cover,
-        color: isUnlocked ? null : Colors.grey.withOpacity(0.5),
-        colorBlendMode: isUnlocked ? null : BlendMode.darken,
         errorBuilder: (context, error, stackTrace) {
           return Container(
             width: double.infinity,
@@ -396,33 +397,6 @@ class PlanScreen extends StatelessWidget {
         },
       ),
     );
-
-    if (!isUnlocked) {
-      return Stack(
-        children: [
-          imageWidget,
-          Container(
-            height: AppConstants.cardImageHeight,
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.4),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(AppConstants.cardBorderRadius),
-                topRight: Radius.circular(AppConstants.cardBorderRadius),
-              ),
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.lock,
-                color: Colors.white,
-                size: 40,
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return imageWidget;
   }
 
   Widget _buildCardContent(Programa programa, bool isUnlocked) {
@@ -478,10 +452,11 @@ class PlanScreen extends StatelessWidget {
       children: [
         Text(
           programa.nombreTecnica,
-          style: GoogleFonts.poppins(
-            fontSize: 16.0,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 14,
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w700,
           ),
         ),
         const SizedBox(height: 8),
@@ -489,9 +464,12 @@ class PlanScreen extends StatelessWidget {
           programa.startDate == null
               ? 'Esta lección se desbloqueará al día siguiente de haber completado la anterior.'
               : 'Esta lección se desbloqueará el ${programa.formattedStartDate}',
-          style: GoogleFonts.poppins(
-            fontSize: 14.0,
-            color: Colors.white,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 13,
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w400,
+            height: 1.31,
           ),
         ),
       ],

@@ -216,8 +216,6 @@ class _StepScreenState extends State<StepScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isLastStep = currentStep >= widget.steps.length;
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -226,10 +224,9 @@ class _StepScreenState extends State<StepScreen> {
             _buildHeader(),
             _buildProgressIndicator(),
             Expanded(
-              child: isLastStep ? _buildRatingView() : _buildStepContent(),
+              child: _buildStepContent(),
             ),
-            if (!isLastStep) _buildControls(),
-            if (isLastStep) _buildSubmitSection(),
+            _buildControls(),
           ],
         ),
       ),
@@ -586,13 +583,17 @@ class _StepScreenState extends State<StepScreen> {
           Expanded(
             flex: 2,
             child: SingleChildScrollView(
-              child: Text(
-                widget.steps[currentStep],
-                style: TextStyle(
-                  fontSize: textSize,
-                  color: const Color(0xFF212121),
-                  fontFamily: 'Inter',
-                  fontWeight: FontWeight.w400,
+              child: Align(
+                alignment: Alignment.centerLeft, // Alineación a la izquierda
+                child: Text(
+                  widget.steps[currentStep],
+                  style: TextStyle(
+                    fontSize: textSize,
+                    color: const Color(0xFF212121),
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w400,
+                  ),
+                  textAlign: TextAlign.left, // Texto alineado a la izquierda
                 ),
               ),
             ),
@@ -674,79 +675,6 @@ class _StepScreenState extends State<StepScreen> {
         icon,
         size: 40,
         color: isPrimary ? Colors.white : Colors.black,
-      ),
-    );
-  }
-
-  Widget _buildRatingView() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            "Califica tu experiencia con las técnicas de relajación",
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              color: Colors.white,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 10),
-          RatingBar.builder(
-            initialRating: 0,
-            minRating: 1,
-            direction: Axis.horizontal,
-            allowHalfRating: false,
-            itemCount: 5,
-            itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
-            itemBuilder: (context, _) => const Icon(
-              Icons.star,
-              color: Colors.amber,
-            ),
-            onRatingUpdate: (newRating) {
-              setState(() {
-                rating = newRating;
-              });
-            },
-          ),
-          const SizedBox(height: 30),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: TextField(
-              controller: commentController,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.white,
-                hintText: "Deja un comentario sobre la técnica",
-                hintStyle: GoogleFonts.poppins(color: Colors.grey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10.0),
-                ),
-              ),
-              maxLines: 3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSubmitSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      child: ElevatedButton(
-        onPressed: _sendComment,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color.fromARGB(255, 75, 21, 141),
-        ),
-        child: Text(
-          'Enviar',
-          style: GoogleFonts.poppins(
-            fontSize: 16.0,
-            color: Colors.white,
-          ),
-        ),
       ),
     );
   }
