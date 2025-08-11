@@ -1,15 +1,100 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'dart:typed_data';
 import 'models/profile_data.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   final ProfileData? profileData;
   final Function onLogout;
+  final Function(String)? onImageSelected; // Callback para manejar la nueva imagen
 
   ProfileScreen({
     required this.profileData,
     required this.onLogout,
+    this.onImageSelected,
   });
+
+  @override
+  _ProfileScreenState createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  File? _selectedImage;
+  Uint8List? _selectedImageBytes; // Para web
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _pickImage() async {
+    try {
+      // Mostrar diálogo para elegir entre cámara y galería
+      final ImageSource? source = await _showImageSourceDialog();
+      if (source == null) return;
+
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        if (kIsWeb) {
+          // En web, leemos los bytes de la imagen
+          final bytes = await image.readAsBytes();
+          setState(() {
+            _selectedImageBytes = bytes;
+            _selectedImage = null;
+          });
+        } else {
+          // En móvil, usamos File
+          setState(() {
+            _selectedImage = File(image.path);
+            _selectedImageBytes = null;
+          });
+        }
+
+        // Llamar al callback si existe
+        if (widget.onImageSelected != null) {
+          widget.onImageSelected!(image.path);
+        }
+      }
+    } catch (e) {
+      // Mostrar error al usuario
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al seleccionar imagen: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<ImageSource?> _showImageSourceDialog() async {
+    return showDialog<ImageSource>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Seleccionar imagen'),
+          content: const Text('¿De dónde quieres obtener la imagen?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(ImageSource.camera),
+              child: const Text('Cámara'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(ImageSource.gallery),
+              child: const Text('Galería'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,54 +180,66 @@ class ProfileScreen extends StatelessWidget {
   Widget _buildProfileImage(bool isWeb, bool isTablet) {
     final imageSize = isWeb ? 150.0 : (isTablet ? 140.0 : 130.0);
 
-    return Container(
-      width: imageSize,
-      height: imageSize,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF52178F),
-            Color(0xFFA88BC7),
-          ],
-          begin: Alignment(1.00, 1.00),
-          end: Alignment(1.00, 0.50),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF8A67C8).withOpacity(0.3),
-            blurRadius: isWeb ? 25 : 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
+    return GestureDetector(
+      onTap: _pickImage,
       child: Container(
-        margin: const EdgeInsets.all(8),
-        decoration: const BoxDecoration(
+        width: imageSize,
+        height: imageSize,
+        decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white,
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF52178F),
+              Color(0xFFA88BC7),
+            ],
+            begin: Alignment(1.00, 1.00),
+            end: Alignment(1.00, 0.50),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF8A67C8).withOpacity(0.3),
+              blurRadius: isWeb ? 25 : 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
         ),
-        child: CircleAvatar(
-          radius: (imageSize - 16) / 2,
-          backgroundColor: Colors.transparent,
-          backgroundImage: profileData?.profileImage != null
-              ? NetworkImage(profileData!.profileImage!)
-              : null,
-          child: profileData?.profileImage == null
-              ? Icon(
-            Icons.person,
-            size: isWeb ? 60 : (isTablet ? 55 : 50),
-            color: const Color(0xFF4320AD),
-          )
-              : null,
+        child: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white,
+          ),
+          child: CircleAvatar(
+            radius: (imageSize - 16) / 2,
+            backgroundColor: Colors.transparent,
+            backgroundImage: _getImageProvider(),
+            child: _getImageProvider() == null
+                ? Icon(
+              Icons.person,
+              size: isWeb ? 60 : (isTablet ? 55 : 50),
+              color: const Color(0xFF4320AD),
+            )
+                : null,
+          ),
         ),
       ),
     );
   }
 
+  ImageProvider? _getImageProvider() {
+    if (kIsWeb && _selectedImageBytes != null) {
+      return MemoryImage(_selectedImageBytes!);
+    } else if (!kIsWeb && _selectedImage != null) {
+      return FileImage(_selectedImage!);
+    } else if (widget.profileData?.profileImage != null) {
+      return NetworkImage(widget.profileData!.profileImage!);
+    }
+    return null;
+  }
+
   Widget _buildUserName(bool isWeb, bool isTablet) {
     return Text(
-      "${profileData?.nombres ?? 'Usuario'} ${profileData?.apellidos ?? ''}",
+      "${widget.profileData?.nombres ?? 'Usuario'} ${widget.profileData?.apellidos ?? ''}",
       textAlign: TextAlign.center,
       style: TextStyle(
         color: const Color(0xFF212121),
@@ -173,7 +270,7 @@ class ProfileScreen extends StatelessWidget {
                 Expanded(child: _buildInfoCard(
                     icon: Icons.email_outlined,
                     title: 'ID',
-                    value: profileData?.email.split('@')[0] ?? 'No disponible',
+                    value: widget.profileData?.email.split('@')[0] ?? 'No disponible',
                     isWeb: isWeb,
                     isTablet: isTablet
                 )),
@@ -197,7 +294,7 @@ class ProfileScreen extends StatelessWidget {
                 Expanded(child: _buildInfoCard(
                     icon: Icons.business_outlined,
                     title: 'Centro',
-                    value: profileData?.nombreEmpresa ?? 'No disponible',
+                    value: widget.profileData?.nombreEmpresa ?? 'No disponible',
                     isWeb: isWeb,
                     isTablet: isTablet
                 )),
@@ -213,7 +310,7 @@ class ProfileScreen extends StatelessWidget {
                       child: _buildInfoCard(
                         icon: Icons.email_outlined,
                         title: 'ID',
-                        value: profileData?.email.split('@')[0] ?? 'No disponible',
+                        value: widget.profileData?.email.split('@')[0] ?? 'No disponible',
                         isWeb: isWeb,
                         isTablet: isTablet,
                       ),
@@ -247,7 +344,7 @@ class ProfileScreen extends StatelessWidget {
                       child: _buildInfoCard(
                         icon: Icons.business_outlined,
                         title: 'Centro',
-                        value: profileData?.nombreEmpresa ?? 'No disponible',
+                        value: widget.profileData?.nombreEmpresa ?? 'No disponible',
                         isWeb: isWeb,
                         isTablet: isTablet,
                       ),
@@ -350,7 +447,7 @@ class ProfileScreen extends StatelessWidget {
       ),
       margin: EdgeInsets.symmetric(horizontal: horizontalMargin),
       child: ElevatedButton(
-        onPressed: () => onLogout(),
+        onPressed: () => widget.onLogout(),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: const Color(0xFF6D4BD8),
