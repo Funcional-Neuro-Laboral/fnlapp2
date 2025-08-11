@@ -112,7 +112,7 @@ class _ChatMessageState extends State<ChatMessage> {
     if (lastMatchEnd < text.length) {
       spans.add(TextSpan(
         text: text.substring(lastMatchEnd),
-        style: TextStyle(color: widget.userType != 1 ? Colors.black : Colors.black),
+        style: TextStyle(color: widget.userType != 1 ? Colors.white : Colors.black),
       ));
     }
 
@@ -137,7 +137,7 @@ class _ChatMessageState extends State<ChatMessage> {
                   backgroundColor: Colors.transparent,
                   child: ClipOval(
                     child: Image.network(
-                      'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/logo_funcy_scale.png',
+                      'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_chat.jpg',
                       width: 40,
                       height: 40,
                       fit: BoxFit.cover,
@@ -151,7 +151,7 @@ class _ChatMessageState extends State<ChatMessage> {
                     margin: EdgeInsets.only(right: 80.0),
                     padding: EdgeInsets.all(10.0),
                     decoration: BoxDecoration(
-                      color: Color(0xFFF0EEF1),
+                      color: Color(0xFFEAE5F9),
                       borderRadius: BorderRadius.circular(10.0),
                       boxShadow: [
                         BoxShadow(
@@ -245,7 +245,7 @@ class _ChatMessageState extends State<ChatMessage> {
               ),
               padding: EdgeInsets.all(10.0),
               decoration: BoxDecoration(
-                color: Color(0xFFDCD4F6),
+                color: Color(0xFF8A6FE0),
                 borderRadius: BorderRadius.circular(10.0),
               ),
               child: Column(

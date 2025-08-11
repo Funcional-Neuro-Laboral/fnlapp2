@@ -187,8 +187,8 @@ class ProfileScreen extends StatelessWidget {
                 )),
                 SizedBox(width: cardSpacing),
                 Expanded(child: _buildInfoCard(
-                    icon: Icons.calendar_month_outlined,
-                    title: 'Edad',
+                    icon: Icons.person,
+                    title: 'Puesto',
                     value: '--',
                     isWeb: isWeb,
                     isTablet: isTablet
@@ -235,8 +235,8 @@ class ProfileScreen extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _buildInfoCard(
-                        icon: Icons.calendar_month_outlined,
-                        title: 'Edad',
+                        icon: Icons.person,
+                        title: 'Puesto',
                         value: '--',
                         isWeb: isWeb,
                         isTablet: isTablet,
