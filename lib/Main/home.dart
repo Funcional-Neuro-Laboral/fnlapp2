@@ -227,9 +227,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color.fromARGB(255, 237, 221, 255),
+      backgroundColor: Color(0xFF5027D0),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(
+              color: Colors.white,
+            ),
+          )
           : Stack(
         children: [
           Positioned.fill(child: _getSelectedWidget()),

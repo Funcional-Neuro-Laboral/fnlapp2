@@ -29,3 +29,5 @@ class SplashScreen extends StatelessWidget {
     );
   }
 }
+
+//SPLASH SCREEN INNECESARIO, Solo relentiza la navegación del usuario

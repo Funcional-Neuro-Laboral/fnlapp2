@@ -158,7 +158,7 @@ class _FinalStepScreenState extends State<FinalStepScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 80),
                         _buildHeaderText(),
                         const SizedBox(height: 40),
                         _buildRatingSection(),
