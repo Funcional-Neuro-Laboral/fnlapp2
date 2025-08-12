@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../Main/recuperarcontra.dart';
 import '../config.dart'; // Importa el archivo de configuración
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -316,7 +317,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ),
                                         GestureDetector(
                                           onTap: () {
-                                            // Acción para olvidé mi contraseña
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => ForgotPasswordScreen(),
+                                              ),
+                                            );
                                           },
                                           child: Text(
                                             'Olvidé mi contraseña',
