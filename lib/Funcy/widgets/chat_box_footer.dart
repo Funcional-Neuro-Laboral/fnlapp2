@@ -12,7 +12,6 @@ class ChatBoxFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Color(0xFFF6F6F6),
       padding: EdgeInsets.all(16.0),
       child: Row(
         children: [
@@ -22,8 +21,9 @@ class ChatBoxFooter extends StatelessWidget {
               height: 44,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: ShapeDecoration(
-                color: const Color(0xFFEAE6FA),
+                color: const Color(0xFFF8F7FD),
                 shape: RoundedRectangleBorder(
+                  side: BorderSide(width: 1, color: Colors.black),
                   borderRadius: BorderRadius.circular(20),
                 ),
               ),

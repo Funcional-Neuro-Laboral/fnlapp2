@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fnlapp/SharedPreferences/sharedpreference.dart';
 import 'dart:math' as math;
+import '../../Funcy/screens/chat_screen.dart';
 
 class ChatWidget extends StatelessWidget {
   final int userId;
@@ -256,7 +257,7 @@ class ChatWidget extends StatelessWidget {
       await _updateFuncyInteract();
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => SplashScreen(userId: userId)),
+        MaterialPageRoute(builder: (context) => ChatScreen(userId: userId)),
       );
     } else {
       print("Error: userId no definido");

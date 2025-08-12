@@ -1,884 +1,575 @@
 import 'package:flutter/material.dart';
 import 'package:fnlapp/Util/enums.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'dart:convert'; // Importa esta librería para usar json.decode
+import 'dart:convert';
 import 'package:fnlapp/Main/step_screen.dart';
 import 'package:intl/intl.dart';
+
+// Constantes
+class AppConstants {
+  static const int totalPrograms = 21;
+  static const int percentageMultiplier = 1000;
+  static const int percentageDivider = 10;
+  static const double cardImageHeight = 150.0;
+  static const double cardBorderRadius = 12.0;
+  static const double progressBarHeight = 12.0;
+}
+
+// Colores del tema
+class AppColors {
+  static const Color primary = Color(0xFF6F3EA2);
+  static const Color secondary = Color(0xFF8A6FE0);
+  static const Color background = Color(0xFFF6F6F6);
+  static const Color textPrimary = Color(0xFF212121);
+  static const Color textSecondary = Color(0xFF4A4A4A);
+  static const Color cardBackground = Colors.white;
+  static const Color lockedBackground = Color(0xFFFFFFFF);
+  static const Color badgeBackground = Color(0xFFDCD4F6);
+  static const Color badgeText = Color(0xFF10082A);
+  static const Color progressBackground = Color(0xFFEFEFEF);
+  static const Color progressGradientStart = Color(0xFFDCD4F6);
+  static const Color progressGradientEnd = Color(0xFF8A6FE0);
+}
+
+// Modelo de datos
+class Programa {
+  final String? startDate;
+  final String? completedDate;
+  final String nombreTecnica;
+  final String? descripcion;
+  final String? urlImg;
+  final int dia;
+  final int userId;
+  final int id;
+  final dynamic guia;
+
+  Programa({
+    this.startDate,
+    this.completedDate,
+    required this.nombreTecnica,
+    this.descripcion,
+    this.urlImg,
+    required this.dia,
+    required this.userId,
+    required this.id,
+    this.guia,
+  });
+
+  factory Programa.fromMap(Map<String, dynamic> map) {
+    return Programa(
+      startDate: map['start_date'],
+      completedDate: map['completed_date'],
+      nombreTecnica: map['nombre_tecnica'] ?? 'Sin nombre',
+      descripcion: map['descripcion'],
+      urlImg: map['url_img'],
+      dia: int.tryParse(map['dia'].toString()) ?? 0,
+      userId: int.tryParse(map['user_id'].toString()) ?? 0,
+      id: int.tryParse(map['id'].toString()) ?? 0,
+      guia: map['guia'],
+    );
+  }
+
+  bool get isUnlocked {
+    if (startDate != null) {
+      DateTime temp = DateTime.parse(startDate!).toLocal();
+      DateTime date = DateTime(temp.year, temp.month, temp.day);
+      return DateTime.now().isAfter(date);
+    }
+    return false;
+  }
+
+  List<String> get parsedSteps {
+    try {
+      if (guia is String) {
+        return List<String>.from(json.decode(guia));
+      } else if (guia is List) {
+        return List<String>.from(guia);
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error parsing steps: $e');
+      return [];
+    }
+  }
+
+  String get formattedStartDate {
+    if (startDate == null) return '';
+    return DateFormat('dd/MM/yyyy').format(DateTime.parse(startDate!).toLocal());
+  }
+}
 
 class PlanScreen extends StatelessWidget {
   final NivelEstres nivelEstres;
   final bool isLoading;
   final List<dynamic> programas;
 
-  PlanScreen(
-      {required this.nivelEstres,
-      required this.isLoading,
-      required this.programas});
+  const PlanScreen({
+    Key? key,
+    required this.nivelEstres,
+    required this.isLoading,
+    required this.programas,
+  }) : super(key: key);
 
-  bool isProgramUnlocked(dynamic programa) {
-    if (programa['start_date'] != null) {
-      DateTime temp = DateTime.parse(programa['start_date']).toLocal();
-      DateTime date = DateTime(temp.year, temp.month, temp.day);
-      bool isRightDay = DateTime.now().isAfter(date);
-      return isRightDay;
-    } else {
-      return false;
-    }
-
-    //return true;
+  List<Programa> get _parsedProgramas {
+    return programas
+        .where((p) => p['nombre_tecnica'] != null && p['nombre_tecnica'].isNotEmpty)
+        .map((p) => Programa.fromMap(p))
+        .toList();
   }
 
-  double getProgramPercentage() {
-    if (programas.isEmpty) {
-      return 0;
-    }
-    return (programas.where((x) => x['completed_date'] != null).length /
-                21 *
-                1000)
-            .round() /
-        10;
+  double get _progressPercentage {
+    if (programas.isEmpty) return 0;
+
+    final completedCount = programas
+        .where((x) => x['completed_date'] != null)
+        .length;
+
+    return ((completedCount / AppConstants.totalPrograms *
+        AppConstants.percentageMultiplier).round() /
+        AppConstants.percentageDivider);
   }
 
-  Expanded buildProgramView(dynamic programa, BuildContext context,
-      Color backgroundColor, Color textColor) {
-    if (isProgramUnlocked(programa)) {
-      return Expanded(
-        child: Container(
-          width: 350,
-          margin: EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-          padding: EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 255, 255, 255),
-            borderRadius: BorderRadius.circular(12.0),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.3),
-                spreadRadius: 2,
-                blurRadius: 6,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                programa['nombre_tecnica'] ?? 'Sin nombre',
-                style: GoogleFonts.poppins(
-                    fontSize: 16.0,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black),
-              ),
-              SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Flexible(
-                    child: Text(
-                      programa['descripcion'] ?? '',
-                      style: GoogleFonts.poppins(
-                          fontSize: 14.0, color: Colors.black87),
-                    ),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 130.0),
+            child: SingleChildScrollView(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20.0,
+                      vertical: 20.0
                   ),
-                  GestureDetector(
-                    onTap: () {
-                      dynamic stepsData = programa['guia'];
-                      List<dynamic> steps;
-
-                      if (stepsData is String) {
-                        steps = json.decode(stepsData);
-                      } else {
-                        steps = stepsData;
-                      }
-
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => StepScreen(
-                            steps: List<String>.from(steps),
-                            tecnicaNombre: programa['nombre_tecnica'],
-                            dia: int.tryParse(programa['dia'].toString()) ?? 0,
-                            userId: int.tryParse(programa['user_id'].toString()) ?? 0,
-                            tecnicaId: int.tryParse(programa['id'].toString()) ?? 0,
-                            url_img: programa['url_img'],
-                          ),
-                        ),
-                      );
-                    },
-                    child: CircleAvatar(
-                      backgroundColor: Color.fromARGB(255, 237, 221, 255),
-                      radius: 24,
-                      child: Icon(
-                        Icons.play_arrow,
-                        size: 28,
-                        color: Color.fromARGB(255, 75, 21, 141),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 12),
-              Row(
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      CircleAvatar(
-                        backgroundColor: Color.fromARGB(255, 240, 240, 240),
-                        radius: 15,
-                        child: Icon(Icons.headset,
-                            color: Color.fromARGB(255, 103, 21, 141), size: 18),
-                      ),
-                      Positioned(
-                        top: -4,
-                        right: -4,
-                        child: CircleAvatar(
-                          backgroundColor: Colors.green,
-                          radius: 8,
-                          child:
-                          Icon(Icons.check, color: Colors.white, size: 9),
-                        ),
-                      ),
+                      _buildHeader(),
+                      const SizedBox(height: 40),
+                      _buildProgressSection(context),
+                      const SizedBox(height: 20),
+                      _buildContent(context),
                     ],
                   ),
-                  SizedBox(width: 6),
-                  Flexible(
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-                      decoration: BoxDecoration(
-                        color: backgroundColor,
-                        borderRadius: BorderRadius.circular(20.0),
-                      ),
-                      child: Text(
-                        programa['tipo_tecnica'],
-                        style: GoogleFonts.poppins(
-                          fontSize: 12.0,
-                          fontWeight: FontWeight.w400,
-                          color: textColor,
-                        ),
-                        maxLines: 2, // Si el texto es largo, se ajusta en dos líneas como máximo
-                        overflow: TextOverflow.ellipsis, // Si sigue siendo largo, muestra "..."
-                        textAlign: TextAlign.center, // Centra el texto dentro del cuadro
-                      ),
-                    ),
-                  ),
-
-                ],
-              ),
-            ],
-          ),
-        ),
-      );
-    } else {
-      return Expanded(
-        child: Container(
-          width: 350,
-          margin: EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-          padding: EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            color: const Color(0xFF6e848e),
-            borderRadius: BorderRadius.circular(12.0),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.3),
-                spreadRadius: 2,
-                blurRadius: 6,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                programa['nombre_tecnica'] ?? 'Sin nombre',
-                style: GoogleFonts.poppins(
-                    fontSize: 16.0,
-                    fontWeight: FontWeight.bold,
-                    color: const Color.fromARGB(255, 255, 255, 255)),
-              ),
-              SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Flexible(
-                    child: Text(
-                      programa['start_date'] == null
-                          ? 'Esta lección se desbloqueará al día siguiente de haber completado la anterior.'
-                          : 'Esta lección se desbloqueará el ${DateFormat('dd/MM/yyyy').format(DateTime.parse(programa['start_date']).toLocal())}',
-                      style: GoogleFonts.poppins(
-                          fontSize: 14.0,
-                          color: const Color.fromARGB(255, 255, 255, 255)),
-                    ),
-                  ),
-                  CircleAvatar(
-                    backgroundColor: Color.fromARGB(255, 255, 255, 255),
-                    radius: 24,
-                    child: Icon(
-                        programa['start_date'] == null
-                            ? Icons.lock
-                            : Icons.lock_clock_rounded,
-                        size: 28,
-                        color: const Color(0xFF6e848e)),
-                  )
-                ],
-              ),
-              SizedBox(height: 12),
-            ],
-          ),
-        ),
-      );
-    }
-  }
-
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    backgroundColor: const Color(0xFFF6F6F6),
-    body: Stack(
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 130.0),
-          child: SingleChildScrollView(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Título principal
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Mi Plan Diario',
-                        style: TextStyle(
-                          color: const Color(0xFF212121),
-                          fontSize: 32,
-                          fontFamily: 'Inter',
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 40),
-
-                    // Sección de progreso
-                    if (!isLoading && programas.length > 0)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Header del progreso y porcentaje
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  "Tu progreso",
-                                  style: TextStyle(
-                                    color: const Color(0xFF212121),
-                                    fontSize: 18,
-                                    fontFamily: 'Inter',
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                Text(
-                                  "${getProgramPercentage()}%",
-                                  style: TextStyle(
-                                    color: const Color(0xFF6F3EA2),
-                                    fontSize: 16,
-                                    fontFamily: 'Inter',
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(height: 16),
-
-                          // Barra de progreso
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                            child: Container(
-                              width: double.infinity,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(20),
-                                color: const Color(0xFFEFEFEF),
-                              ),
-                              child: Stack(
-                                children: [
-                                  // Fondo de la barra
-                                  Container(
-                                    width: double.infinity,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(20),
-                                      color: const Color(0xFFEFEFEF),
-                                    ),
-                                  ),
-                                  // Progreso
-                                  FractionallySizedBox(
-                                    widthFactor: getProgramPercentage() / 100,
-                                    child: Container(
-                                      height: 12,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(20),
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            const Color(0xFFDCD4F6),
-                                            const Color(0xFF8A6FE0)
-                                          ],
-                                          begin: Alignment.centerLeft,
-                                          end: Alignment.centerRight,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      SizedBox(),
-
-                    SizedBox(height: 20),
-
-                    // Contenido de programas
-                    if (isLoading)
-                      CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Color(0xFF3F0071),
-                        ),
-                      )
-                    else if (programas.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 20.0),
-                        child: Text(
-                          'No hay programas disponibles',
-                          style: GoogleFonts.poppins(
-                              fontSize: 16.0, color: Color(0xFF4A4A4A)),
-                        ),
-                      )
-                    else
-                      Column(
-                        children: programas
-                            .map((programa) => Padding(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 10.0),
-                          child:
-                          _buildProgramaWidget(programa, context),
-                        ))
-                            .toList(),
-                      ),
-                  ],
                 ),
               ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
-
-  /*Expanded buildProgramView(dynamic programa, BuildContext context,
-      Color backgroundColor, Color textColor) {
-    if (isProgramUnlocked(programa)) {
-      return Expanded(
-        child: Container(
-          width: 350,
-          margin: EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-          padding: EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 255, 255, 255),
-            borderRadius: BorderRadius.circular(12.0),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.3),
-                spreadRadius: 2,
-                blurRadius: 6,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                programa['nombre_tecnica'] ?? 'Sin nombre',
-                style: GoogleFonts.poppins(
-                    fontSize: 16.0,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black),
-              ),
-              SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Flexible(
-                    child: Text(
-                      programa['descripcion'] ?? '',
-                      style: GoogleFonts.poppins(
-                          fontSize: 14.0, color: Colors.black87),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      dynamic stepsData = programa['guia'];
-                      List<dynamic> steps;
-
-                      if (stepsData is String) {
-                        steps = json.decode(stepsData);
-                      } else {
-                        steps = stepsData;
-                      }
-
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => StepScreen(
-                            steps: List<String>.from(steps),
-                            tecnicaNombre: programa['nombre_tecnica'],
-                            dia: int.tryParse(programa['dia'].toString()) ?? 0,
-                            userId: int.tryParse(programa['user_id'].toString()) ?? 0,
-                            tecnicaId: int.tryParse(programa['id'].toString()) ?? 0,
-                            url_img: programa['url_img'],
-                          ),
-                        ),
-                      );
-                    },
-                    child: CircleAvatar(
-                      backgroundColor: Color.fromARGB(255, 237, 221, 255),
-                      radius: 24,
-                      child: Icon(
-                        Icons.play_arrow,
-                        size: 28,
-                        color: Color.fromARGB(255, 75, 21, 141),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 12),
-              Row(
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: Color.fromARGB(255, 240, 240, 240),
-                        radius: 15,
-                        child: Icon(Icons.headset,
-                            color: Color.fromARGB(255, 103, 21, 141), size: 18),
-                      ),
-                      Positioned(
-                        top: -4,
-                        right: -4,
-                        child: CircleAvatar(
-                          backgroundColor: Colors.green,
-                          radius: 8,
-                          child:
-                              Icon(Icons.check, color: Colors.white, size: 9),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(width: 6),
-                  Flexible(
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-                      decoration: BoxDecoration(
-                        color: backgroundColor,
-                        borderRadius: BorderRadius.circular(20.0),
-                      ),
-                      child: Text(
-                        programa['tipo_tecnica'],
-                        style: GoogleFonts.poppins(
-                          fontSize: 12.0,
-                          fontWeight: FontWeight.w400,
-                          color: textColor,
-                        ),
-                        maxLines: 2, // Si el texto es largo, se ajusta en dos líneas como máximo
-                        overflow: TextOverflow.ellipsis, // Si sigue siendo largo, muestra "..."
-                        textAlign: TextAlign.center, // Centra el texto dentro del cuadro
-                      ),
-                    ),
-                  ),
-
-                ],
-              ),
-            ],
-          ),
-        ),
-      );
-    } else {
-      return Expanded(
-        child: Container(
-          width: 350,
-          margin: EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-          padding: EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            color: const Color(0xFF6e848e),
-            borderRadius: BorderRadius.circular(12.0),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.3),
-                spreadRadius: 2,
-                blurRadius: 6,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                programa['nombre_tecnica'] ?? 'Sin nombre',
-                style: GoogleFonts.poppins(
-                    fontSize: 16.0,
-                    fontWeight: FontWeight.bold,
-                    color: const Color.fromARGB(255, 255, 255, 255)),
-              ),
-              SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Flexible(
-                    child: Text(
-                      programa['start_date'] == null
-                          ? 'Esta lección se desbloqueará al día siguiente de haber completado la anterior.'
-                          : 'Esta lección se desbloqueará el ${DateFormat('dd/MM/yyyy').format(DateTime.parse(programa['start_date']).toLocal())}',
-                      style: GoogleFonts.poppins(
-                          fontSize: 14.0,
-                          color: const Color.fromARGB(255, 255, 255, 255)),
-                    ),
-                  ),
-                  CircleAvatar(
-                    backgroundColor: Color.fromARGB(255, 255, 255, 255),
-                    radius: 24,
-                    child: Icon(
-                        programa['start_date'] == null
-                            ? Icons.lock
-                            : Icons.lock_clock_rounded,
-                        size: 28,
-                        color: const Color(0xFF6e848e)),
-                  )
-                ],
-              ),
-              SizedBox(height: 12),
-            ],
-          ),
-        ),
-      );
-    }
+        ],
+      ),
+    );
   }
 
-  @override
-    Widget build(BuildContext context) {
-      return Scaffold(
-        backgroundColor: Color.fromARGB(255, 237, 221, 255),
-        body: Stack(
+  Widget _buildHeader() {
+    return const Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        'Mi Plan Diario',
+        style: TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 32,
+          fontFamily: 'Inter',
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressSection(BuildContext context) {
+    if (isLoading || programas.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildProgressHeader(),
+        const SizedBox(height: 16),
+        _buildProgressBar(context),
+      ],
+    );
+  }
+
+  Widget _buildProgressHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            "Tu progreso",
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 18,
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Text(
+            "${_progressPercentage}%",
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontSize: 16,
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressBar(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Container(
+        width: double.infinity,
+        height: AppConstants.progressBarHeight,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          color: AppColors.progressBackground,
+        ),
+        child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 130.0),
-              child: SingleChildScrollView(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Mi plan diario',
-                          style: GoogleFonts.poppins(
-                              fontSize: 28.0,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF3F0071)),
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Nivel de estrés: ',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 18.0,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF4A4A4A)),
-                            ),
-                            Text(
-                              isLoading
-                                  ? "Cargando..."
-                                  : nivelEstres.name.toUpperCase(),
-                              style: GoogleFonts.poppins(
-                                  fontSize: 18.0,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF3F0071)),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 30),
-                        // Progreso mejorado con diseño minimalista
-                        if (!isLoading && programas.length > 0)
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                "Progreso del plan",
-                                style: GoogleFonts.poppins(
-                                    fontSize: 18.0,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF3F0071)),
-                              ),
-                              SizedBox(height: 10),
-                              // Barra de progreso personalizada
-                              Stack(
-                                children: [
-                                  Container(
-                                    width: 300,
-                                    height: 20,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(10),
-                                      color: Colors.white, // Fondo blanco
-                                    ),
-                                  ),
-                                  Container(
-                                    width: (300 * getProgramPercentage() / 100)
-                                        .clamp(0, 300),
-                                    height: 20,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(10),
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Color(0xFF3F0071),
-                                          Color(0xFF7C47FF),
-                                        ],
-                                        begin: Alignment.centerLeft,
-                                        end: Alignment.centerRight,
-                                      ),
-                                    ),
-                                  ),
-                                  Positioned.fill(
-                                    child: Center(
-                                      child: Text(
-                                        "${getProgramPercentage()}%",
-                                        style: GoogleFonts.poppins(
-                                            fontSize: 14.0,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF3F0071)),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          )
-                        else
-                          SizedBox(),
-                        SizedBox(height: 20),
-                        if (isLoading)
-                          CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Color(0xFF3F0071),
-                            ),
-                          )
-                        else if (programas.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 20.0),
-                            child: Text(
-                              'No hay programas disponibles',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 16.0, color: Color(0xFF4A4A4A)),
-                            ),
-                          )
-                        else
-                          Column(
-                            children: programas
-                                .map((programa) => Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 10.0),
-                                      child:
-                                          _buildProgramaWidget(programa, context),
-                                    ))
-                                .toList(),
-                          ),
-                      ],
-                    ),
+            Container(
+              width: double.infinity,
+              height: AppConstants.progressBarHeight,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                color: AppColors.progressBackground,
+              ),
+            ),
+            FractionallySizedBox(
+              widthFactor: _progressPercentage / 100,
+              child: Container(
+                height: AppConstants.progressBarHeight,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: const LinearGradient(
+                    colors: [
+                      AppColors.progressGradientStart,
+                      AppColors.progressGradientEnd,
+                    ],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
                   ),
                 ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    if (isLoading) {
+      return const CircularProgressIndicator(
+        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
       );
-    }*/
-
-  Widget _buildProgramaWidget(dynamic programa, BuildContext context) {
-    print('Contenido de programa: ${jsonEncode(programa)}');
-    // Verifica que 'tecnica' no sea null
-    if (programa['nombre_tecnica'] == null ||
-        programa['nombre_tecnica'].isEmpty) {
-      return Container(); // O muestra un widget de error/placeholder
     }
 
-    // Añadir logs para depurar
-    print('Programa ID: ${programa['id']}');
-    print('Técnica: ${programa['nombre_tecnica']}');
-
-    Color backgroundColor;
-    Color textColor;
-
-    bool isUnlocked = isProgramUnlocked(programa);
-
-    // Establecer colores dependiendo del tipo de terapia
-    if (programa['dia'] >= 1 && programa['dia'] <= 4) {
-      backgroundColor = Color.fromARGB(255, 206, 252, 255); // Azul claro
-      textColor = Color(0xFF44DEE8); // Azul para el texto
-    } else if (programa['dia'] >= 5 && programa['dia'] <= 7) {
-      backgroundColor = Color.fromARGB(255, 240, 230, 255); // Lavanda claro
-      textColor = Color(0xFF9C27B0); // Morado para el texto
-    } else if (programa['dia'] >= 8 && programa['dia'] <= 10) {
-      backgroundColor = Color.fromARGB(255, 255, 220, 240); // Rosado claro
-      textColor = Color(0xFFFF44B5); // Rosado para el texto
-    } else if (programa['dia'] >= 11 && programa['dia'] <= 13) {
-      backgroundColor = Color.fromARGB(255, 255, 200, 240); // Rosa más suave
-      textColor = Color(0xFFFF80AB); // Rosa intenso para el texto
-    } else if (programa['dia'] >= 14 && programa['dia'] <= 16) {
-      backgroundColor = Color.fromARGB(255, 255, 235, 205); // Naranja claro
-      textColor = Color(0xFFFFA500); // Naranja para el texto
-    } else if (programa['dia'] >= 17 && programa['dia'] <= 19) {
-      backgroundColor = Color.fromARGB(255, 255, 235, 175); // Amarillo suave
-      textColor = Color(0xFFFFC107); // Amarillo para el texto
-    } else if (programa['dia'] >= 20 && programa['dia'] <= 21) {
-      backgroundColor = Color.fromARGB(255, 255, 180, 180); // Coral suave
-      textColor = Color(0xFFFF5722); // Naranja quemado para el texto
-    } else {
-      // Para cualquier día fuera del rango de 1 a 21, asignamos un color por defecto
-      backgroundColor =
-          Color.fromARGB(255, 206, 252, 255); // Azul claro por defecto
-      textColor = Color(0xFF44DEE8); // Azul para el texto
+    if (programas.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20.0),
+        child: Text(
+          'No hay programas disponibles',
+          style: GoogleFonts.poppins(
+            fontSize: 16.0,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      );
     }
+
+    return _buildProgramsList(context);
+  }
+
+  Widget _buildProgramsList(BuildContext context) {
+    final parsedProgramas = _parsedProgramas;
+
+    return Column(
+      children: parsedProgramas
+          .map((programa) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4.0),
+        child: _buildProgramCard(programa, context),
+      ))
+          .toList(),
+    );
+  }
+
+  Widget _buildProgramCard(Programa programa, BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final cardWidth = screenWidth * 0.9;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 55,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      child: programa.isUnlocked
+          ? _buildUnlockedCard(programa, context, cardWidth)
+          : _buildLockedCard(programa, context, cardWidth),
+    );
+  }
+
+  Widget _buildUnlockedCard(Programa programa, BuildContext context, double cardWidth) {
+    return GestureDetector(
+      onTap: () => _navigateToStepScreen(programa, context),
+      child: Container(
+        width: cardWidth,
+        margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 3.0),
+        decoration: _buildCardDecoration(),
+        child: Stack(
+          children: [
+            Column(
               children: [
-                Text(
-                  'Día',
-                  style: GoogleFonts.poppins(
-                      fontSize: 14.0,
-                      fontWeight: FontWeight.w400,
-                      color: Colors.black),
-                ),
-                Text(
-                  programa['dia'].toString().padLeft(2, '0'),
-                  style: GoogleFonts.poppins(
-                      fontSize: 34.0,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black),
-                ),
-                Container(
-                  height: 40,
-                  width: 3,
-                  color: const Color.fromARGB(255, 255, 255, 255),
-                ),
+                _buildCardImage(programa, true),
+                _buildCardContent(programa, true),
               ],
             ),
-          ),
-          SizedBox(width: 16),
-          buildProgramView(programa, context, backgroundColor, textColor)
+            _buildDayBadge(programa),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLockedCard(Programa programa, BuildContext context, double cardWidth) {
+    return Container(
+      width: cardWidth,
+      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 3.0),
+      decoration: _buildCardDecoration(),
+      child: Column(
+        children: [
+          _buildCardImage(programa, false),
+          _buildCardContent(programa, false),
         ],
       ),
     );
   }
 
-  /*Widget _buildProgramaWidget(dynamic programa, BuildContext context) {
-    print('Contenido de programa: ${jsonEncode(programa)}');
-    // Verifica que 'tecnica' no sea null
-    if (programa['nombre_tecnica'] == null ||
-        programa['nombre_tecnica'].isEmpty) {
-      return Container(); // O muestra un widget de error/placeholder
-    }
+  BoxDecoration _buildCardDecoration() {
+    return BoxDecoration(
+      borderRadius: BorderRadius.circular(AppConstants.cardBorderRadius),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.3),
+          spreadRadius: 2,
+          blurRadius: 6,
+          offset: const Offset(0, 3),
+        ),
+      ],
+    );
+  }
 
-    // Añadir logs para depurar
-    print('Programa ID: ${programa['id']}');
-    print('Técnica: ${programa['nombre_tecnica']}');
+  Widget _buildCardImage(Programa programa, bool isUnlocked) {
 
-    Color backgroundColor;
-    Color textColor;
+    const String lockedImageUrl = 'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/imagen_bloqueada.png'; // Imagen de bloqueo
 
-    // Establecer colores dependiendo del tipo de terapia
-    if (programa['dia'] >= 1 && programa['dia'] <= 4) {
-      backgroundColor = Color.fromARGB(255, 206, 252, 255); // Azul claro
-      textColor = Color(0xFF44DEE8); // Azul para el texto
-    } else if (programa['dia'] >= 5 && programa['dia'] <= 7) {
-      backgroundColor = Color.fromARGB(255, 240, 230, 255); // Lavanda claro
-      textColor = Color(0xFF9C27B0); // Morado para el texto
-    } else if (programa['dia'] >= 8 && programa['dia'] <= 10) {
-      backgroundColor = Color.fromARGB(255, 255, 220, 240); // Rosado claro
-      textColor = Color(0xFFFF44B5); // Rosado para el texto
-    } else if (programa['dia'] >= 11 && programa['dia'] <= 13) {
-      backgroundColor = Color.fromARGB(255, 255, 200, 240); // Rosa más suave
-      textColor = Color(0xFFFF80AB); // Rosa intenso para el texto
-    } else if (programa['dia'] >= 14 && programa['dia'] <= 16) {
-      backgroundColor = Color.fromARGB(255, 255, 235, 205); // Naranja claro
-      textColor = Color(0xFFFFA500); // Naranja para el texto
-    } else if (programa['dia'] >= 17 && programa['dia'] <= 19) {
-      backgroundColor = Color.fromARGB(255, 255, 235, 175); // Amarillo suave
-      textColor = Color(0xFFFFC107); // Amarillo para el texto
-    } else if (programa['dia'] >= 20 && programa['dia'] <= 21) {
-      backgroundColor = Color.fromARGB(255, 255, 180, 180); // Coral suave
-      textColor = Color(0xFFFF5722); // Naranja quemado para el texto
-    } else {
-      // Para cualquier día fuera del rango de 1 a 21, asignamos un color por defecto
-      backgroundColor =
-          Color.fromARGB(255, 206, 252, 255); // Azul claro por defecto
-      textColor = Color(0xFF44DEE8); // Azul para el texto
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 55,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(
-                  'Día',
-                  style: GoogleFonts.poppins(
-                      fontSize: 14.0,
-                      fontWeight: FontWeight.w400,
-                      color: Colors.black),
-                ),
-                Text(
-                  programa['dia'].toString().padLeft(2, '0'),
-                  style: GoogleFonts.poppins(
-                      fontSize: 34.0,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black),
-                ),
-                Container(
-                  height: 40,
-                  width: 3,
-                  color: const Color.fromARGB(255, 255, 255, 255),
-                ),
-              ],
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(AppConstants.cardBorderRadius),
+        topRight: Radius.circular(AppConstants.cardBorderRadius),
+      ),
+      child: Image.network(
+        isUnlocked ? (programa.urlImg ?? '') : lockedImageUrl,
+        width: double.infinity,
+        height: AppConstants.cardImageHeight,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            width: double.infinity,
+            height: AppConstants.cardImageHeight,
+            decoration: BoxDecoration(
+              color: isUnlocked ? Colors.grey[300] : Colors.grey[600],
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(AppConstants.cardBorderRadius),
+                topRight: Radius.circular(AppConstants.cardBorderRadius),
+              ),
             ),
-          ),
-          SizedBox(width: 16),
-          buildProgramView(programa, context, backgroundColor, textColor)
-        ],
+            child: Icon(
+              Icons.image_not_supported,
+              color: isUnlocked ? Colors.grey[600] : Colors.grey[400],
+              size: 50,
+            ),
+          );
+        },
       ),
     );
-  }*/
+  }
+
+  Widget _buildCardContent(Programa programa, bool isUnlocked) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: isUnlocked ? AppColors.cardBackground : AppColors.lockedBackground,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(AppConstants.cardBorderRadius),
+          bottomRight: Radius.circular(AppConstants.cardBorderRadius),
+        ),
+      ),
+      child: isUnlocked
+          ? _buildUnlockedContent(programa)
+          : _buildLockedContent(programa),
+    );
+  }
+
+  Widget _buildUnlockedContent(Programa programa) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          programa.nombreTecnica,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 14,
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          programa.descripcion ?? '',
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 13,
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w400,
+            height: 1.31,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _buildProgramInfo(),
+      ],
+    );
+  }
+
+  Widget _buildLockedContent(Programa programa) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          programa.nombreTecnica,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 14,
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          programa.startDate == null
+              ? 'Esta lección se desbloqueará al día siguiente de haber completado la anterior.'
+              : 'Esta lección se desbloqueará el ${programa.formattedStartDate}',
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 13,
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w400,
+            height: 1.31,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgramInfo() { //Futuro usar value
+    return Row(
+      children: const [
+        Text(
+          'Relajación guiada',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 13,
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        SizedBox(width: 8),
+        _DotSeparator(),
+        SizedBox(width: 8),
+        Text(
+          '5 - 10 min',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 13,
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDayBadge(Programa programa) {
+    return Positioned(
+      top: 13,
+      left: 20,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: const ShapeDecoration(
+          color: AppColors.badgeBackground,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(32)),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.calendar_today,
+              size: 16,
+              color: AppColors.badgeText,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Día ${programa.dia.toString().padLeft(2, '0')}',
+              style: const TextStyle(
+                color: AppColors.badgeText,
+                fontSize: 14,
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToStepScreen(Programa programa, BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => StepScreen(
+          steps: programa.parsedSteps,
+          tecnicaNombre: programa.nombreTecnica,
+          dia: programa.dia,
+          userId: programa.userId,
+          tecnicaId: programa.id,
+          url_img: programa.urlImg ?? '',
+        ),
+      ),
+    );
+  }
+}
+
+// Widget helper para el separador de puntos
+class _DotSeparator extends StatelessWidget {
+  const _DotSeparator();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: const ShapeDecoration(
+        color: Color(0xFFC6C6C6),
+        shape: OvalBorder(),
+      ),
+    );
+  }
 }
