@@ -173,7 +173,7 @@ class TestEstresScreen extends StatelessWidget {
   double _obtenerTamanoTitulo(double anchoPantalla) {
     if (anchoPantalla > 1024) return 42; // Escritorio
     if (anchoPantalla > 600) return 40;  // Tablet
-    return 38; // Móvil
+    return 32; // Móvil
   }
 
   double _obtenerTamanoCuerpo(double anchoPantalla) {

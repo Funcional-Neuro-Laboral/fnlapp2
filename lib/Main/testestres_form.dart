@@ -324,14 +324,14 @@ Future<void> submitTest() async {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     // Verificación inicial para asegurarse de que 'questions' no esté vacío y que el índice esté en rango
     if (questions.isEmpty || currentQuestionIndex >= questions.length) {
       return Scaffold(
         body: Center(
-          child: Text(
-              "No hay preguntas disponibles"), // Mensaje de error si no hay preguntas
+          child: Text("No hay preguntas disponibles"), // Mensaje de error si no hay preguntas
         ),
       );
     }
@@ -339,200 +339,315 @@ Future<void> submitTest() async {
     // Asignar la pregunta actual solo si la lista de preguntas tiene contenido y el índice es válido
     final question = questions[currentQuestionIndex];
 
+    // Obtener el ancho de la pantalla
+    double screenWidth = MediaQuery.of(context).size.width;
+
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back), // Icono de flecha hacia atrás
-          onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => HomeScreen()),
-              (Route<dynamic> route) => false, // Elimina todas las rutas anteriores
-            );
-          },
-        ),
-      ),
-      
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment
-                .center, // Centra los elementos en el eje horizontal
-            children: [
-              SizedBox(height: 20),
-
-              // Mostrar el número de pregunta actual
-              Text(
-                'Pregunta ${currentQuestionIndex + 1} de ${questions.length}',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              ),
-              SizedBox(height: 20),
-
-              // Verificar que 'question['question']' no sea null antes de usarlo
-              if (question['question'] != null) ...[
-                Text(
-                  question['question']!,
-                  textAlign: TextAlign.center, // Centra el texto
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold), // Font más pequeño
-                ),
-              ] else ...[
-                Text(
-                  'Pregunta no disponible',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red),
-                ),
-              ],
-
-              // Descripción centrada y con margen superior
-              if (question['description'] != null) ...[
-                SizedBox(height: 12), // Margen superior
-                Text(
-                  question['description']!,
-                  textAlign: TextAlign.center, // Centra el texto
-                  style: TextStyle(fontSize: 16),
-                ),
-              ],
-              SizedBox(height: 20),
-
-              // Opciones de respuesta
-              Column(
-                children: List.generate(8, (index) {
-                  final optionKey = 'option${index + 1}';
-                  final detailKey = 'detail${index + 1}';
-                  final optionText = question[optionKey];
-                  final optionDetail = question[detailKey];
-
-                  // Verificar que cada opción no sea null antes de crear el widget
-                  if (optionText == null || optionDetail == null) {
-                    return SizedBox
-                        .shrink(); // No mostrar si la opción o detalle son null
-                  }
-
-                  bool isSelected =
-                      selectedOptions[currentQuestionIndex] == (index + 1);
-
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 8.0, horizontal: 5),
-                    child: GestureDetector(
-                      onTap: () => selectOption(
-                          index + 1), // Seleccionar opción al hacer clic
-                      child: AnimatedContainer(
-                        duration: const Duration(
-                            milliseconds: 300), // Animación al cambiar tamaño
-                        width: double
-                            .infinity, // Opción ocupa todo el ancho disponible
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 14, horizontal: 13),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? Color.fromARGB(255, 56, 30, 134)
-                              : const Color.fromARGB(255, 234, 234, 234),
-                          border: Border.all(
-                            color: isSelected
-                                ? Color.fromARGB(255, 40, 19, 105)
-                                : const Color.fromARGB(255, 212, 212, 212),
-                            width: 2.0,
-                          ),
-                          borderRadius:
-                              BorderRadius.circular(6), // Bordes más cuadrados
+      body: Container(
+        color: Color(0xFFF6F6F6), // Fondo de todo el Scaffold
+        child: SingleChildScrollView( // Añadir el SingleChildScrollView para permitir el desplazamiento
+          child: Padding(
+            padding: const EdgeInsets.only(top: 20.0),  // Mantener margen horizontal
+            child: Column(
+              children: [
+                // Row para colocar el icono "Atrás" a la izquierda y el texto centrado
+                Padding(
+                  padding: const EdgeInsets.only(top: 20.0), // Añadir espacio vertical hacia abajo
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          Icons.chevron_left,
+                          color: Colors.black, // Color de la flecha
+                          size: 50.0, // Tamaño más grande de la flecha
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              optionText,
+                        onPressed: () {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (context) => HomeScreen()),
+                                (Route<dynamic> route) => false, // Elimina todas las rutas anteriores
+                          );
+                        },
+                      ),
+                      SizedBox(width: 0), // Espacio entre el icono y el texto
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment(-0.25, 0), // Alineación a la izquierda
+                          child: Text(
+                            'Pregunta ${currentQuestionIndex + 1} de ${questions.length}', // Texto completo
+                            style: TextStyle(
+                              color: const Color(0xFF4320AD),
+                              fontSize: 16,
+                              fontFamily: 'Inter',
+                              fontWeight: FontWeight.w700, // Estilo para "Pregunta"
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Para la línea sombreada en la parte inferior
+                Container(
+                  margin: const EdgeInsets.only(top: 5.0), // Agregar un poco de espacio por encima
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF6F6F6),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x14000000),
+                        blurRadius: 8,
+                        offset: Offset(0, 4),
+                        spreadRadius: 0,
+                      ),
+                    ],
+                  ),
+                  height: 7, // Definir altura de la línea
+                ),
+
+                SizedBox(height: 20), // Espacio entre el encabezado y la pregunta
+
+                if (question['question'] != null) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0), // Espacio a la izquierda y derecha
+                    child: Text(
+                      question['question']!,
+                      textAlign: TextAlign.start, // Alineación ajustada un poco a la izquierda
+                      style: TextStyle(
+                        color: const Color(0xFF4320AD),
+                        fontSize: 18,
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0), // Espacio a la izquierda y derecha
+                    child: Text(
+                      'Pregunta no disponible',
+                      textAlign: TextAlign.start, // Alineación ajustada un poco a la izquierda
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ),
+                ],
+
+                if (question['description'] != null) ...[
+                  SizedBox(height: 12), // Margen superior
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0), // Espacio a la izquierda y derecha
+                    child: Text(
+                      question['description']!,
+                      textAlign: TextAlign.start, // Alineación ajustada un poco a la izquierda
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  ),
+                ],
+
+                SizedBox(height: 20),
+
+
+                // Opciones de respuesta
+                Column(
+                  children: List.generate(8, (index) {
+                    final optionKey = 'option${index + 1}';
+                    final detailKey = 'detail${index + 1}';
+                    final optionText = question[optionKey];
+                    final optionDetail = question[detailKey];
+
+                    if (optionText == null || optionDetail == null) {
+                      return SizedBox.shrink();
+                    }
+
+                    bool isSelected = selectedOptions[currentQuestionIndex] == (index + 1);
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: GestureDetector(
+                        onTap: () => selectOption(index + 1),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          width: screenWidth - 48, // Ajustar el ancho para que no se recorte
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 32),
+                          decoration: BoxDecoration(
+                            color: isSelected ? Color(0x8E5027D0) : Colors.white,
+                            border: Border.all(
+                              width: 2,
+                              color: Color(0xFF6D4BD8),
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                optionText,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Color(0xFF6D4BD8),
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (isSelected)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        TextSpan(
+                                          text: "Detalle: ",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: optionDetail,
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w400,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+
+                SizedBox(height: 20), // Espacio adicional
+
+                // Botones de navegación (Atrás y Siguiente/Finalizar)
+                // Botones de navegación
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 60),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // ---- ATRÁS ----
+                      if (currentQuestionIndex > 0)
+                        GestureDetector(
+                          onTap: goToPreviousQuestion,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                            decoration: ShapeDecoration(
+                              color: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(80),
+                              ),
+                              shadows: const [
+                                BoxShadow(
+                                  color: Color(0x4C000000),
+                                  blurRadius: 3,
+                                  offset: Offset(0, 2),
+                                  spreadRadius: 0,
+                                ),
+                                BoxShadow(
+                                  color: Color(0x26000000),
+                                  blurRadius: 10,
+                                  offset: Offset(0, 6),
+                                  spreadRadius: 4,
+                                ),
+                              ],
+                            ),
+                            child: const Text(
+                              'Atrás',
                               style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight
-                                        .normal, // Negrita si está seleccionado
-                                color: isSelected ? Colors.white : Colors.black,
+                                color: Colors.black,
+                                fontSize: 22,
+                                fontFamily: 'Inter',
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                            if (isSelected) // Mostrar el detalle si la opción está seleccionada
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                    top:
-                                        13.0), // Incrementar margen superior del detalle
-                                child: Text.rich(
-                                  TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: "Detalle: ",
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight
-                                              .bold, // Negrita para "Detalle:"
-                                          color: Colors.white,
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                      ),
-                                      TextSpan(
-                                        text: optionDetail,
-                                        style: const TextStyle(
-                                          fontStyle: FontStyle
-                                              .italic, // Texto en cursiva para el detalle
-                                          fontSize:
-                                              14, // Tamaño de fuente reducido
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
+                          ),
+                        )
+                      else
+                        const SizedBox(width: 88), // Espacio vacío cuando no hay más preguntas anteriores
+
+                      // ---- SIGUIENTE / FINALIZAR ----
+                      Builder(
+                        builder: (context) {
+                          final bool isNextEnabled = selectedOptions[currentQuestionIndex] != 0;
+                          final String nextLabel = currentQuestionIndex < questions.length - 1 ? 'Siguiente' : 'Finalizar';
+
+                          return GestureDetector(
+                            onTap: isNextEnabled
+                                ? () {
+                              if (currentQuestionIndex < questions.length - 1) {
+                                goToNextQuestion();
+                              } else {
+                                submitTest(); // Llamar a la función que envía el test
+                              }
+                            }
+                                : null,
+                            child: Container(
+                              width: 158,
+                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                              clipBehavior: Clip.antiAlias,
+                              decoration: ShapeDecoration(
+                                color: isNextEnabled ? const Color(0xFF6D4BD8) : const Color(0xFFD7D7D7),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(40),
+                                ),
+                                shadows: isNextEnabled
+                                    ? const [
+                                  BoxShadow(
+                                    color: Color(0x26000000),
+                                    blurRadius: 6,
+                                    offset: Offset(0, 2),
+                                    spreadRadius: 2,
+                                  ),
+                                  BoxShadow(
+                                    color: Color(0x4C000000),
+                                    blurRadius: 2,
+                                    offset: Offset(0, 1),
+                                    spreadRadius: 0,
+                                  ),
+                                ]
+                                    : const [],
+                              ),
+                              child: Center(
+                                child: Text(
+                                  nextLabel,
+                                  style: TextStyle(
+                                    color: isNextEnabled ? Colors.white : const Color(0xFF868686),
+                                    fontSize: 22,
+                                    fontFamily: 'Inter',
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
-                          ],
-                        ),
+                            ),
+                          );
+                        },
                       ),
-                    ),
-                  );
-                }),
-              ),
-
-              SizedBox(height: 20),
-
-              // Botones de navegación
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  if (currentQuestionIndex > 0)
-                    ElevatedButton(
-                      onPressed: goToPreviousQuestion,
-                      child: Text('Anterior'),
-                    ),
-                  if (currentQuestionIndex < questions.length - 1)
-                    ElevatedButton(
-                      onPressed: selectedOptions[currentQuestionIndex] != 0
-                          ? goToNextQuestion
-                          : null, // Deshabilitar si no hay selección
-                      child: Text('Siguiente'),
-                    ),
-                ],
-              ),
-              SizedBox(height: 20),
-
-              // Botón para enviar el test
-              Padding(
-                padding: const EdgeInsets.only(bottom: 15.0),
-                child: ElevatedButton(
-                  onPressed: (currentQuestionIndex == questions.length - 1 &&
-                          selectedOptions[currentQuestionIndex] != 0)
-                      ? submitTest
-                      : null, // Deshabilitar si no es la última pregunta o no hay selección
-                  child: Text('Enviar Test'),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+
+
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
 }
+
+

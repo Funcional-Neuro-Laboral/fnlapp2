@@ -11,6 +11,7 @@ import 'package:fnlapp/SharedPreferences/sharedpreference.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fnlapp/config.dart';
 import '../Util/api_service.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../Util/carga.dart';
 import '../Util/style.dart';
 
@@ -48,7 +49,15 @@ class _IndexScreenState extends State<IndexScreen> {
 
   // Variable para almacenar la opción seleccionada en la pregunta actual
   String? selectedOption;
-
+  String _getOptionText(Map<String, dynamic> question) {
+    return question['age_range']?.toString() ??
+        question['area']?.toString() ??
+        question['level']?.toString() ??
+        question['gender']?.toString() ??
+        question['responsability_level']?.toString() ??
+        question['sede']?.toString() ??
+        'Valor no disponible';
+  }
   @override
   void initState() {
     super.initState();
@@ -407,232 +416,311 @@ class _IndexScreenState extends State<IndexScreen> {
   }
 
   @override
+
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          loading
-              ? Center(child: CircularProgressIndicator())
-              : agreedToTerms
-                  ? _buildQuestionsScreen()
-                  : _buildWelcomeScreen(),
-        ],
-      ),
+      backgroundColor: const Color(0xFFF6F6F6),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : agreedToTerms
+          ? _buildQuestionsScreen()
+          : _buildWelcomeScreen(),
     );
   }
 
   Widget _buildWelcomeScreen() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 40.0, left: 20.0, right: 20.0),
-          child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.center, // Centramos el texto horizontalmente
-            children: [
-              Text(
-                'Tu privacidad nos importa',
-                style: TextStyle(
-                  fontSize: 22.0,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-                textAlign: TextAlign.center, // Aseguramos el centrado del texto
-              ),
-              SizedBox(height: 20.0),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenHeight = MediaQuery.of(context).size.height;
+        final isSmallHeight = screenHeight < 700;
+        final isMobile = constraints.maxWidth < 600;
+        final scaleFactor = isMobile ? 1.0 : 1.2;
+        return Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isMobile ? 430 : 700, // O incluso 800 si prefieres más amplitud
+              maxHeight: MediaQuery.of(context).size.height,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20.0, 20.0, 20.0, 12.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Checkbox(
-                    value: acceptedProcessing,
-                    activeColor: Color(0xFF5027D0),
-                    onChanged: (value) {
-                      setState(() {
-                        acceptedProcessing = value ?? false;
-                        _updateAgreedToAll();
-                      });
-                    },
-                  ),
-                  Flexible(
-                    child: Text.rich(
-                      TextSpan(
-                        text: 'Acepto la ',
-                        style: TextStyle(fontSize: 16.0, color: Colors.black),
-                        children: [
+                  // Encabezado y checkboxes
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.center, // <- Centrar horizontalmente todo
+                    children: [
+                      const SizedBox(height: 10),
+                       Center( // <- Centrar específicamente el texto
+                        child: Text(
+                          'Tu privacidad nos importa',
+                          style: TextStyle(
+                            fontSize: isSmallHeight ? 18.0 : 24.0,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF281368),
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    SizedBox(height: isSmallHeight ? 10.0 : 20.0),
+
+                      // checkboxes
+                      _buildCheckboxRow(
+                        isChecked: acceptedProcessing,
+                        textSpans: [
+                          TextSpan(
+                            text: 'Acepto la ',
+                            style: TextStyle(fontSize: 18.0 * scaleFactor, color: Colors.black),
+                          ),
                           TextSpan(
                             text: 'Política de privacidad',
-                            style: TextStyle(color: Colors.red),
+                            style: TextStyle(
+                              fontSize: 18.0 * scaleFactor,
+                              color: Color(0xFF5027D0),
+                              fontWeight: FontWeight.bold,
+                            ),
                             recognizer: TapGestureRecognizer()
                               ..onTap = () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(
-                                      builder: (context) =>
-                                          PoliticaPrivacidadScreen()),
+                                  MaterialPageRoute(builder: (_) => PoliticaPrivacidadScreen()),
                                 );
                               },
                           ),
-                          TextSpan(text: ' y las '),
+                          TextSpan(
+                              text: ' y las ',
+                              style: TextStyle(
+                                  fontSize: 18.0 * scaleFactor, color: Colors.black)
+                          ),
                           TextSpan(
                             text: 'Condiciones de uso',
-                            style: TextStyle(color: Colors.red),
+                            style: TextStyle(
+                              fontSize: 18.0 * scaleFactor,
+                              color: Color(0xFF5027D0),
+                              fontWeight: FontWeight.bold,
+                            ),
                             recognizer: TapGestureRecognizer()
                               ..onTap = () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(
-                                      builder: (context) =>
-                                          CondicionesUsoScreen()),
+                                  MaterialPageRoute(builder: (_) => CondicionesUsoScreen()),
                                 );
                               },
                           ),
                         ],
+                        onChanged: () {
+                          setState(() {
+                            acceptedProcessing = !acceptedProcessing;
+                            _updateAgreedToAll();
+                          });
+                        },
                       ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 10.0),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Checkbox(
-                    value: acceptedProcessing1,
-                    activeColor: Color(0xFF5027D0),
-                    onChanged: (value) {
-                      setState(() {
-                        acceptedProcessing1 = value ?? false;
-                        _updateAgreedToAll();
-                      });
-                    },
-                  ),
-                  Flexible(
-                    child: Text.rich(
-                      TextSpan(
-                        text:
-                            'Acepto el procesamiento de mis datos personales de salud con el fin de facilitar las funciones de la aplicación. Ver más en la ',
-                        style: TextStyle(fontSize: 16.0, color: Colors.black),
-                        children: [
+                      const SizedBox(height: 12.0),
+                      _buildCheckboxRow(
+                        isChecked: acceptedProcessing1,
+                        textSpans: [
+                            TextSpan(
+                            text: 'Acepto el procesamiento de mis datos personales de salud con el fin de facilitar las funciones de la aplicación. Ver más en la ',
+                            style: TextStyle(fontSize: 18.0 * scaleFactor, color: Colors.black),
+                          ),
                           TextSpan(
                             text: 'Política de privacidad',
-                            style: TextStyle(color: Colors.red),
+                            style: TextStyle(
+                              fontSize: 18.0 * scaleFactor,
+                              color: Color(0xFF5027D0),
+                              fontWeight: FontWeight.bold,
+                            ),
                             recognizer: TapGestureRecognizer()
                               ..onTap = () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(
-                                      builder: (context) =>
-                                          PoliticaPrivacidadScreen()),
+                                  MaterialPageRoute(builder: (_) => PoliticaPrivacidadScreen()),
                                 );
                               },
                           ),
                         ],
+                        onChanged: () {
+                          setState(() {
+                            acceptedProcessing1 = !acceptedProcessing1;
+                            _updateAgreedToAll();
+                          });
+                        },
                       ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 10.0),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Checkbox(
-                    value: acceptedTracking,
-                    activeColor: Color(0xFF5027D0),
-                    onChanged: (value) {
-                      setState(() {
-                        acceptedTracking = value ?? false;
-                        _updateAgreedToAll();
-                      });
-                    },
-                  ),
-                  Flexible(
-                    child: Text.rich(
-                      TextSpan(
-                        text:
+                      const SizedBox(height: 12.0),
+                      _buildCheckboxRow(
+                        isChecked: acceptedTracking,
+                        textSpans: [
+                            TextSpan(
+                            text:
                             'Autorizo a la empresa a recopilar y utilizar información sobre mi actividad en aplicaciones y sitios web relacionados, así como datos necesarios para evaluar mi nivel de estrés y bienestar laboral, conforme a lo establecido en la ',
-                        style: TextStyle(fontSize: 16.0, color: Colors.black),
-                        children: [
+                            style: TextStyle(fontSize: 18.0 * scaleFactor, color: Colors.black),
+                          ),
                           TextSpan(
                             text: 'Política de privacidad',
-                            style: TextStyle(color: Colors.red),
+                            style: TextStyle(
+                              fontSize: 18.0 * scaleFactor,
+                              color: Color(0xFF5027D0),
+                              fontWeight: FontWeight.bold,
+                            ),
                             recognizer: TapGestureRecognizer()
                               ..onTap = () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(
-                                      builder: (context) =>
-                                          PoliticaPrivacidadScreen()),
+                                  MaterialPageRoute(builder: (_) => PoliticaPrivacidadScreen()),
                                 );
                               },
                           ),
                         ],
+                        onChanged: () {
+                          setState(() {
+                            acceptedTracking = !acceptedTracking;
+                            _updateAgreedToAll();
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: isSmallHeight ? 10.0 : 20.0),
+
+                  // Imagen
+                  Image.network(
+                    'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_like.png',
+                    width: 150,
+                    height: 180,
+                    fit: BoxFit.contain,
+                  ),
+                  SizedBox(height: isSmallHeight ? 10.0 : 20.0),
+
+                  // Botón Aceptar todo
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        acceptedProcessing = true;
+                        acceptedProcessing1 = true;
+                        acceptedTracking = true;
+                        _updateAgreedToAll();
+                      });
+                    },
+                    child: Container(
+                      width: isMobile ? 165 : 200,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+                      decoration: ShapeDecoration(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Center(
+                        child: FittedBox( // <- ESTO AJUSTA AUTOMÁTICAMENTE EL TEXTO
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Aceptar todo',
+                            style: TextStyle(
+                              color: Color(0xFF6D4BD8),
+                              fontSize: 18,
+                              fontFamily: 'Inter',
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: false,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+
+                  const SizedBox(height: 10.0),
+
+                  // Botón Continuar
+                  GestureDetector(
+                    onTap: agreedToAll
+                        ? () {
+                      _handleAcceptAll();
+                      setState(() {
+                        agreedToTerms = true;
+                        currentQuestionIndex = 0;
+                      });
+                    }
+                        : null,
+                    child: Container(
+                      width: isMobile ? 310 : 400,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                      clipBehavior: Clip.antiAlias,
+                      decoration: ShapeDecoration(
+                        color: agreedToAll ? const Color(0xFF5027D0) : const Color(0xFFD7D7D7),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(40),
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Continuar',
+                          style: TextStyle(
+                            color: agreedToAll ? Colors.white : const Color(0xFF868686),
+                            fontSize: 22,
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
-            ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+
+
+  Widget _buildCheckboxRow({
+    required bool isChecked,
+    required List<TextSpan> textSpans,
+    required VoidCallback onChanged,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: onChanged,
+          child: Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: isChecked ? Color(0xFF5027D0) : Colors.transparent,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                width: 1.78,
+                color: isChecked ? Color(0xFF5027D0) : Colors.black,
+              ),
+            ),
+            child: isChecked
+                ? const Icon(
+              Icons.check,
+              size: 18,
+              color: Colors.white,
+            )
+                : null,
           ),
         ),
-        Spacer(),
-        Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            children: [
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    acceptedProcessing = true;
-                    acceptedProcessing1 = true;
-                    acceptedTracking = true;
-                    _updateAgreedToAll();
-                  });
-                },
-                child: Text(
-                  'Aceptar todo',
-                  style: TextStyle(
-                    fontSize: 16.0,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF5027D0),
-                  ),
-                ),
-              ),
-              SizedBox(height: 10.0),
-              ElevatedButton(
-                onPressed: agreedToAll
-                    ? () {
-                        _handleAcceptAll();
-                        setState(() {
-                          agreedToTerms = true;
-                          currentQuestionIndex = 0;
-                        });
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF5027D0),
-                  padding: EdgeInsets.symmetric(horizontal: 100, vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-                child: Text(
-                  'Continuar',
-                  style: TextStyle(
-                    fontSize: 16.0,
-                    color: agreedToAll
-                        ? Colors.white
-                        : Colors
-                            .grey, // Cambia el color del texto según el estado
-                  ),
-                ),
-              ),
-            ],
+        const SizedBox(width: 12),
+        Flexible(
+          child: RichText(
+            text: TextSpan(children: textSpans),
           ),
         ),
       ],
     );
   }
+
+
+
+
+
 
   Widget _buildQuestionsScreen() {
     String currentCategoryKey;
@@ -696,231 +784,282 @@ class _IndexScreenState extends State<IndexScreen> {
 
 
 
-    return Column(
-      children: [
-        // Contenido en la parte superior, con reducción de espacio
-        Padding(
-          padding:
-              const EdgeInsets.only(top: 40.0), // Espacio superior ajustado
-          child: Column(
-            children: [
-              Text(
-                'Pregunta ${currentQuestionIndex + 1} de 6',
-                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-              ),
-              if (currentQuestionIndex ==
-                  0) // Mensaje especial solo en la primera pregunta
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenHeight = MediaQuery.of(context).size.height;
+        final screenWidth = constraints.maxWidth;
+        final isSmallDevice = screenHeight < 650 || screenWidth < 350;
+
+        final optionFontSize = isSmallDevice ? 14.0 : 16.0;
+        final verticalPadding = isSmallDevice ? 12.0 : 20.0;
+
+        // 🔹 ancho máximo para web
+        final contentWidth = constraints.maxWidth > 720 ? 720.0 : constraints.maxWidth;
+
+        return Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            width: contentWidth,
+            child: Column(
+              children: [
                 Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    'Te damos la bienvenida a FNL',
-                    style:
-                        TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
+                  padding: const EdgeInsets.only(top: 60.0, left: 20.0, right: 20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Barra de progreso
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: List.generate(6, (index) {
+                          return Expanded(
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                              height: 6.0,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(3.0),
+                                color: index <= currentQuestionIndex
+                                    ? const Color(0xFF6D4BD8)
+                                    : const Color(0xFFE0E0E0),
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                      const SizedBox(height: 35.0),
+
+                      // Contenedor para mantener la bienvenida y la pregunta en posición fija
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Banda fija para la bienvenida (20 px de alto)
+                          SizedBox(
+                            height: 20,
+                            child: currentQuestionIndex == 0
+                                ? const Align(
+                              alignment: Alignment.bottomLeft,
+                              child: Text(
+                                'Te damos la bienvenida a FNL',
+                                style: TextStyle(
+                                  color: Color(0xFF212121),
+                                  fontSize: 18,
+                                  fontFamily: 'Inter',
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            )
+                                : const SizedBox.shrink(),
+                          ),
+
+                          const SizedBox(height: 8.0), // espacio fijo debajo de la bienvenida
+
+                          // Banda fija para la pregunta
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              preguntaTexto,
+                              style: const TextStyle(
+                                color: Color(0xFF5027D0),
+                                fontSize: 24,
+                                fontFamily: 'Inter',
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.start,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              SizedBox(height: 8.0), // Espacio entre los textos
-              Text(
-                preguntaTexto, // Texto dinámico de la pregunta
-                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 10), // Espacio antes de las opciones
-            ],
-          ),
-        ),
 
-        // Opciones centradas en la pantalla
-        Expanded(
-          flex: 2,
-          child: Center(
-            child: _buildQuestionField(
-                currentCategoryQuestions), // Campo de respuesta dinámico
-          ),
-        ),
-
-        // Botones en la parte inferior
-        Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (currentQuestionIndex > 0) // Botón de retroceso
-                TextButton(
-                  onPressed: goToPreviousQuestion,
-                  child: Text(
-                    'Volver',
-                    style: TextStyle(
-                        color: Color(0xFF5027D0), fontWeight: FontWeight.w600),
+                // Opciones
+                Padding(
+                  padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
+                  child: _buildQuestionField(
+                    currentCategoryQuestions,
+                    optionFontSize,
+                    verticalPadding,
                   ),
                 ),
-              Spacer(),
-              
-              // Botón de siguiente o finalización según el índice de pregunta
-              TextButton(
-                
-                onPressed: currentQuestionIndex < 5
-                    ? goToNextQuestion
-                    : saveResponses, // Guardar respuestas si es la última pregunta
-                child: Text(
-                  currentQuestionIndex < 5 ? 'Siguiente' : 'Finalizar',
-                  style: TextStyle(
-                      color: Color(0xFF5027D0), fontWeight: FontWeight.w600),
+
+                const Spacer(),
+
+                // Botones (Atrás / Siguiente o Finalizar)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 60),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // ---- ATRÁS ----
+                      if (currentQuestionIndex > 0)
+                        GestureDetector(
+                          onTap: goToPreviousQuestion,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                            decoration: ShapeDecoration(
+                              color: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(80),
+                              ),
+                              shadows: const [
+                                BoxShadow(
+                                  color: Color(0x4C000000),
+                                  blurRadius: 3,
+                                  offset: Offset(0, 2),
+                                  spreadRadius: 0,
+                                ),
+                                BoxShadow(
+                                  color: Color(0x26000000),
+                                  blurRadius: 10,
+                                  offset: Offset(0, 6),
+                                  spreadRadius: 4,
+                                ),
+                              ],
+                            ),
+                            child: const Text(
+                              'Atrás',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 22,
+                                fontFamily: 'Inter',
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        const SizedBox(width: 88),
+
+                      // ---- SIGUIENTE / FINALIZAR ----
+                      Builder(
+                        builder: (context) {
+                          final bool isNextEnabled = selectedOption != null ||
+                              selectedAnswers.containsKey(currentQuestionIndex);
+                          final String nextLabel =
+                          currentQuestionIndex < 5 ? 'Siguiente' : 'Finalizar';
+
+                          return GestureDetector(
+                            onTap: isNextEnabled
+                                ? () {
+                              if (currentQuestionIndex < 5) {
+                                goToNextQuestion();
+                              } else {
+                                saveResponses();
+                              }
+                            }
+                                : null,
+                            child: Container(
+                              width: 158,
+                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                              clipBehavior: Clip.antiAlias,
+                              decoration: ShapeDecoration(
+                                color: isNextEnabled
+                                    ? const Color(0xFF6D4BD8)
+                                    : const Color(0xFFD7D7D7),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(40),
+                                ),
+                                shadows: isNextEnabled
+                                    ? const [
+                                  BoxShadow(
+                                    color: Color(0x26000000),
+                                    blurRadius: 6,
+                                    offset: Offset(0, 2),
+                                    spreadRadius: 2,
+                                  ),
+                                  BoxShadow(
+                                    color: Color(0x4C000000),
+                                    blurRadius: 2,
+                                    offset: Offset(0, 1),
+                                    spreadRadius: 0,
+                                  ),
+                                ]
+                                    : const [],
+                              ),
+                              child: Center(
+                                child: Text(
+                                  nextLabel,
+                                  style: TextStyle(
+                                    color: isNextEnabled
+                                        ? Colors.white
+                                        : const Color(0xFF868686),
+                                    fontSize: 22,
+                                    fontFamily: 'Inter',
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
-  
-
-  Widget _buildQuestionField(List<Map<String, dynamic>> questions) {
-    return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: ListView.builder(
-        shrinkWrap: true,  // Permite que el ListView se ajuste a su contenido
-        itemCount: questions.length,
-        itemBuilder: (context, index) {
-          var question = questions[index];
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: SizedBox(
-              width: MediaQuery.of(context).size.width * 0.85,
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: selectedOption == question.values.first.toString()
-                      ? Colors.white
-                      : Color(0xFF5027D0),
-                  side: BorderSide(
-                    color: selectedOption == question.values.first.toString()
-                        ? Color(0xFF5027D0)
+    Widget _buildQuestionField(List<Map<String, dynamic>> questions, double fontSize, double verticalPadding) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(), // Evita scroll
+          itemCount: questions.length,
+          itemBuilder: (context, index) {
+            var question = questions[index];
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.85,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: selectedOption == question['id'].toString()
+                        ? const Color(0x515027D0)
                         : Colors.transparent,
-                    width: 2.0,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(0.0),
-                  ),
-                  padding: EdgeInsets.symmetric(vertical: 20.0),
-                ),
-                onPressed: () {
-                  setState(() {
-                    selectedOption = question['id'].toString();
-                  });
-
-                  if (currentQuestionIndex == 2) { 
-                    int areaId = question['id']; 
-                    fetchHierarchicalLevel(areaId);
-                  }
-                },
-                child: Text(
-                  question.containsKey('age_range')
-                      ? question['age_range'].toString()
-                      : question.containsKey('area')
-                          ? question['area'].toString()
-                          : question.containsKey('level')
-                              ? question['level'].toString()
-                              : question.containsKey('gender')
-                                  ? question['gender'].toString()
-                                  : question.containsKey('responsability_level')
-                                      ? question['responsability_level'].toString()
-                                      : question.containsKey('sede')
-                                        ? question['sede'].toString()
-                                          : 'Valor no disponible',
-                  style: TextStyle(
-                    fontSize: 16.0,
-                    color: selectedOption == question.values.first.toString()
-                        ? Color(0xFF5027D0)
-                        : Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      )
-    );
-  }
-
-
-  Widget _buildCheckBoxes() {
-    return Column(
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Checkbox(
-              value: acceptedProcessing,
-              onChanged: (value) {
-                setState(() {
-                  acceptedProcessing = value ?? false;
-                  _updateAgreedToAll();
-                });
-              },
-            ),
-            Flexible(
-              child: Text.rich(
-                TextSpan(
-                  text: 'Acepto la ',
-                  children: [
-                    TextSpan(
-                      text: 'Política de privacidad',
-                      style: TextStyle(color: Colors.red),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) =>
-                                    PoliticaPrivacidadScreen()),
-                          );
-                        },
+                    side: const BorderSide(
+                      color: Color(0xFF6D4BD8),
+                      width: 2.0,
                     ),
-                    TextSpan(text: ' y las '),
-                    TextSpan(
-                      text: 'Condiciones de uso',
-                      style: TextStyle(color: Colors.red),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => CondicionesUsoScreen()),
-                          );
-                        },
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16.0),
                     ),
-                  ],
+                    padding: EdgeInsets.symmetric(
+                      vertical: verticalPadding,
+                      horizontal: 32.0,
+                    ),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      selectedOption = question['id'].toString();
+                    });
+
+                    if (currentQuestionIndex == 2) {
+                      int areaId = question['id'];
+                      fetchHierarchicalLevel(areaId);
+                    }
+                  },
+                  child: Text(
+                    _getOptionText(question),
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF6D4BD8),
+                      fontFamily: 'Inter',
+                    ),
+                  ),
                 ),
-                style: TextStyle(fontSize: 16.0),
               ),
-            ),
-          ],
+            );
+          },
         ),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Checkbox(
-              value: acceptedTracking,
-              onChanged: (value) {
-                setState(() {
-                  acceptedTracking = value ?? false;
-                  _updateAgreedToAll();
-                });
-              },
-            ),
-            Flexible(
-              child: Text(
-                'Acepto el seguimiento de mi actividad.',
-                style: TextStyle(fontSize: 16.0),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+      );
+    }
 
   void _updateAgreedToAll() {
     setState(() {
