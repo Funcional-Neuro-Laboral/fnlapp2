@@ -275,7 +275,7 @@ Future<void> submitTest() async {
       if (genderId == 1) {
         nivelEstres = NivelEstres.moderado;
         estresNivelId = 2;
-      } else if (genderId == 2) {
+      } else if (genderId == 2 || genderId == 3) { // Considerando 3 como otro género
         nivelEstres =
             totalScore <= 132 ? NivelEstres.moderado : NivelEstres.severo;
         estresNivelId = totalScore <= 132 ? 2 : 3;
@@ -284,7 +284,7 @@ Future<void> submitTest() async {
       if (genderId == 1) {
         nivelEstres = NivelEstres.severo;
         estresNivelId = 3;
-      } else if (genderId == 2) {
+      } else if (genderId == 2 || genderId == 3) { // Considerando 3 como otro género
         nivelEstres = NivelEstres.leve;
         estresNivelId = 3;
       }
