@@ -153,7 +153,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildContent(bool isWeb, bool isTablet, double screenWidth) {
-    final maxWidth = isWeb ? 800.0 : double.infinity;
+    final maxWidth = isWeb ? 1000.0 : (isTablet ? 900.0 : double.infinity);
     final horizontalPadding = isWeb ? 40.0 : (isTablet ? 30.0 : 20.0);
 
     return Center(
@@ -251,7 +251,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildInfoGrid(bool isWeb, bool isTablet, double screenWidth) {
-    final cardPadding = isWeb ? 25.0 : (isTablet ? 22.0 : 20.0);
+    final cardPadding = isWeb ? 35.0 : (isTablet ? 30.0 : 14.0);
     final cardSpacing = isWeb ? 16.0 : 12.0;
 
     return Container(
@@ -278,7 +278,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Expanded(child: _buildInfoCard(
                     icon: Icons.female,
                     title: 'Género',
-                    value: '--',
+                    value: widget.profileData?.gender ?? 'No disponible',
                     isWeb: isWeb,
                     isTablet: isTablet
                 )),
@@ -286,7 +286,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Expanded(child: _buildInfoCard(
                     icon: Icons.person,
                     title: 'Puesto',
-                    value: '--',
+                    value: widget.profileData?.hierarchicalLevel ?? 'No disponible',
                     isWeb: isWeb,
                     isTablet: isTablet
                 )),
@@ -320,7 +320,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: _buildInfoCard(
                         icon: Icons.female,
                         title: 'Género',
-                        value: '--',
+                        value: widget.profileData?.gender ?? 'No disponible',
                         isWeb: isWeb,
                         isTablet: isTablet,
                       ),
@@ -334,7 +334,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: _buildInfoCard(
                         icon: Icons.person,
                         title: 'Puesto',
-                        value: '--',
+                        value: widget.profileData?.hierarchicalLevel ?? 'No disponible',
                         isWeb: isWeb,
                         isTablet: isTablet,
                       ),
@@ -365,10 +365,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required bool isWeb,
     required bool isTablet,
   }) {
-    final cardPadding = isWeb ? 20.0 : (isTablet ? 18.0 : 16.0);
-    final iconSize = isWeb ? 24.0 : (isTablet ? 22.0 : 20.0);
-    final titleFontSize = isWeb ? 16.0 : 15.0;
-    final valueFontSize = isWeb ? 14.0 : 13.0;
+    final cardPadding = isWeb ? 28.0 : (isTablet ? 24.0 : 8.0);
+    final iconSize = 22.00;
+    final titleFontSize = isWeb ? 16.0 : 12.0;
+    final valueFontSize = isWeb ? 14.0 : 12.0;
 
     return Container(
       padding: EdgeInsets.all(cardPadding),
