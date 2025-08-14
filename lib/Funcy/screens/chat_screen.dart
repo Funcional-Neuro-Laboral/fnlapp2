@@ -1,16 +1,24 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
+// Import condicional para Web
+import 'dart:html' as html show WebSocket;
+// Import condicional para plataformas nativas
+import 'dart:io' show WebSocket;
 import '../widgets/chat_message.dart';
 import '../widgets/chat_box_footer.dart';
 import '../widgets/custom_app_bar.dart';
-import '../../config.dart'; // Importa el archivo de configuración
+import '../../config.dart';
+import 'dart:async';
 
 class ChatScreen extends StatefulWidget {
   final int userId;
+  final String username;
 
-  ChatScreen({required this.userId});
+  ChatScreen({required this.userId, required this.username});
 
   @override
   _ChatScreenState createState() => _ChatScreenState();
@@ -24,16 +32,158 @@ class _ChatScreenState extends State<ChatScreen> {
   int _limit = 20;
   int _offset = 0;
   bool _loadingMore = false;
+  dynamic _webSocket;
+  bool _isConnected = false;
+  bool _botIsTyping = false;
+  String _currentBotMessage = '';
+  Timer? _typingTimer;
 
   @override
   void initState() {
     super.initState();
+    _connectWebSocket();
     _scrollController.addListener(_onScroll);
     _fetchMessages();
   }
 
+  void _connectWebSocket() async {
+    try {
+      if (kIsWeb) {
+        // Para Flutter Web
+        _webSocket = html.WebSocket(Config.wsUrl);
+        _webSocket.onOpen.listen((event) {
+          if (mounted) { // Verificar si el widget sigue montado
+            setState(() => _isConnected = true);
+          }
+          print("Conectado (Web)");
+        });
+
+        _webSocket.onMessage.listen((event) {
+          final data = jsonDecode(event.data);
+          _handleIncomingMessage(data);
+        });
+
+        _webSocket.onClose.listen((event) {
+          print("WebSocket cerrado (Web)");
+          if (mounted) { // Verificar si el widget sigue montado
+            setState(() => _isConnected = false);
+          }
+        });
+      } else {
+        // Para Android, iOS, Desktop
+        _webSocket = await WebSocket.connect(Config.wsUrl);
+        if (mounted) { // Verificar si el widget sigue montado
+          setState(() => _isConnected = true);
+        }
+        print("Conectado (Móvil/Escritorio)");
+
+        _webSocket.listen((message) {
+          final data = jsonDecode(message);
+          _handleIncomingMessage(data);
+        },
+            onDone: () {
+              print("⚠WebSocket cerrado (Móvil/Escritorio)");
+              if (mounted) { // Verificar si el widget sigue montado
+                setState(() => _isConnected = false);
+              }
+            });
+      }
+    } catch (e) {
+      print("No se pudo conectar: $e");
+    }
+  }
+
+  void _showTypingEffect(String fullMessage) {
+    if (!mounted || fullMessage.isEmpty) return; // Verificar mounted
+
+    final botMessageId = DateTime.now().millisecondsSinceEpoch.toString();
+    setState(() {
+      messages.insert(0, {
+        'id': botMessageId,
+        'text': '',
+        'time': DateFormat('HH:mm').format(DateTime.now()),
+        'user_id': 1,
+        'created_at': DateTime.now().toString(),
+        'isTyping': true,
+      });
+      _currentBotMessage = '';
+    });
+
+    final words = fullMessage.split(' ');
+    int currentWordIndex = 0;
+
+    _typingTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
+      if (!mounted) { // Verificar mounted en cada iteración
+        timer.cancel();
+        return;
+      }
+
+      if (currentWordIndex < words.length) {
+        setState(() {
+          _currentBotMessage += (currentWordIndex == 0 ? '' : ' ') + words[currentWordIndex];
+          final messageIndex = messages.indexWhere((msg) => msg['id'] == botMessageId);
+          if (messageIndex != -1) {
+            messages[messageIndex]['text'] = _currentBotMessage;
+          }
+        });
+        currentWordIndex++;
+      } else {
+        timer.cancel();
+        if (mounted) { // Verificar mounted antes del setState final
+          setState(() {
+            final messageIndex = messages.indexWhere((msg) => msg['id'] == botMessageId);
+            if (messageIndex != -1) {
+              messages[messageIndex]['isTyping'] = false;
+            }
+          });
+        }
+      }
+    });
+  }
+
+  void _handleIncomingMessage(Map<String, dynamic> data) {
+    if (!mounted) return;
+
+    if (data['type'] == 'status') {
+      print("Estado: ${data['status']} - ${data['message']}");
+
+      if (data['status'] == 'processing') {
+        setState(() {
+          _botIsTyping = true;
+        });
+      }
+    }
+    else if (data['type'] == 'bot_message') {
+      setState(() {
+        _botIsTyping = false;
+      });
+
+      final botResponse = data['data']['response'] ?? '';
+      _showTypingEffect(botResponse);
+    }
+    else if (data['type'] == 'error') {
+      setState(() {
+        _botIsTyping = false;
+      });
+      print("Error: ${data['message']}");
+    }
+  }
+
+
   @override
   void dispose() {
+    _typingTimer?.cancel();
+    if (_webSocket != null) {
+      try {
+        if (kIsWeb) {
+          _webSocket.close();
+        } else {
+          _webSocket.close();
+        }
+      } catch (e) {
+        print("Error cerrando WebSocket: $e");
+      }
+    }
     _scrollController.dispose();
     super.dispose();
   }
@@ -41,7 +191,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _onScroll() {
     _scrollOffset = _scrollController.offset;
     if (_scrollController.position.pixels ==
-            _scrollController.position.maxScrollExtent &&
+        _scrollController.position.maxScrollExtent &&
         !_loadingMore) {
       _loadMoreMessages();
     }
@@ -54,7 +204,7 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     }
 
-    final url = Uri.parse('${Config.apiUrl}/messages/filtered?userId=${widget.userId}&limit=$_limit&offset=$_offset');
+    final url = Uri.parse('${Config.apiUrl2}/chat/messages?userId=${widget.userId}&limit=$_limit&offset=$_offset');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
@@ -68,7 +218,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 'time': item['created_at'] != null
                     ? DateFormat('HH:mm').format(DateTime.parse(item['created_at']))
                     : '',
-                'user_id': item['user_id'] ?? 0,
+                // Mapear según el sender: FUNCY = 1 (bot), USER = userId actual
+                'user_id': item['sender'] == 'FUNCY' ? 1 : widget.userId,
                 'created_at': item['created_at'] ?? '',
               };
             }).toList());
@@ -81,7 +232,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 'time': item['created_at'] != null
                     ? DateFormat('HH:mm').format(DateTime.parse(item['created_at']))
                     : '',
-                'user_id': item['user_id'] ?? 0,
+                // Mapear según el sender: FUNCY = 1 (bot), USER = userId actual
+                'user_id': item['sender'] == 'FUNCY' ? 1 : widget.userId,
                 'created_at': item['created_at'] ?? '',
               };
             }).toList();
@@ -102,69 +254,52 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendMessage(String text) async {
-    final url = Uri.parse('${Config.apiUrl}/ask'); // Usar Config.apiUrl
-    try {
-      final id = messages.length;
-      print(id);
-      setState(() {
-        messages.insert(
-          0,
-          {
-            'id': id ?? '',
-            'text': text,
-            'time': DateFormat('HH:mm').format(DateTime.now()),
-            'user_id': widget.userId,
-            'created_at': '2025-01-18 20:21:08',
-          },
-        );
-      });
-      _scrollController.animateTo(
-        0.0,
-        duration: Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'prompt': text,
-          'userId': widget.userId,
-        }),
-      );
-      if (response.statusCode == 201) {
-        //el mensaje del usuario se almacena en local
-
-        //la respuesta del bot se almacena en local
-        final responseData = json.decode(response.body);
-        final botMessage = responseData['response']?.toString().trim() ?? '';
-        final idbot = messages.length;
-        print(idbot);
-        setState(() {
-          messages.insert(
-            0,
-            {
-              'id': idbot ?? '',
-              'text': botMessage,
-              'time': DateFormat('HH:mm').format(DateTime.now()),
-              'user_id': 1,
-              'created_at': responseData['created_at'] ?? '2025-01-18 20:21:08',
-            },
-          );
-        });
-        _scrollController.animateTo(
-          0.0,
-          duration: Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-
-        //_getBotResponse(text);
-      } else {
-        print('Error al enviar el mensaje: ${response.statusCode}');
-      }
-    } catch (error) {
-      print('Error en la solicitud HTTP: $error');
+    if (!_isConnected) {
+      print("No conectado al WebSocket");
+      return;
     }
+
+    // Agregar mensaje local del usuario
+    setState(() {
+      messages.insert(0, {
+        'id': DateTime
+            .now()
+            .millisecondsSinceEpoch
+            .toString(),
+        'text': text,
+        'time': DateFormat('HH:mm').format(DateTime.now()),
+        'user_id': widget.userId,
+        'created_at': DateTime.now().toString(),
+      });
+    });
+
+    // Enviar al WebSocket
+    final message = {
+      'type': 'send_message',
+      'prompt': text,
+      'userId': widget.userId,
+      'username': widget.username
+    };
+
+    final messageJson = jsonEncode(message);
+
+    // Usar el metodo correcto según la plataforma
+    if (kIsWeb) {
+      // Para Flutter Web usar send()
+      _webSocket.send(messageJson);
+    } else {
+      // Para plataformas nativas usar add()
+      _webSocket.add(messageJson);
+    }
+
+    // Mover scroll al inicio
+    _scrollController.animateTo(
+      0.0,
+      duration: Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
   }
+
   /*
   Future<void> _getBotResponse(String userMessage) async {
     if (userMessage.isEmpty) {
@@ -247,11 +382,11 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: Stack(
               children: [
-                  Positioned.fill(
+                Positioned.fill(
                     child: Container(
                       color: Color(0xFFF6F6F6),
                     )
-                  ),
+                ),
                 Column(
                   children: [
                     Expanded(
@@ -259,16 +394,24 @@ class _ChatScreenState extends State<ChatScreen> {
                         controller: _scrollController,
                         reverse: true,
                         cacheExtent: 1000,
-                        itemCount: messages.length,
+                        itemCount: messages.length + (_botIsTyping ? 1 : 0),
                         itemBuilder: (context, index) {
-                          final text = messages[index]['text'] ?? '';
-                          final time = messages[index]['time'] ?? '';
-                          final user_id = messages[index]['user_id'] ?? '';
+                          // Mostrar indicador de "analizando" en la primera posición
+                          if (_botIsTyping && index == 0) {
+                            return _buildTypingIndicator();
+                          }
 
-                          final userType = user_id == widget.userId ? user_id : 1;
+                          final messageIndex = _botIsTyping ? index - 1 : index;
+                          final text = messages[messageIndex]['text'] ?? '';
+                          final time = messages[messageIndex]['time'] ?? '';
+                          final user_id = messages[messageIndex]['user_id'] ??
+                              '';
+                          final userType = user_id == widget.userId
+                              ? user_id
+                              : 1;
 
                           return ChatMessage(
-                            key: ValueKey(messages[index]['id']),
+                            key: ValueKey(messages[messageIndex]['id']),
                             message: text,
                             time: time,
                             userId: user_id,
@@ -293,4 +436,56 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
+
+  Widget _buildTypingIndicator() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 20.0,
+            backgroundColor: Colors.transparent,
+            child: ClipOval(
+              child: Image.network(
+                'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_chat.jpg',
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          SizedBox(width: 8),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Color(0xFFEAE5F9),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Funcy está pensando...',
+                  style: TextStyle(
+                    color: Color(0xFF222222),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(width: 8),
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF351A8B)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 }

@@ -257,7 +257,7 @@ class ChatWidget extends StatelessWidget {
       await _updateFuncyInteract();
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => ChatScreen(userId: userId)),
+        MaterialPageRoute(builder: (context) => ChatScreen(userId: userId, username: username,)),
       );
     } else {
       print("Error: userId no definido");
