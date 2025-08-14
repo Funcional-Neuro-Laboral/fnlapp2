@@ -364,8 +364,24 @@ class PlanScreen extends StatelessWidget {
   }
 
   Widget _buildCardImage(Programa programa, bool isUnlocked) {
+    const String lockedImageUrl = 'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/imagen_bloqueada.png';
 
-    const String lockedImageUrl = 'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/imagen_bloqueada.png'; // Imagen de bloqueo
+    // Función para generar URL de imagen por día
+    String getImageUrl() {
+      if (!isUnlocked) return lockedImageUrl;
+
+      /*// Si ya tiene una URL específica en la base de datos, usarla
+      if (programa.urlImg != null && programa.urlImg!.isNotEmpty) {
+        return programa.urlImg!;
+      }*/
+
+      // Mapeo temporal para los 21 días
+      if (programa.dia >= 1 && programa.dia <= 21) {
+        return 'https://funkyrecursos.s3.us-east-2.amazonaws.com/recursos_nuevos/DIA${programa.dia}.png';
+      }
+
+      return '';
+    }
 
     return ClipRRect(
       borderRadius: const BorderRadius.only(
@@ -373,7 +389,7 @@ class PlanScreen extends StatelessWidget {
         topRight: Radius.circular(AppConstants.cardBorderRadius),
       ),
       child: Image.network(
-        isUnlocked ? (programa.urlImg ?? '') : lockedImageUrl,
+        getImageUrl(),
         width: double.infinity,
         height: AppConstants.cardImageHeight,
         fit: BoxFit.cover,
