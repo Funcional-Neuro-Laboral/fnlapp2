@@ -3,7 +3,7 @@ import 'package:fnlapp/config.dart';
 class ProfileData {
   final String email;
   final String hierarchicalLevel;
-  final String? profileImage;
+  String? profileImage;
   final int? idEmpresa;
   final String nombres;
   final String apellidos;
