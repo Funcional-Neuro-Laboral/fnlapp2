@@ -60,16 +60,21 @@ class CustomNavigationBar extends StatelessWidget {
     bool isExitTest = index == 4;
     bool isSelected = selectedIndex == index;
 
+    // Ajustar padding según el número de elementos
+    double horizontalPadding = showExitTest
+        ? (isSelected ? 16 : 8)
+        : (isSelected ? 20 : 12);
+
     return GestureDetector(
       onTap: isExitTest && !isExitTestEnabled
           ? null
           : () => onItemTapped(index),
       child: AnimatedContainer(
         duration: Duration(milliseconds: 200),
-      padding: EdgeInsets.symmetric(
-        horizontal: isSelected ? 20 : 12,
-        vertical: isSelected ? 12 : 10,
-      ),
+        padding: EdgeInsets.symmetric(
+          horizontal: horizontalPadding,
+          vertical: isSelected ? 12 : 10,
+        ),
         decoration: BoxDecoration(
           color: isSelected
               ? const Color(0xFF6D4BD8)
@@ -84,16 +89,19 @@ class CustomNavigationBar extends StatelessWidget {
               color: isExitTest && !isExitTestEnabled
                   ? Colors.grey.shade700
                   : (isSelected ? Colors.white : const Color(0xFF1C1B1F)),
-              size: 24,
+              size: showExitTest ? 20 : 24, // Iconos más pequeños con 5 elementos
             ),
             if (isSelected) ...[
-              SizedBox(width: 8),
-              Text(
-                items[index]['label'],
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+              SizedBox(width: showExitTest ? 6 : 8), // Menor espacio con 5 elementos
+              Flexible(
+                child: Text(
+                  items[index]['label'],
+                  style: TextStyle(
+                    fontSize: showExitTest ? 12 : 14, // Texto más pequeño con 5 elementos
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

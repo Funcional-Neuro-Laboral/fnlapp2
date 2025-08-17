@@ -148,7 +148,7 @@ class PlanScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       _buildHeader(),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 15),
                       _buildProgressSection(context),
                       const SizedBox(height: 20),
                       _buildContent(context),
