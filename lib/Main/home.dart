@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fnlapp/Funcy/screens/splash_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../Util/token_service.dart';
 import './models/profile_data.dart';
 import '../config.dart';
 import '../Main/widgets/custom_navigation_bar.dart';
@@ -266,8 +267,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _handleLogout() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    // Usar logout con invalidación de tokens en servidor
+    await TokenService.instance.logout(logoutAll: false);
+
     if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,

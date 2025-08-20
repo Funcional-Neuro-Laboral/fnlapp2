@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../Util/token_service.dart';
 import 'models/profile_data.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -546,7 +547,14 @@ Future<void> _uploadProfileImage() async {
       ),
       margin: EdgeInsets.symmetric(horizontal: horizontalMargin),
       child: ElevatedButton(
-        onPressed: () => widget.onLogout(),
+        onPressed: () async {
+          // Mostrar diálogo de confirmación con opción de cerrar en todos los dispositivos
+          final result = await _showLogoutDialog();
+          if (result != null) {
+            await TokenService.instance.logout(logoutAll: result);
+            widget.onLogout();
+          }
+        },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: const Color(0xFF6D4BD8),
@@ -574,6 +582,33 @@ Future<void> _uploadProfileImage() async {
           ),
         ),
       ),
+    );
+  }
+
+  // Agregar metodo para mostrar diálogo de logout
+  Future<bool?> _showLogoutDialog() async {
+    return showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Cerrar sesión'),
+          content: Text('¿Deseas cerrar sesión en todos tus dispositivos?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('Solo este dispositivo'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text('Todos los dispositivos'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
