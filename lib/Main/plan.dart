@@ -377,7 +377,7 @@ class PlanScreen extends StatelessWidget {
 
       // Mapeo temporal para los 21 días
       if (programa.dia >= 1 && programa.dia <= 21) {
-        return 'https://funkyrecursos.s3.us-east-2.amazonaws.com/recursos_nuevos/DIA${programa.dia}.png';
+        return 'https://funkyrecursos.s3.us-east-2.amazonaws.com/recursos_nuevos2/DIA${programa.dia}.png';
       }
 
       return '';
