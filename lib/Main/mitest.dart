@@ -223,21 +223,6 @@ class MiTestScreen extends StatelessWidget {
                 ),
               ),
             ),
-
-
-
-            // “pill” inferior (el handle visual)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12.0),
-              child: Container(
-                width: 134,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(100),
-                ),
-              ),
-            ),
           ],
         ),
       ),
