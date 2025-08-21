@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../Main/recuperarcontra.dart';
+import '../Util/token_service.dart';
 import '../config.dart'; // Importa el archivo de configuración
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -35,22 +36,26 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login(BuildContext context) async {
     if (_formKey.currentState == null || !_formKey.currentState!.validate()) return;
 
-    final username = emailController.text.trim();
+    final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
     setState(() {
-      isLoading = true;  // Activar el indicador de carga
+      isLoading = true;
     });
 
     try {
       final response = await http.post(
-        Uri.parse('${Config.apiUrl}/login'),
+        Uri.parse('${Config.apiUrl2}/users/login'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'username': username, 'password': password}),
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          'rememberMe': rememberMe.value
+        }),
       );
 
       setState(() {
-        isLoading = false;  // Desactivar el indicador de carga
+        isLoading = false;
       });
 
       if (response.statusCode == 200) {
@@ -64,7 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       setState(() {
-        isLoading = false;  // Desactivar el indicador de carga en caso de error
+        isLoading = false;
       });
       print(e);
       _showSnackBar(context, 'Error: Intentar nuevamente o Contactar al soporte');
@@ -73,26 +78,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleLoginResponse(BuildContext context, http.Response response) async {
     final responseBody = jsonDecode(response.body);
-    final token = responseBody['token'];
-    final username = responseBody['username'];
-    final userId = responseBody['userId'];
-    final email = responseBody['email'];
-    final role = responseBody['role'];
 
-    if (role == 'User') {
+    if (responseBody['success'] == true && responseBody['data'] != null) {
+      final data = responseBody['data'];
+      final user = data['user'];
+      final token = data['token'];
+      final refreshToken = data['refreshToken'];
+
+      final userId = user['id'];
+      final email = user['email'];
+      final username = user['username'];
+
       if (token != null && username != null && userId != null && email != null) {
-        await _saveUserData(token, username, userId, email);
-
-
+        await _saveUserData(token, username, userId, email, refreshToken);
         await _fetchAndSavePermissions(userId);
 
+        // Inicializar el servicio de renovación de tokens
+        await TokenService.instance.initializeTokenRefresh();
 
         _navigateBasedOnPermission(context);
       } else {
         _showSnackBar(context, 'Datos de autenticación no recibidos');
       }
     } else {
-      _showSnackBar(context, 'Usuario no autorizado');
+      _showSnackBar(context, 'Error en la respuesta del servidor');
     }
   }
 
@@ -128,10 +137,18 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
 
-  Future<void> _saveUserData(String token, String username, int userId, String email) async {
+  Future<void> _saveUserData(String token, String username, int userId, String email, String? refreshToken) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
 
     await prefs.setString('token', token);
+
+    // Solo guardar refreshToken si no es null
+    if (refreshToken != null) {
+      await prefs.setString('refreshToken', refreshToken);
+    } else {
+      await prefs.remove('refreshToken'); // Remover si existe
+    }
+
     await prefs.setString('username', username);
     await prefs.setInt('userId', userId);
     await prefs.setString('email', email);

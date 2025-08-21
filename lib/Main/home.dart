@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fnlapp/Funcy/screens/splash_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../Util/token_service.dart';
 import './models/profile_data.dart';
 import '../config.dart';
 import '../Main/widgets/custom_navigation_bar.dart';
@@ -143,7 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     try {
-      String url = '${Config.apiUrl}/perfilUsuario/$userId';
+      String url = '${Config.apiUrl2}/users/getprofile/$userId';
       final response = await http.get(Uri.parse(url), headers: {
         'Authorization': 'Bearer $token',
       });
@@ -172,6 +173,16 @@ class _HomeScreenState extends State<HomeScreen> {
         showWidgets = true;
       }
     });
+  }
+
+  // --- FUNCIÓN PARA ACTUALIZAR LA IMAGEN DE PERFIL ---
+  void _updateProfileImage(String newImageUrl) {
+    if (profileData != null) {
+      setState(() {
+        profileData!.profileImage = newImageUrl;
+      });
+      print('Imagen de perfil actualizada en HomeScreen: $newImageUrl');
+    }
   }
 
   Widget _getSelectedWidget() {
@@ -205,6 +216,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return ProfileScreen(
           profileData: profileData,
           onLogout: _handleLogout,
+          onProfileImageUpdated: _updateProfileImage,
         );
       case 4:
         if (showExitTest) {
@@ -255,8 +267,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _handleLogout() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    // Usar logout con invalidación de tokens en servidor
+    await TokenService.instance.logout(logoutAll: false);
+
     if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,

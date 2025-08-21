@@ -3,8 +3,9 @@ import 'chat_screen.dart';
 
 class SplashScreen extends StatelessWidget {
   final int userId;
+  final String username; // Agregar username
 
-  SplashScreen({required this.userId});
+  SplashScreen({required this.userId, required this.username}); // Requerir username
 
   @override
   Widget build(BuildContext context) {
@@ -12,7 +13,10 @@ class SplashScreen extends StatelessWidget {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => ChatScreen(userId: userId), // Pasa el userId a ChatScreen
+          builder: (context) => ChatScreen(
+            userId: userId,
+            username: username, // Pasar username
+          ),
         ),
       );
     });
@@ -29,5 +33,3 @@ class SplashScreen extends StatelessWidget {
     );
   }
 }
-
-//SPLASH SCREEN INNECESARIO, Solo relentiza la navegación del usuario

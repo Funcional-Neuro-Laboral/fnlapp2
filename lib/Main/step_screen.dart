@@ -61,6 +61,15 @@ class _StepScreenState extends State<StepScreen> {
     });
   }
 
+  //mapeo temporal de 21 dias
+  String _getImageUrlByDay() {
+    // Usar la misma lógica que en plan.dart
+    if (widget.dia >= 1 && widget.dia <= 21) {
+      return 'https://funkyrecursos.s3.us-east-2.amazonaws.com/recursos_nuevos2/DIA${widget.dia}.png';
+    }
+    return widget.url_img; // Fallback a la URL original
+  }
+
   @override
   void dispose() {
     flutterTts?.stop();
@@ -394,10 +403,9 @@ class _StepScreenState extends State<StepScreen> {
       child: Column(
         children: [
           // Imagen con bordes redondeados
-          Expanded(
-            flex: 3,
-            child: Container(
+            Container(
               width: double.infinity,
+              height: 300,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
@@ -411,8 +419,10 @@ class _StepScreenState extends State<StepScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: Image.network(
-                  widget.url_img,
+                  _getImageUrlByDay(), //temporal mientras se usa mapeo de 21 dias
                   fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: 300,
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
                     return Container(
@@ -435,7 +445,6 @@ class _StepScreenState extends State<StepScreen> {
                 ),
               ),
             ),
-          ),
           const SizedBox(height: 24),
 
           // Título de tamaño de texto

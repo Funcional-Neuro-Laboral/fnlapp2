@@ -3,11 +3,12 @@ import 'package:fnlapp/config.dart';
 class ProfileData {
   final String email;
   final String hierarchicalLevel;
-  final String? profileImage;
+  String? profileImage;
   final int? idEmpresa;
   final String nombres;
   final String apellidos;
   String? nombreEmpresa;
+  final String? gender;
 
   ProfileData({
     required this.email,
@@ -17,6 +18,7 @@ class ProfileData {
     this.profileImage,
     this.idEmpresa,
     this.nombreEmpresa,
+    this.gender,
   });
 
   // --- FÁBRICA CORREGIDA PARA SER A PRUEBA DE NULOS ---
@@ -42,11 +44,12 @@ class ProfileData {
 
       // Nos aseguramos de que el id sea un entero nulable.
       idEmpresa: json['id_empresa'] as int?,
+      gender: json['gender'],
     );
   }
 
   @override
   String toString() {
-    return 'ProfileData{profileImage: $profileImage, hierarchicalLevel: $hierarchicalLevel, email: $email, id_empresa: $idEmpresa}';
+    return 'ProfileData{profileImage: $profileImage, hierarchicalLevel: $hierarchicalLevel, email: $email, id_empresa: $idEmpresa, gender: $gender}';
   }
 }

@@ -2,18 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'dart:typed_data';
+import '../Util/token_service.dart';
 import 'models/profile_data.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../config.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http_parser/http_parser.dart';
 
 class ProfileScreen extends StatefulWidget {
   final ProfileData? profileData;
   final Function onLogout;
-  final Function(String)? onImageSelected; // Callback para manejar la nueva imagen
+  final Function(String)? onImageSelected;
+  final Function(String)? onProfileImageUpdated;
 
   ProfileScreen({
     required this.profileData,
     required this.onLogout,
     this.onImageSelected,
+    this.onProfileImageUpdated, // Agregar este parámetro
   });
 
   @override
@@ -25,9 +32,103 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Uint8List? _selectedImageBytes; // Para web
   final ImagePicker _picker = ImagePicker();
 
+Future<void> _uploadProfileImage() async {
+  if (_selectedImage == null && _selectedImageBytes == null) {
+    return;
+  }
+
+  try {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt('userId');
+    final token = prefs.getString('token');
+
+    if (userId == null) {
+      throw Exception('No se pudo obtener el ID del usuario');
+    }
+
+    final uri = Uri.parse('${Config.apiUrl2}/users/upload-photo/$userId');
+    final request = http.MultipartRequest('PUT', uri);
+
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+
+    if (kIsWeb && _selectedImageBytes != null) {
+      String filename = 'profile_image.jpg';
+      String contentType = 'image/jpeg';
+
+      if (_selectedImageBytes!.length > 3) {
+        if (_selectedImageBytes![0] == 0x89 &&
+            _selectedImageBytes![1] == 0x50 &&
+            _selectedImageBytes![2] == 0x4E &&
+            _selectedImageBytes![3] == 0x47) {
+          filename = 'profile_image.png';
+          contentType = 'image/png';
+        }
+        else if (_selectedImageBytes![0] == 0xFF &&
+                 _selectedImageBytes![1] == 0xD8 &&
+                 _selectedImageBytes![2] == 0xFF) {
+          contentType = 'image/jpeg';
+        }
+      }
+
+      request.files.add(http.MultipartFile.fromBytes(
+        'file',
+        _selectedImageBytes!,
+        filename: filename,
+        contentType: MediaType.parse(contentType),
+      ));
+    } else if (!kIsWeb && _selectedImage != null) {
+      String path = _selectedImage!.path.toLowerCase();
+      String contentType;
+
+      if (path.endsWith('.png')) {
+        contentType = 'image/png';
+      } else if (path.endsWith('.jpg') || path.endsWith('.jpeg')) {
+        contentType = 'image/jpeg';
+      } else {
+        throw Exception('Solo se permiten archivos JPG y PNG');
+      }
+
+      request.files.add(await http.MultipartFile.fromPath(
+        'file',
+        _selectedImage!.path,
+        contentType: MediaType.parse(contentType),
+      ));
+    }
+
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+
+    if (response.statusCode == 200) {
+      final jsonResponse = json.decode(responseBody);
+
+      if (jsonResponse['profileImage'] != null) {
+        final newImageUrl = jsonResponse['profileImage'];
+
+        setState(() {
+          widget.profileData?.profileImage = newImageUrl;
+          _selectedImage = null;
+          _selectedImageBytes = null;
+        });
+
+        if (widget.onProfileImageUpdated != null) {
+          widget.onProfileImageUpdated!(newImageUrl);
+        }
+
+        imageCache.clear();
+        imageCache.clearLiveImages();
+      }
+    } else {
+      final errorResponse = json.decode(responseBody);
+      throw Exception('Error del servidor: ${response.statusCode} - ${errorResponse['error']['message']}');
+    }
+  } catch (e) {
+  }
+}
+
   Future<void> _pickImage() async {
     try {
-      // Mostrar diálogo para elegir entre cámara y galería
       final ImageSource? source = await _showImageSourceDialog();
       if (source == null) return;
 
@@ -39,34 +140,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
       if (image != null) {
+        // Verificar que sea JPG o PNG
+        String fileName = image.name.toLowerCase();
+        if (!fileName.endsWith('.jpg') && !fileName.endsWith('.jpeg') && !fileName.endsWith('.png')) {
+          return;
+        }
+
         if (kIsWeb) {
-          // En web, leemos los bytes de la imagen
           final bytes = await image.readAsBytes();
           setState(() {
             _selectedImageBytes = bytes;
             _selectedImage = null;
           });
         } else {
-          // En móvil, usamos File
           setState(() {
             _selectedImage = File(image.path);
             _selectedImageBytes = null;
           });
         }
 
-        // Llamar al callback si existe
         if (widget.onImageSelected != null) {
           widget.onImageSelected!(image.path);
         }
+
+        // Subir la imagen automáticamente
+        await _uploadProfileImage();
       }
     } catch (e) {
-      // Mostrar error al usuario
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al seleccionar imagen: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 
@@ -153,7 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildContent(bool isWeb, bool isTablet, double screenWidth) {
-    final maxWidth = isWeb ? 800.0 : double.infinity;
+    final maxWidth = isWeb ? 1000.0 : (isTablet ? 900.0 : double.infinity);
     final horizontalPadding = isWeb ? 40.0 : (isTablet ? 30.0 : 20.0);
 
     return Center(
@@ -251,7 +351,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildInfoGrid(bool isWeb, bool isTablet, double screenWidth) {
-    final cardPadding = isWeb ? 25.0 : (isTablet ? 22.0 : 20.0);
+    final cardPadding = isWeb ? 35.0 : (isTablet ? 30.0 : 14.0);
     final cardSpacing = isWeb ? 16.0 : 12.0;
 
     return Container(
@@ -278,7 +378,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Expanded(child: _buildInfoCard(
                     icon: Icons.female,
                     title: 'Género',
-                    value: '--',
+                    value: widget.profileData?.gender ?? 'No disponible',
                     isWeb: isWeb,
                     isTablet: isTablet
                 )),
@@ -286,7 +386,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Expanded(child: _buildInfoCard(
                     icon: Icons.person,
                     title: 'Puesto',
-                    value: '--',
+                    value: widget.profileData?.hierarchicalLevel ?? 'No disponible',
                     isWeb: isWeb,
                     isTablet: isTablet
                 )),
@@ -320,7 +420,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: _buildInfoCard(
                         icon: Icons.female,
                         title: 'Género',
-                        value: '--',
+                        value: widget.profileData?.gender ?? 'No disponible',
                         isWeb: isWeb,
                         isTablet: isTablet,
                       ),
@@ -334,7 +434,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: _buildInfoCard(
                         icon: Icons.person,
                         title: 'Puesto',
-                        value: '--',
+                        value: widget.profileData?.hierarchicalLevel ?? 'No disponible',
                         isWeb: isWeb,
                         isTablet: isTablet,
                       ),
@@ -365,10 +465,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required bool isWeb,
     required bool isTablet,
   }) {
-    final cardPadding = isWeb ? 20.0 : (isTablet ? 18.0 : 16.0);
-    final iconSize = isWeb ? 24.0 : (isTablet ? 22.0 : 20.0);
-    final titleFontSize = isWeb ? 16.0 : 15.0;
-    final valueFontSize = isWeb ? 14.0 : 13.0;
+    final cardPadding = isWeb ? 28.0 : (isTablet ? 24.0 : 8.0);
+    final iconSize = 22.00;
+    final titleFontSize = isWeb ? 16.0 : 12.0;
+    final valueFontSize = isWeb ? 14.0 : 12.0;
 
     return Container(
       padding: EdgeInsets.all(cardPadding),
@@ -447,7 +547,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       margin: EdgeInsets.symmetric(horizontal: horizontalMargin),
       child: ElevatedButton(
-        onPressed: () => widget.onLogout(),
+        onPressed: () async {
+          // Mostrar diálogo de confirmación con opción de cerrar en todos los dispositivos
+          final result = await _showLogoutDialog();
+          if (result != null) {
+            await TokenService.instance.logout(logoutAll: result);
+            widget.onLogout();
+          }
+        },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: const Color(0xFF6D4BD8),
@@ -475,6 +582,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  // Agregar metodo para mostrar diálogo de logout
+  Future<bool?> _showLogoutDialog() async {
+    return showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Cerrar sesión'),
+          content: Text('¿Deseas cerrar sesión en todos tus dispositivos?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('Solo este dispositivo'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text('Todos los dispositivos'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

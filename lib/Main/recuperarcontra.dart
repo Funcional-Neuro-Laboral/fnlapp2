@@ -11,18 +11,31 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final TextEditingController emailController = TextEditingController();
+  final TextEditingController codeController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool isLoading = false;
-  int currentStep = 1; // 1: Email, 2: Password, 3: Finish
+  int currentStep = 1; // 1: Email, 2: Code, 3: Password, 4: Finish
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   void _handleEmailStep() {
-    _nextStep(); // Solo avanzar al siguiente paso
+    if (_formKey.currentState!.validate()) {
+      _sendResetEmail();
+    }
+  }
+
+  void _handleCodeStep() {
+    if (_formKey.currentState!.validate()) {
+      _verifyCode();
+    }
   }
 
   void _handlePasswordStep() {
-    _nextStep(); // Solo avanzar al siguiente paso
+    if (_formKey.currentState!.validate()) {
+      _resetPassword();
+    }
   }
 
   // Metodo para avanzar al siguiente paso
@@ -38,24 +51,25 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       case 1:
         return _buildEmailStep();
       case 2:
-        return _buildPasswordStep();
+        return _buildCodeStep();
       case 3:
+        return _buildPasswordStep();
+      case 4:
         return _buildFinishStep();
       default:
         return _buildEmailStep();
     }
   }
 
+  // Metodo para enviar codigo al correo
   Future<void> _sendResetEmail() async {
-    if (!_formKey.currentState!.validate()) return;
-
     setState(() {
       isLoading = true;
     });
 
     try {
       final response = await http.post(
-        Uri.parse('${Config.apiUrl}/forgot-password'),
+        Uri.parse('${Config.apiUrl2}/users/recovery-password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': emailController.text.trim()}),
       );
@@ -65,9 +79,72 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       });
 
       if (response.statusCode == 200) {
-        _nextStep(); // Avanzar al siguiente paso en lugar de mostrar dialog
+        _nextStep(); // Avanzar al paso de verificación de código
       } else {
         _showSnackBar('Error al enviar el correo de recuperación');
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      _showSnackBar('Error de conexión. Intenta nuevamente.');
+    }
+  }
+
+  // Método para reenviar código
+  Future<void> _resendCode() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('${Config.apiUrl2}/users/recovery-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': emailController.text.trim()}),
+      );
+
+      setState(() {
+        isLoading = false;
+      });
+
+      if (response.statusCode == 200) {
+        _showSnackBar('Código reenviado exitosamente');
+      } else {
+        _showSnackBar('Error al reenviar el código');
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      _showSnackBar('Error de conexión. Intenta nuevamente.');
+    }
+  }
+
+  // Metodo para verificar codigo
+  Future<void> _verifyCode() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('${Config.apiUrl2}/users/validate-code'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': emailController.text.trim(),
+          'code': codeController.text.trim(),
+        }),
+      );
+
+      setState(() {
+        isLoading = false;
+      });
+
+      if (response.statusCode == 200) {
+        _nextStep(); // Avanzar al paso de nueva contraseña
+      } else {
+        _showSnackBar('Código incorrecto, expirado o ya utilizado.');
       }
     } catch (e) {
       setState(() {
@@ -84,12 +161,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
 
     try {
-      final response = await http.post(
-        Uri.parse('${Config.apiUrl}/reset-password'),
+      final response = await http.put(
+        Uri.parse('${Config.apiUrl2}/users/reset-password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': emailController.text.trim(),
-          'password': passwordController.text,
+          'code': codeController.text.trim(),
+          'newPassword': passwordController.text,
         }),
       );
 
@@ -100,7 +178,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       if (response.statusCode == 200) {
         _nextStep(); // Avanzar al paso final
       } else {
-        _showSnackBar('Error al restablecer la contraseña');
+        _showSnackBar('Error al restablecer la contraseña. Verifica los datos.');
       }
     } catch (e) {
       setState(() {
@@ -299,6 +377,132 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
+
+  Widget _buildCodeStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(height: 4),
+        Text(
+          'Verificar código',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Color(0xFF020107),
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Inter',
+          ),
+        ),
+        SizedBox(height: 16),
+        Text(
+          'Hemos enviado un código de verificación de 6 digitos a tu correo electrónico.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 18,
+            color: Color(0xFF020107),
+            fontFamily: 'Roboto',
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        SizedBox(height: 52),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Código de verificación',
+              style: TextStyle(
+                color: Color(0xFF212121),
+                fontSize: 16,
+                fontFamily: 'Roboto',
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: 8),
+            TextFormField(
+              controller: codeController,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: 'XXXXXX',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    width: 1,
+                    color: const Color(0xFF7F7F7F),
+                  ),
+                ),
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Este campo es requerido';
+                }
+                if (value.length != 6) {
+                  return 'El código debe tener 6 dígitos';
+                }
+                return null;
+              },
+            ),
+          ],
+        ),
+        SizedBox(height: 24),
+        TextButton(
+          onPressed: isLoading ? null : () => _resendCode(),
+          child: Text(
+            '¿No recibiste el código? Reenviar',
+            style: TextStyle(
+              color: Color(0xFF6D4BD8),
+              fontSize: 16,
+              fontFamily: 'Roboto',
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Spacer(), // Esto empuja el botón hacia abajo
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: isLoading ? null : _handleCodeStep,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF6D4BD8),
+              padding: EdgeInsets.symmetric(vertical: 16),
+              elevation: 4,
+              shadowColor: Color(0x26000000),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(40),
+              ),
+            ),
+            child: isLoading
+                ? CircularProgressIndicator(color: Colors.white)
+                : Text(
+              'Verificar código',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: 24), // Espacio entre botón y texto
+        Text(
+          'App para estudiantes',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: const Color(0x6652178F),
+            fontSize: 16,
+            fontFamily: 'Roboto',
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        SizedBox(height: 16),
+      ],
+    );
+  }
+
   Widget _buildPasswordStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -341,7 +545,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             SizedBox(height: 8),
             TextFormField(
               controller: passwordController,
-              obscureText: true,
+              obscureText: _obscurePassword,
               decoration: InputDecoration(
                 hintText: 'Ingresa tu nueva contraseña',
                 filled: true,
@@ -354,6 +558,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                 ),
                 contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                suffixIcon: Padding(
+                  padding: EdgeInsets.only(right: 8.0),
+                  child: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                      color: Colors.grey[600],
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
+                ),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
@@ -378,7 +596,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             SizedBox(height: 8),
             TextFormField(
               controller: confirmPasswordController,
-              obscureText: true,
+              obscureText: _obscureConfirmPassword,
               decoration: InputDecoration(
                 hintText: 'Repite tu nueva contraseña',
                 filled: true,
@@ -391,6 +609,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                 ),
                 contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                suffixIcon: Padding(
+                  padding: EdgeInsets.only(right: 8.0),
+                  child: IconButton(
+                    icon: Icon(
+                      _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                      color: Colors.grey[600],
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscureConfirmPassword = !_obscureConfirmPassword;
+                      });
+                    },
+                  ),
+                ),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
@@ -544,6 +776,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   void dispose() {
     emailController.dispose();
+    codeController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
     super.dispose();
