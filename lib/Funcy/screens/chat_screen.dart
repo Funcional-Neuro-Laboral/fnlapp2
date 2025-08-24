@@ -4,10 +4,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
-// Import condicional para Web
-import 'dart:html' as html show WebSocket;
-// Import condicional para plataformas nativas
-import 'dart:io' show WebSocket;
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:web_socket_channel/status.dart' as status;
 import '../widgets/chat_message.dart';
 import '../widgets/chat_box_footer.dart';
 import '../widgets/custom_app_bar.dart';
@@ -46,52 +44,33 @@ class _ChatScreenState extends State<ChatScreen> {
     _fetchMessages();
   }
 
-  void _connectWebSocket() async {
+  late WebSocketChannel _channel;
+
+  void _connectWebSocket() {
     try {
-      if (kIsWeb) {
-        // Para Flutter Web
-        _webSocket = html.WebSocket(Config.wsUrl);
-        _webSocket.onOpen.listen((event) {
-          if (mounted) { // Verificar si el widget sigue montado
-            setState(() => _isConnected = true);
-          }
-          print("Conectado (Web)");
-        });
+      _channel = WebSocketChannel.connect(Uri.parse(Config.wsUrl));
 
-        _webSocket.onMessage.listen((event) {
-          final data = jsonDecode(event.data);
-          _handleIncomingMessage(data);
-        });
-
-        _webSocket.onClose.listen((event) {
-          print("WebSocket cerrado (Web)");
-          if (mounted) { // Verificar si el widget sigue montado
-            setState(() => _isConnected = false);
-          }
-        });
-      } else {
-        // Para Android, iOS, Desktop
-        _webSocket = await WebSocket.connect(Config.wsUrl);
-        if (mounted) { // Verificar si el widget sigue montado
-          setState(() => _isConnected = true);
-        }
-        print("Conectado (Móvil/Escritorio)");
-
-        _webSocket.listen((message) {
-          final data = jsonDecode(message);
-          _handleIncomingMessage(data);
-        },
-            onDone: () {
-              print("⚠WebSocket cerrado (Móvil/Escritorio)");
-              if (mounted) { // Verificar si el widget sigue montado
-                setState(() => _isConnected = false);
-              }
-            });
+      if (mounted) {
+        setState(() => _isConnected = true);
       }
+      print("✅ Conectado al WebSocket");
+
+      _channel.stream.listen((message) {
+        final data = jsonDecode(message);
+        _handleIncomingMessage(data);
+      }, onDone: () {
+        print("⚠ WebSocket cerrado");
+        if (mounted) {
+          setState(() => _isConnected = false);
+        }
+      }, onError: (error) {
+        print("❌ Error WebSocket: $error");
+      });
     } catch (e) {
       print("No se pudo conectar: $e");
     }
   }
+
 
   void _showTypingEffect(String fullMessage) {
     if (!mounted || fullMessage.isEmpty) return; // Verificar mounted
@@ -171,22 +150,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
 
   @override
+  @override
   void dispose() {
     _typingTimer?.cancel();
-    if (_webSocket != null) {
-      try {
-        if (kIsWeb) {
-          _webSocket.close();
-        } else {
-          _webSocket.close();
-        }
-      } catch (e) {
-        print("Error cerrando WebSocket: $e");
-      }
-    }
+    _channel.sink.close(status.goingAway);
     _scrollController.dispose();
     super.dispose();
   }
+
 
   void _onScroll() {
     _scrollOffset = _scrollController.offset;
@@ -259,13 +230,9 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    // Agregar mensaje local del usuario
     setState(() {
       messages.insert(0, {
-        'id': DateTime
-            .now()
-            .millisecondsSinceEpoch
-            .toString(),
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
         'text': text,
         'time': DateFormat('HH:mm').format(DateTime.now()),
         'user_id': widget.userId,
@@ -273,7 +240,6 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     });
 
-    // Enviar al WebSocket
     final message = {
       'type': 'send_message',
       'prompt': text,
@@ -281,18 +247,8 @@ class _ChatScreenState extends State<ChatScreen> {
       'username': widget.username
     };
 
-    final messageJson = jsonEncode(message);
+    _channel.sink.add(jsonEncode(message));
 
-    // Usar el metodo correcto según la plataforma
-    if (kIsWeb) {
-      // Para Flutter Web usar send()
-      _webSocket.send(messageJson);
-    } else {
-      // Para plataformas nativas usar add()
-      _webSocket.add(messageJson);
-    }
-
-    // Mover scroll al inicio
     _scrollController.animateTo(
       0.0,
       duration: Duration(milliseconds: 300),

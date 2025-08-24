@@ -347,50 +347,12 @@ Future<void> submitTest() async {
         color: Color(0xFFF6F6F6), // Fondo de todo el Scaffold
         child: SingleChildScrollView( // Añadir el SingleChildScrollView para permitir el desplazamiento
           child: Padding(
-            padding: const EdgeInsets.only(top: 20.0),  // Mantener margen horizontal
+            padding: const EdgeInsets.only(top: 5.0),  // Mantener margen horizontal
             child: Column(
               children: [
                 // Row para colocar el icono "Atrás" a la izquierda y el texto centrado
-                Padding(
-                  padding: const EdgeInsets.only(top: 20.0), // Añadir espacio vertical hacia abajo
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.chevron_left,
-                          color: Colors.black, // Color de la flecha
-                          size: 50.0, // Tamaño más grande de la flecha
-                        ),
-                        onPressed: () {
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(builder: (context) => HomeScreen()),
-                                (Route<dynamic> route) => false, // Elimina todas las rutas anteriores
-                          );
-                        },
-                      ),
-                      SizedBox(width: 0), // Espacio entre el icono y el texto
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment(-0.25, 0), // Alineación a la izquierda
-                          child: Text(
-                            'Pregunta ${currentQuestionIndex + 1} de ${questions.length}', // Texto completo
-                            style: TextStyle(
-                              color: const Color(0xFF4320AD),
-                              fontSize: 16,
-                              fontFamily: 'Inter',
-                              fontWeight: FontWeight.w700, // Estilo para "Pregunta"
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Para la línea sombreada en la parte inferior
                 Container(
-                  margin: const EdgeInsets.only(top: 5.0), // Agregar un poco de espacio por encima
+                  margin: const EdgeInsets.only(top: 20.0),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF6F6F6),
                     boxShadow: [
@@ -402,7 +364,42 @@ Future<void> submitTest() async {
                       ),
                     ],
                   ),
-                  height: 7, // Definir altura de la línea
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 5.0),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.chevron_left,
+                            color: Colors.black,
+                            size: 40.0,
+                          ),
+                          onPressed: () {
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(builder: (context) => HomeScreen()),
+                                  (Route<dynamic> route) => false,
+                            );
+                          },
+                        ),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment(-0.05, 0.0), // Mueve ligeramente a la izquierda
+                            child: Text(
+                              'Pregunta ${currentQuestionIndex + 1} de ${questions.length}',
+                              style: TextStyle(
+                                color: const Color(0xFF4320AD),
+                                fontSize: 16,
+                                fontFamily: 'Inter',
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 48), // Equilibra el espacio del IconButton
+                      ],
+                    ),
+                  ),
                 ),
 
                 SizedBox(height: 20), // Espacio entre el encabezado y la pregunta
