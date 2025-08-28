@@ -203,6 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
           nivelEstres: nivelEstres,
           isLoading: isLoading,
           programas: modifiedProgramas,
+          showExitTestModal: isExitTestEnabled,
         );
       case 1:
         return ChatWidget(

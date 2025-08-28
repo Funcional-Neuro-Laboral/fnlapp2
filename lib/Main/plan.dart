@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:convert';
 import 'package:fnlapp/Main/step_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:fnlapp/Main/testestres_form.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Constantes
 class AppConstants {
@@ -98,29 +100,224 @@ class Programa {
   }
 }
 
-class PlanScreen extends StatelessWidget {
+class PlanScreen extends StatefulWidget {
   final NivelEstres nivelEstres;
   final bool isLoading;
   final List<dynamic> programas;
+  final bool showExitTestModal;
 
   const PlanScreen({
     Key? key,
     required this.nivelEstres,
     required this.isLoading,
     required this.programas,
+    this.showExitTestModal = false,
   }) : super(key: key);
 
+  @override
+  _PlanScreenState createState() => _PlanScreenState();
+}
+
+class _PlanScreenState extends State<PlanScreen> {
+  bool _hasShownModal = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAndShowModal();
+  }
+
+  @override
+  void didUpdateWidget(PlanScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Si cambió el estado del test de salida, verificar si mostrar el modal
+    if (widget.showExitTestModal && !oldWidget.showExitTestModal) {
+      _checkAndShowModal();
+    }
+  }
+
+  Future<void> _checkAndShowModal() async {
+    if (!widget.showExitTestModal) return;
+
+    // Verificar si ya se mostró el modal anteriormente
+    final prefs = await SharedPreferences.getInstance();
+    final hasShownExitTestModal = prefs.getBool('hasShownExitTestModal') ?? false;
+
+    if (!hasShownExitTestModal && !_hasShownModal) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showExitTestModal();
+        _hasShownModal = true;
+      });
+    }
+  }
+
+  void _showExitTestModal() async {
+    // Marcar que el modal ya se mostró
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hasShownExitTestModal', true);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        final screenSize = MediaQuery.of(context).size;
+        final isTablet = screenSize.width > 600;
+        final isMobile = screenSize.width <= 600;
+
+        // Configuración responsive
+        final modalWidth = isTablet
+            ? screenSize.width * 0.5  // 50% en tablets
+            : screenSize.width * 0.85; // 85% en móviles
+
+        final maxWidth = isTablet ? 500.0 : 350.0;
+        final padding = isTablet ? 32.0 : 24.0;
+        final iconSize = isTablet ? 56.0 : 48.0;
+        final titleFontSize = isTablet ? 28.0 : 24.0;
+        final bodyFontSize = isTablet ? 18.0 : 16.0;
+        final buttonFontSize = isTablet ? 18.0 : 16.0;
+        final buttonPadding = isTablet
+            ? const EdgeInsets.symmetric(horizontal: 32, vertical: 20)
+            : const EdgeInsets.symmetric(horizontal: 24, vertical: 16);
+
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            width: modalWidth,
+            constraints: BoxConstraints(
+              maxWidth: maxWidth,
+              maxHeight: screenSize.height * 0.7, // Máximo 70% de la altura
+            ),
+            padding: EdgeInsets.all(padding),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Stack(
+              children: [
+                SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.star_rate_rounded,
+                            color: const Color(0xFFF1D93E),
+                            size: iconSize,
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              '¡Felicidades!',
+                              style: TextStyle(
+                                color: const Color(0xFF212121),
+                                fontSize: titleFontSize,
+                                fontFamily: 'Inter',
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: isTablet ? 20 : 16),
+                      Text(
+                        'Completaste tus 21 días con éxito, ahora puedes realizar tu test de salida para terminar tu fase.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: const Color(0xFF212121),
+                          fontSize: bodyFontSize,
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w400,
+                          height: 1.4,
+                        ),
+                      ),
+                      SizedBox(height: isTablet ? 32 : 24),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).pop(); // Cerrar modal
+                          // Navegar al test de salida
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => TestEstresQuestionScreen(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          constraints: BoxConstraints(
+                            maxWidth: isTablet ? 280 : 240,
+                          ),
+                          padding: buttonPadding,
+                          clipBehavior: Clip.antiAlias,
+                          decoration: ShapeDecoration(
+                            color: const Color(0xFF6D4BD8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(40),
+                            ),
+                            shadows: const [
+                              BoxShadow(
+                                color: Color(0x26000000),
+                                blurRadius: 6,
+                                offset: Offset(0, 2),
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Test de salida',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: buttonFontSize,
+                                fontFamily: 'Inter',
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Botón de cerrar responsive
+                Positioned(
+                  top: isTablet ? -16 : -12,
+                  right: isTablet ? -16 : -12,
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      padding: EdgeInsets.all(isTablet ? 12 : 8),
+                      child: Icon(
+                        Icons.close,
+                        color: const Color(0xFF212121),
+                        size: isTablet ? 28 : 24,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   List<Programa> get _parsedProgramas {
-    return programas
+    return widget.programas
         .where((p) => p['nombre_tecnica'] != null && p['nombre_tecnica'].isNotEmpty)
         .map((p) => Programa.fromMap(p))
         .toList();
   }
 
   double get _progressPercentage {
-    if (programas.isEmpty) return 0;
+    if (widget.programas.isEmpty) return 0;
 
-    final completedCount = programas
+    final completedCount = widget.programas
         .where((x) => x['completed_date'] != null)
         .length;
 
@@ -179,7 +376,7 @@ class PlanScreen extends StatelessWidget {
   }
 
   Widget _buildProgressSection(BuildContext context) {
-    if (isLoading || programas.isEmpty) {
+    if (widget.isLoading || widget.programas.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -266,13 +463,13 @@ class PlanScreen extends StatelessWidget {
   }
 
   Widget _buildContent(BuildContext context) {
-    if (isLoading) {
+    if (widget.isLoading) {
       return const CircularProgressIndicator(
         valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
       );
     }
 
-    if (programas.isEmpty) {
+    if (widget.programas.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 20.0),
         child: Text(
