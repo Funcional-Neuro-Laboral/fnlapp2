@@ -15,7 +15,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController emailController = TextEditingController();
+  final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final ValueNotifier<bool> passwordVisible = ValueNotifier(false);
   final _formKey = GlobalKey<FormState>();
@@ -36,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login(BuildContext context) async {
     if (_formKey.currentState == null || !_formKey.currentState!.validate()) return;
 
-    final email = emailController.text.trim();
+    final username = usernameController.text.trim();
     final password = passwordController.text.trim();
 
     setState(() {
@@ -48,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Uri.parse('${Config.apiUrl2}/users/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'email': email,
+          'username': username,
           'password': password,
           'rememberMe': rememberMe.value
         }),
@@ -273,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                           ),
                                         ),
                                         SizedBox(height: 4),
-                                        _buildTextField('Nombre de Usuario', emailController),
+                                        _buildTextField('Nombre de Usuario', usernameController),
                                         SizedBox(height: 16),
 
                                         // Campo de Contraseña
