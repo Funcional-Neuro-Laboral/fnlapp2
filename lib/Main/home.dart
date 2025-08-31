@@ -136,8 +136,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // --- FUNCIÓN fetchProfile CORREGIDA ---
   Future<ProfileData?> fetchProfile() async {
-    // Ya no necesitamos leer de SharedPreferences, usamos las variables de la clase.
-    // La verificación principal ya se hizo en _loadInitialData.
     if (userId == null || token == null) {
       print('Error en fetchProfile: Faltan datos de usuario.');
       return null;
@@ -150,10 +148,11 @@ class _HomeScreenState extends State<HomeScreen> {
       });
 
       if (response.statusCode == 200) {
-        var profile = ProfileData.fromJson(json.decode(response.body));
-        // Esta llamada anidada puede ser un punto de mejora en el futuro.
-        var res = await http.get(Uri.parse('${Config.apiUrl}/empresa/${profile.idEmpresa}'));
-        profile.nombreEmpresa = json.decode(res.body)['nombre'];
+        var profileJson = json.decode(response.body);
+        var profile = ProfileData.fromJson(profileJson);
+
+        profile.nombreEmpresa = profileJson['companyName'] ?? '';
+
         return profile;
       } else {
         print('Error fetching profile: ${response.statusCode}');
