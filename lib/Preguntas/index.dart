@@ -5,15 +5,10 @@ import 'package:fnlapp/Main/prevtestestres.dart';
 import 'package:fnlapp/Politicas%20y%20Terminos/condiciones_uso.dart';
 import 'package:fnlapp/Politicas%20y%20Terminos/politica_privacidad.dart';
 import 'package:http/http.dart' as http;
-import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import 'package:fnlapp/SharedPreferences/sharedpreference.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fnlapp/config.dart';
 import '../Util/api_service.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import '../Util/carga.dart';
-import '../Util/style.dart';
 
 class IndexScreen extends StatefulWidget {
   final String username;
@@ -356,7 +351,6 @@ class _IndexScreenState extends State<IndexScreen> {
       "branch_id": selectedAnswers[5],
     };
 
-
     print('Data to send: $dataToSend');
 
     try {
@@ -374,9 +368,6 @@ class _IndexScreenState extends State<IndexScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Respuestas guardadas exitosamente.')),
         );
-
-        // Actualizar el campo userresponsebool utilizando la API existente
-        await _updateUserResponseBool();
 
         // Navegar a la siguiente pantalla
         Navigator.pushReplacement(
@@ -398,47 +389,7 @@ class _IndexScreenState extends State<IndexScreen> {
     }
   }
 
-  Future<void> _updateUserResponseBool() async {
-    try {
-
-      
-      if (userId == null) {
-        print('No se encontró el ID del usuario.');
-        return;
-      }
-
-      String? token = await getToken(); // Obtener el token de SharedPreferences
-
-      if (token == null) {
-        print('No se encontró el token de autenticación.');
-        return;
-      }
-
-      final url = '${Config.apiUrl}/users/$userId';
-      final response = await http.put(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token', // Token de autenticación
-        },
-        body: jsonEncode({'userresponsebool': true}), // Actualizar el campo
-      );
-
-      if (response.statusCode == 200) {
-        print('Campo userresponsebool actualizado correctamente.');
-        // Guardar en SharedPreferences
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('userresponsebool', true);
-      } else {
-        print('Error al actualizar userresponsebool: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error al actualizar userresponsebool: $e');
-    }
-  }
-
   @override
-
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF6F6F6),
