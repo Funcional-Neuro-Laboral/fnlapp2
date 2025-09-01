@@ -10,7 +10,6 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../config.dart';
-import 'completed_dia_screen.dart';
 
 
 class StepScreen extends StatefulWidget {
@@ -20,6 +19,7 @@ class StepScreen extends StatefulWidget {
   final int userId; // Nuevo: user_id
   final int tecnicaId; // Nuevo: tecnica_id
   final String url_img;
+  final int sessionId; // Nuevo: session_id para el endpoint
 
   const StepScreen({
     Key? key,
@@ -29,6 +29,7 @@ class StepScreen extends StatefulWidget {
     required this.userId,
     required this.tecnicaId,
     required this.url_img,
+    required this.sessionId, // Agregar sessionId
   }) : super(key: key);
 
   @override
@@ -85,7 +86,7 @@ class _StepScreenState extends State<StepScreen> {
     });
 
     try {
-      final url = Uri.parse('${Config.apiUrl}/voice/texttovoice/?text=$text&voiceId=Joanna');
+      final url = Uri.parse('${Config.apiUrl2}/general/speech/tts/?text=$text');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -152,39 +153,7 @@ class _StepScreenState extends State<StepScreen> {
     });
 
     try {
-      final response = await http.get(
-        Uri.parse('${Config.apiUrl}/userprograma/${widget.userId}/act/${widget.dia}'),
-      );
-
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        if (responseData['isCompleted'] == true) {
-          if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CompletedDiaScreen(),
-              ),
-            );
-          }
-        } else {
-          if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => FinalStepScreen(
-                  userId: widget.userId,
-                  tecnicaId: widget.tecnicaId,
-                ),
-              ),
-            );
-          }
-        }
-      } else {
-        throw Exception('Error en la respuesta del servidor');
-      }
-    } catch (e) {
-      debugPrint("Error al verificar el estado del día: $e");
+      // Navegar directamente a FinalStepScreen sin verificar estado
       if (mounted) {
         Navigator.push(
           context,
@@ -192,6 +161,21 @@ class _StepScreenState extends State<StepScreen> {
             builder: (context) => FinalStepScreen(
               userId: widget.userId,
               tecnicaId: widget.tecnicaId,
+              sessionId: widget.sessionId, // Pasar sessionId
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error al navegar: $e");
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FinalStepScreen(
+              userId: widget.userId,
+              tecnicaId: widget.tecnicaId,
+              sessionId: widget.sessionId, // Pasar sessionId
             ),
           ),
         );

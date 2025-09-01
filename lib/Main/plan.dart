@@ -43,7 +43,9 @@ class Programa {
   final int dia;
   final int userId;
   final int id;
+  final int sessionId;
   final dynamic guia;
+  final bool unlocked;
 
   Programa({
     this.startDate,
@@ -54,7 +56,9 @@ class Programa {
     required this.dia,
     required this.userId,
     required this.id,
+    required this.sessionId, 
     this.guia,
+    this.unlocked = false, 
   });
 
   factory Programa.fromMap(Map<String, dynamic> map) {
@@ -67,15 +71,24 @@ class Programa {
       dia: int.tryParse(map['dia'].toString()) ?? 0,
       userId: int.tryParse(map['user_id'].toString()) ?? 0,
       id: int.tryParse(map['id'].toString()) ?? 0,
+      sessionId: int.tryParse(map['session_id'].toString()) ?? 0, // Parsear sessionId
       guia: map['guia'],
+      unlocked: map['unlocked'] ?? false, 
     );
   }
 
   bool get isUnlocked {
+ 
+    if (!unlocked) return false;
+    
+    // Luego verificar la fecha
     if (startDate != null) {
       DateTime temp = DateTime.parse(startDate!).toLocal();
       DateTime date = DateTime(temp.year, temp.month, temp.day);
-      return DateTime.now().isAfter(date);
+      DateTime now = DateTime.now();
+      DateTime today = DateTime(now.year, now.month, now.day);
+      
+      return today.isAtSameMomentAs(date) || today.isAfter(date);
     }
     return false;
   }
@@ -764,6 +777,7 @@ class _PlanScreenState extends State<PlanScreen> {
           userId: programa.userId,
           tecnicaId: programa.id,
           url_img: programa.urlImg ?? '',
+          sessionId: programa.id, // Usar id como sessionId
         ),
       ),
     );

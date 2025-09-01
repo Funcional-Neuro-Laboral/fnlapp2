@@ -54,7 +54,7 @@ class _IndexScreenState extends State<IndexScreen> {
         question['area']?.toString() ??
         question['level']?.toString() ??
         question['gender']?.toString() ??
-        question['responsability_level']?.toString() ??
+        question['responsability_level']?.toString() ?? // ahora sí funcionará
         question['sede']?.toString() ??
         'Valor no disponible';
   }
@@ -117,15 +117,15 @@ class _IndexScreenState extends State<IndexScreen> {
         return;
       }
 
-      final url = '${Config.apiUrl}/users/$userId';
-      final response = await http.put(
+      final url = '${Config.apiUrl2}/users/accept-permisos';
+      final response = await http.post(
         Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
           'Authorization':
-              'Bearer $token', // Aquí añadimos el token en el header
+              'Bearer $token',
         },
-        body: jsonEncode({'permisopoliticas': true}),
+        body: jsonEncode({'iduser': userId}),
       );
 
       if (response.statusCode == 200) {
@@ -175,23 +175,37 @@ class _IndexScreenState extends State<IndexScreen> {
 
   Future<void> fetchHierarchicalLevel(int areaId) async {
     try {
-      var hierarchicalEndpoint = 'v1/maintance/hierarchical-level/$areaId';
-      var hierarchicalResponse = await widget.apiServiceWithToken.get(hierarchicalEndpoint);
+      final queryParams = {
+        'areaId': areaId.toString(),
+      };
 
-      var hierarchicalData = json.decode(hierarchicalResponse.body);
-      var hierarchicalLevels = hierarchicalData['results'];
+      final uri = Uri.parse('general/hierarchical-levels/by-area')
+          .replace(queryParameters: queryParams);
 
-      if (hierarchicalLevels != null) {
-        setState(() {
-          questionCategories['level'] = (hierarchicalLevels as List)
+      final response = await widget.apiServiceWithToken.get(uri.toString());
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+
+        if (data.isNotEmpty) {
+          final hierarchicalLevels = data
               .map((item) => Map<String, dynamic>.from(item))
               .toList();
-        });
-      }
 
-      print('Niveles jerárquicos cargados correctamente para el área ID: $areaId.');
-    } catch (e) {
-      print('Error al cargar niveles jerárquicos: $e');
+          setState(() {
+            questionCategories['level'] = hierarchicalLevels;
+          });
+
+          print('Niveles jerárquicos cargados correctamente (${hierarchicalLevels.length}).');
+        } else {
+          print('No se encontraron niveles jerárquicos para el área $areaId.');
+        }
+      } else {
+        print('Error al cargar niveles jerárquicos: ${response.statusCode}');
+      }
+    } catch (e, stackTrace) {
+      print('Excepción al cargar niveles jerárquicos: $e');
+      print(stackTrace);
     }
   }
 
@@ -201,47 +215,60 @@ class _IndexScreenState extends State<IndexScreen> {
       // Cargar áreas
       userId = await getUserId();
 
+      final queryParamsSedes = {
+        'iduser': userId.toString(),
+      };
 
-      var sedesResponse = await widget.apiServiceWithToken.get('v1/maintance/sedes/$userId');
-      var sedesData = json.decode(sedesResponse.body);
-      var sedes = sedesData['results'];
+      final uriSede = Uri.parse('general/branches/by-user')
+          .replace(queryParameters: queryParamsSedes);
 
+      final response = await widget.apiServiceWithToken.get(uriSede.toString());
 
+      if (response.statusCode == 200) {
+        final List<dynamic> sedesData = json.decode(response.body);
 
-      if (sedes != null && sedes.isNotEmpty) {
-        // Guardar áreas en la categoría correspondiente
-        setState(() {
-          questionCategories['sede'] = (sedes as List)
-              .map((item) => Map<String, dynamic>.from(item))
-              .toList();
-        });
-
-        // No cargamos niveles jerárquicos aquí automáticamente, eso será manejado dinámicamente
-        print('Sedes cargadas correctamente.');
+        if (sedesData.isNotEmpty) {
+          setState(() {
+            questionCategories['sede'] = sedesData
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList();
+          });
+          print('Sedes Body: ${response.body}');
+          print('Sedes cargadas correctamente (${sedesData.length}).');
+        } else {
+          print('No se encontraron sedes para el usuario $userId.');
+        }
+      } else {
+        print('Error al cargar sedes: ${response.statusCode}');
       }
 
-      var areasResponse = await widget.apiServiceWithToken.get('v1/maintance/areas/$userId');
+
+      var queryParams = {
+        'iduser': userId.toString(),
+      };
+
+      var uriArea = Uri.parse('general/area/by-user').replace(queryParameters: queryParams);
+      var areasResponse = await widget.apiServiceWithToken.get(uriArea.toString());
+
       var areasData = json.decode(areasResponse.body);
-      var areas = areasData['results'];
+      var areas = areasData as List;
 
-
-      if (areas != null && areas.isNotEmpty) {
-        // Guardar áreas en la categoría correspondiente
+      if (areas.isNotEmpty) {
         setState(() {
-          questionCategories['area'] = (areas as List)
+          questionCategories['area'] = areas
               .map((item) => Map<String, dynamic>.from(item))
               .toList();
         });
 
-        // No cargamos niveles jerárquicos aquí automáticamente, eso será manejado dinámicamente
         print('Áreas cargadas correctamente.');
       }
+
     
       // Cargar otras categorías
       var endpoints = [
-        'v1/maintance/range-age',
-        'v1/maintance/responsability-level',
-        'v1/maintance/gender',
+        'general/age-ranges',
+        'general/responsibility-levels/all',
+        'general/gender/all',
       ];
 
       var responses = await Future.wait(
@@ -250,21 +277,16 @@ class _IndexScreenState extends State<IndexScreen> {
       
       for (var i = 0; i < responses.length; i++) {
         var data = json.decode(responses[i].body);
-        var category = data['results'];
 
-        if (category != null) {
+        if (data != null && data is List) {
+          var category = data.map((item) => Map<String, dynamic>.from(item)).toList();
+
           if (i == 0) {
-            questionCategories['age_range'] = (category as List)
-                .map((item) => Map<String, dynamic>.from(item))
-                .toList();
+            questionCategories['age_range'] = category;
           } else if (i == 1) {
-            questionCategories['responsability_level'] = (category as List)
-                .map((item) => Map<String, dynamic>.from(item))
-                .toList();
+            questionCategories['responsability_level'] = category;
           } else if (i == 2) {
-            questionCategories['gender'] = (category as List)
-                .map((item) => Map<String, dynamic>.from(item))
-                .toList();
+            questionCategories['gender'] = category;
           }
         }
       }
@@ -323,34 +345,32 @@ class _IndexScreenState extends State<IndexScreen> {
       }
     }
     
-
-
-    final DateFormat dateFormat = DateFormat('yyyy-MM-dd');
-    final String createdAt = dateFormat.format(DateTime.now());
+    String? token = await getToken(); 
 
     final Map<String, dynamic> dataToSend = {
-      "user_id": userId,
+      "userId": userId,
       "age_range_id": selectedAnswers[0],
       "hierarchical_level_id": selectedAnswers[3],
       "responsability_level_id": selectedAnswers[4],
       "gender_id": selectedAnswers[1],
-      "sedes_id": selectedAnswers[5],
-      "created_at": createdAt,
+      "branch_id": selectedAnswers[5],
     };
+
 
     print('Data to send: $dataToSend');
 
     try {
       // Llamada a la API para guardar las respuestas
       var response = await http.post(
-        Uri.parse('${Config.apiUrl}/guardarUserResponses'),
+        Uri.parse('${Config.apiUrl2}/users/save-responses'),
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
         },
         body: jsonEncode(dataToSend),
       );
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Respuestas guardadas exitosamente.')),
         );
@@ -380,6 +400,8 @@ class _IndexScreenState extends State<IndexScreen> {
 
   Future<void> _updateUserResponseBool() async {
     try {
+
+      
       if (userId == null) {
         print('No se encontró el ID del usuario.');
         return;
@@ -751,7 +773,7 @@ class _IndexScreenState extends State<IndexScreen> {
 
     // Obtenemos las preguntas de la categoría actual
     var currentCategoryQuestions = questionCategories[currentCategoryKey];
-
+    print('Current Category Questions ($currentCategoryKey): $currentCategoryQuestions');
     // Si no hay preguntas disponibles, mostramos un mensaje
     if (currentCategoryQuestions == null || currentCategoryQuestions.isEmpty) {
       return Center(
@@ -800,203 +822,205 @@ class _IndexScreenState extends State<IndexScreen> {
           alignment: Alignment.topCenter,
           child: SizedBox(
             width: contentWidth,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 60.0, left: 20.0, right: 20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Barra de progreso
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: List.generate(6, (index) {
-                          return Expanded(
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 4.0),
-                              height: 6.0,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(3.0),
-                                color: index <= currentQuestionIndex
-                                    ? const Color(0xFF6D4BD8)
-                                    : const Color(0xFFE0E0E0),
-                              ),
-                            ),
-                          );
-                        }),
-                      ),
-                      const SizedBox(height: 35.0),
-
-                      // Contenedor para mantener la bienvenida y la pregunta en posición fija
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Banda fija para la bienvenida (20 px de alto)
-                          SizedBox(
-                            height: 20,
-                            child: currentQuestionIndex == 0
-                                ? const Align(
-                              alignment: Alignment.bottomLeft,
-                              child: Text(
-                                'Te damos la bienvenida a FNL',
-                                style: TextStyle(
-                                  color: Color(0xFF212121),
-                                  fontSize: 18,
-                                  fontFamily: 'Inter',
-                                  fontWeight: FontWeight.w600,
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 60.0, left: 20.0, right: 20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Barra de progreso
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: List.generate(6, (index) {
+                            return Expanded(
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                                height: 6.0,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(3.0),
+                                  color: index <= currentQuestionIndex
+                                      ? const Color(0xFF6D4BD8)
+                                      : const Color(0xFFE0E0E0),
                                 ),
                               ),
-                            )
-                                : const SizedBox.shrink(),
-                          ),
+                            );
+                          }),
+                        ),
+                        const SizedBox(height: 35.0),
 
-                          const SizedBox(height: 8.0), // espacio fijo debajo de la bienvenida
-
-                          // Banda fija para la pregunta
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              preguntaTexto,
-                              style: const TextStyle(
-                                color: Color(0xFF5027D0),
-                                fontSize: 24,
-                                fontFamily: 'Inter',
-                                fontWeight: FontWeight.w600,
-                              ),
-                              textAlign: TextAlign.start,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Opciones
-                Padding(
-                  padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
-                  child: _buildQuestionField(
-                    currentCategoryQuestions,
-                    optionFontSize,
-                    verticalPadding,
-                  ),
-                ),
-
-                const Spacer(),
-
-                // Botones (Atrás / Siguiente o Finalizar)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 60),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // ---- ATRÁS ----
-                      if (currentQuestionIndex > 0)
-                        GestureDetector(
-                          onTap: goToPreviousQuestion,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                            decoration: ShapeDecoration(
-                              color: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(80),
-                              ),
-                              shadows: const [
-                                BoxShadow(
-                                  color: Color(0x4C000000),
-                                  blurRadius: 3,
-                                  offset: Offset(0, 2),
-                                  spreadRadius: 0,
-                                ),
-                                BoxShadow(
-                                  color: Color(0x26000000),
-                                  blurRadius: 10,
-                                  offset: Offset(0, 6),
-                                  spreadRadius: 4,
-                                ),
-                              ],
-                            ),
-                            child: const Text(
-                              'Atrás',
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontSize: 22,
-                                fontFamily: 'Inter',
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        )
-                      else
-                        const SizedBox(width: 88),
-
-                      // ---- SIGUIENTE / FINALIZAR ----
-                      Builder(
-                        builder: (context) {
-                          final bool isNextEnabled = selectedOption != null ||
-                              selectedAnswers.containsKey(currentQuestionIndex);
-                          final String nextLabel =
-                          currentQuestionIndex < 5 ? 'Siguiente' : 'Finalizar';
-
-                          return GestureDetector(
-                            onTap: isNextEnabled
-                                ? () {
-                              if (currentQuestionIndex < 5) {
-                                goToNextQuestion();
-                              } else {
-                                saveResponses();
-                              }
-                            }
-                                : null,
-                            child: Container(
-                              width: 158,
-                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                              clipBehavior: Clip.antiAlias,
-                              decoration: ShapeDecoration(
-                                color: isNextEnabled
-                                    ? const Color(0xFF6D4BD8)
-                                    : const Color(0xFFD7D7D7),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(40),
-                                ),
-                                shadows: isNextEnabled
-                                    ? const [
-                                  BoxShadow(
-                                    color: Color(0x26000000),
-                                    blurRadius: 6,
-                                    offset: Offset(0, 2),
-                                    spreadRadius: 2,
-                                  ),
-                                  BoxShadow(
-                                    color: Color(0x4C000000),
-                                    blurRadius: 2,
-                                    offset: Offset(0, 1),
-                                    spreadRadius: 0,
-                                  ),
-                                ]
-                                    : const [],
-                              ),
-                              child: Center(
+                        // Contenedor para mantener la bienvenida y la pregunta en posición fija
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Banda fija para la bienvenida (20 px de alto)
+                            SizedBox(
+                              height: 20,
+                              child: currentQuestionIndex == 0
+                                  ? const Align(
+                                alignment: Alignment.bottomLeft,
                                 child: Text(
-                                  nextLabel,
+                                  'Te damos la bienvenida a FNL',
                                   style: TextStyle(
-                                    color: isNextEnabled
-                                        ? Colors.white
-                                        : const Color(0xFF868686),
-                                    fontSize: 22,
+                                    color: Color(0xFF212121),
+                                    fontSize: 18,
                                     fontFamily: 'Inter',
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
+                              )
+                                  : const SizedBox.shrink(),
+                            ),
+
+                            const SizedBox(height: 8.0), // espacio fijo debajo de la bienvenida
+
+                            // Banda fija para la pregunta
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                preguntaTexto,
+                                style: const TextStyle(
+                                  color: Color(0xFF5027D0),
+                                  fontSize: 24,
+                                  fontFamily: 'Inter',
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.start,
                               ),
                             ),
-                          );
-                        },
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+
+                  // Opciones
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
+                    child: _buildQuestionField(
+                      currentCategoryQuestions,
+                      optionFontSize,
+                      verticalPadding,
+                    ),
+                  ),
+
+                  SizedBox(height: 90),
+
+                  // Botones (Atrás / Siguiente o Finalizar)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 60),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // ---- ATRÁS ----
+                        if (currentQuestionIndex > 0)
+                          GestureDetector(
+                            onTap: goToPreviousQuestion,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                              decoration: ShapeDecoration(
+                                color: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(80),
+                                ),
+                                shadows: const [
+                                  BoxShadow(
+                                    color: Color(0x4C000000),
+                                    blurRadius: 3,
+                                    offset: Offset(0, 2),
+                                    spreadRadius: 0,
+                                  ),
+                                  BoxShadow(
+                                    color: Color(0x26000000),
+                                    blurRadius: 10,
+                                    offset: Offset(0, 6),
+                                    spreadRadius: 4,
+                                  ),
+                                ],
+                              ),
+                              child: const Text(
+                                'Atrás',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 22,
+                                  fontFamily: 'Inter',
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          const SizedBox(width: 88),
+
+                        // ---- SIGUIENTE / FINALIZAR ----
+                        Builder(
+                          builder: (context) {
+                            final bool isNextEnabled = selectedOption != null ||
+                                selectedAnswers.containsKey(currentQuestionIndex);
+                            final String nextLabel =
+                            currentQuestionIndex < 5 ? 'Siguiente' : 'Finalizar';
+
+                            return GestureDetector(
+                              onTap: isNextEnabled
+                                  ? () {
+                                if (currentQuestionIndex < 5) {
+                                  goToNextQuestion();
+                                } else {
+                                  saveResponses();
+                                }
+                              }
+                                  : null,
+                              child: Container(
+                                width: 158,
+                                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                                clipBehavior: Clip.antiAlias,
+                                decoration: ShapeDecoration(
+                                  color: isNextEnabled
+                                      ? const Color(0xFF6D4BD8)
+                                      : const Color(0xFFD7D7D7),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(40),
+                                  ),
+                                  shadows: isNextEnabled
+                                      ? const [
+                                    BoxShadow(
+                                      color: Color(0x26000000),
+                                      blurRadius: 6,
+                                      offset: Offset(0, 2),
+                                      spreadRadius: 2,
+                                    ),
+                                    BoxShadow(
+                                      color: Color(0x4C000000),
+                                      blurRadius: 2,
+                                      offset: Offset(0, 1),
+                                      spreadRadius: 0,
+                                    ),
+                                  ]
+                                      : const [],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    nextLabel,
+                                    style: TextStyle(
+                                      color: isNextEnabled
+                                          ? Colors.white
+                                          : const Color(0xFF868686),
+                                      fontSize: 22,
+                                      fontFamily: 'Inter',
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );

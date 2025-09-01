@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fnlapp/Login/login.dart';
 import 'package:fnlapp/Main/profile.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:fnlapp/Funcy/screens/splash_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../Util/token_service.dart';
@@ -66,7 +64,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _checkExitTest(),
       obtenerNivelEstresYProgramas(),
       loadProfile(),
-      checkIfEmotionFilledForToday(),
     ]);
 
     // Actualizamos el estado para reflejar que la carga ha terminado
@@ -78,54 +75,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _checkExitTest() async {
-    // Ya no necesitamos leer de SharedPreferences aquí, usamos las variables de la clase
-    if (userId == null || token == null) {
-      print('Error en _checkExitTest: Faltan datos de usuario.');
-      setState(() => isExitTestEnabled = false);
-      return;
-    }
-    // ... (el resto de tu lógica de _checkExitTest sigue igual)
-    try {
-      final response1 = await http.get(
-        Uri.parse('${Config.apiUrl}/getUserTestEstresSalida/$userId'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      if (response1.statusCode == 404) {
-        final response = await http.get(
-          Uri.parse('${Config.apiUrl}/userprograma/$userId/actividad/21'),
-          headers: {'Authorization': 'Bearer $token'},
-        );
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          final String? completedDateStr = data['completed_date'];
-          if (completedDateStr != null) {
-            final DateTime completedDate = DateTime.parse(completedDateStr);
-            final DateTime today = DateTime.now();
-            final bool showTest = today.isAfter(completedDate) || _isSameDay(today, completedDate);
-            setState(() {
-              showExitTest = showTest;
-              isExitTestEnabled = showTest;
-            });
-            print(showTest ? 'Test de salida habilitado.' : 'Test de salida deshabilitado.');
-          } else {
-            print('El día 21 aún no ha sido completado.');
-            setState(() => isExitTestEnabled = false);
-          }
-        } else {
-          setState(() => isExitTestEnabled = false);
-        }
-      } else {
-        setState(() => isExitTestEnabled = false);
-      }
-    } catch (e) {
-      print('Error al verificar el programa: $e');
-      setState(() => isExitTestEnabled = false);
-    }
+
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        bool isDay21Completed = prefs.getBool('isDay21Completed') ?? false;
+        
+        setState(() {
+          showExitTest = isDay21Completed;
+          isExitTestEnabled = isDay21Completed;
+        });
+        
   }
 
-  bool _isSameDay(DateTime date1, DateTime date2) {
-    return date1.year == date2.year && date1.month == date2.month && date1.day == date2.day;
-  }
 
   Future<void> loadProfile() async {
     profileData = await fetchProfile();
@@ -134,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // --- FUNCIÓN fetchProfile CORREGIDA ---
+  // --- FUNCIÓN fetchProfile MODIFICADA PARA OBTENER EL NIVEL DE ESTRÉS ---
   Future<ProfileData?> fetchProfile() async {
     if (userId == null || token == null) {
       print('Error en fetchProfile: Faltan datos de usuario.');
@@ -151,7 +111,14 @@ class _HomeScreenState extends State<HomeScreen> {
         var profileJson = json.decode(response.body);
         var profile = ProfileData.fromJson(profileJson);
 
-        profile.nombreEmpresa = profileJson['companyName'] ?? '';
+        // NUEVO: Obtener el nivel de estrés del perfil (viene como string)
+        String? estresLevelString = profileJson['estresLevel'];
+        if (estresLevelString != null && mounted) {
+          setState(() {
+            nivelEstres = _mapNivelEstresFromString(estresLevelString);
+          });
+          print('Nivel de estrés obtenido del perfil: $nivelEstres (String: $estresLevelString)');
+        }
 
         return profile;
       } else {
@@ -175,12 +142,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- FUNCIÓN PARA ACTUALIZAR LA IMAGEN DE PERFIL ---
-  void _updateProfileImage(String newImageUrl) {
-    if (profileData != null) {
+  void _updateProfileImage(String newImageUrl) async {
+    print('Callback recibido en HomeScreen: actualizando imagen a $newImageUrl');
+
+    imageCache.clear();
+    imageCache.clearLiveImages();
+  
+    await loadProfile();
+
+    if (mounted) {
       setState(() {
-        profileData!.profileImage = newImageUrl;
       });
-      print('Imagen de perfil actualizada en HomeScreen: $newImageUrl');
+      print('ProfileData actualizado en HomeScreen después del callback');
     }
   }
 
@@ -279,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // --- FUNCIÓN obtenerNivelEstresYProgramas CORREGIDA ---
+  // --- FUNCIÓN obtenerNivelEstresYProgramas MODIFICADA ---
   Future<void> obtenerNivelEstresYProgramas() async {
     // La verificación principal ya se hizo en _loadInitialData.
     if (userId == null || token == null) {
@@ -288,175 +261,51 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     try {
-      final responseNivel = await http.get(
-        Uri.parse('${Config.apiUrl}/userestresessions/$userId/nivel'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      if (responseNivel.statusCode == 200) {
-        final responseData = jsonDecode(responseNivel.body);
-        int estresNivelId = responseData['estres_nivel_id'];
-        if (mounted) setState(() => nivelEstres = _mapNivelEstres(estresNivelId));
-      }
-
-      final responseProgramas = await http.post(
-        Uri.parse('${Config.apiUrl}/userprograma/getprogramcompleto/$userId'),
+      // MODIFICADO: Usar la nueva API para obtener las actividades diarias
+      final responseProgramas = await http.get(
+        Uri.parse('${Config.apiUrl2}/users/daily-activities?userId=$userId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token'
         },
-        body: jsonEncode({'user_id': userId}),
       );
 
       if (responseProgramas.statusCode == 200) {
         final responseData = jsonDecode(responseProgramas.body);
-        if (mounted) setState(() => programas = responseData['userProgramas']);
+        if (mounted) {
+          setState(() {
+            programas = responseData['userProgramas'] ?? [];
+          });
+          print('Programas cargados: ${programas.length}');
+        }
+      } else {
+        print('Error al obtener programas: ${responseProgramas.statusCode}');
+        if (mounted) {
+          setState(() {
+            programas = [];
+          });
+        }
       }
     } catch (e) {
-      print('Error obteniendo nivel de estrés o programas: $e');
+      print('Error obteniendo programas: $e');
+      if (mounted) {
+        setState(() {
+          programas = [];
+        });
+      }
     }
   }
 
-  NivelEstres _mapNivelEstres(int nivelId) {
-    switch (nivelId) {
-      case 1: return NivelEstres.leve;
-      case 2: return NivelEstres.moderado;
-      case 3: return NivelEstres.severo;
+
+  // NUEVA FUNCIÓN para mapear strings a NivelEstres
+  NivelEstres _mapNivelEstresFromString(String nivelString) {
+    switch (nivelString.toUpperCase()) {
+      case 'LEVE': return NivelEstres.leve;
+      case 'MODERADO': return NivelEstres.moderado;
+      case 'ALTO': return NivelEstres.severo;
+      case 'SEVERO': return NivelEstres.severo;
       default: return NivelEstres.desconocido;
     }
   }
-
-  Future<void> checkIfEmotionFilledForToday() async {
-    if (userId == null || token == null) return;
-    try {
-      String fechaHoy = DateTime.now().toIso8601String().split('T')[0];
-      final response = await http.get(
-        Uri.parse('${Config.apiUrl}/emociones_diarias/$fechaHoy'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      if (response.statusCode == 200) {
-        var data = json.decode(response.body);
-        if (mounted) setState(() => hasFilledEmotion = data['data'].isNotEmpty);
-      }
-    } catch (e) {
-      print('Error al verificar las emociones de hoy: $e');
-    }
-  }
-
-  // ... (El resto de tus funciones como _showEmotionModal y _registerEmotion permanecen igual)
-  void _showEmotionModal() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return EmotionModal(
-          onEmotionRegistered: (emotion, note) {
-            setState(() {
-              hasFilledEmotion = true;
-            });
-            _registerEmotion(emotion, note);
-            Navigator.pop(context);
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _registerEmotion(int emotion, String note) async {
-    if (userId == null || token == null) return;
-    try {
-      String fechaHoy = DateTime.now().toIso8601String().split('T')[0];
-      final response = await http.post(
-        Uri.parse('${Config.apiUrl}/emociones_diarias'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          'emocion': emotion,
-          'notaOpcional': note,
-        }),
-      );
-      if (response.statusCode == 201) {
-        print('Emotion registered successfully');
-      } else {
-        print('Failed to register emotion');
-      }
-    } catch (e) {
-      print('Error registering emotion: $e');
-    }
-  }
 }
 
-// ... (La clase EmotionModal permanece igual)
-class EmotionModal extends StatefulWidget {
-  final Function(int emotion, String note) onEmotionRegistered;
-  EmotionModal({required this.onEmotionRegistered});
-  @override
-  _EmotionModalState createState() => _EmotionModalState();
-}
-class _EmotionModalState extends State<EmotionModal> {
-  TextEditingController noteController = TextEditingController();
-  int selectedEmotion = 0;
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Select Emotion'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              GestureDetector(
-                onTap: () => setState(() => selectedEmotion = 1),
-                child: Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: selectedEmotion == 1 ? Colors.grey.shade300 : Colors.transparent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.sentiment_very_satisfied, color: Colors.green, size: 40),
-                ),
-              ),
-              SizedBox(width: 20),
-              GestureDetector(
-                onTap: () => setState(() => selectedEmotion = 0),
-                child: Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: selectedEmotion == 0 ? Colors.grey.shade300 : Colors.transparent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.sentiment_neutral, color: Colors.grey, size: 40),
-                ),
-              ),
-              SizedBox(width: 20),
-              GestureDetector(
-                onTap: () => setState(() => selectedEmotion = -1),
-                child: Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: selectedEmotion == -1 ? Colors.grey.shade300 : Colors.transparent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.sentiment_dissatisfied, color: Colors.red, size: 40),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 20),
-          TextField(
-            controller: noteController,
-            decoration: InputDecoration(hintText: 'Optional note'),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => widget.onEmotionRegistered(selectedEmotion, noteController.text),
-          child: Text('Save'),
-        ),
-      ],
-    );
-  }
-}

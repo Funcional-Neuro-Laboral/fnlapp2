@@ -23,25 +23,72 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       23, 0); // Asigna un valor predeterminado (por ejemplo, 0)
 
   int? userId;
+  bool? isDay21Completed;
 
   @override
   void initState() {
     super.initState();
-    _loadUserId(); // Cargamos el ID del usuario al iniciar
+    _loadUserData(); // Cargamos el ID del usuario y estado del día 21
   }
 
-  // Función para cargar el userId desde SharedPreferences
-  Future<void> _loadUserId() async {
-    int? id = await getUserId(); // Función que obtienes de SharedPreferences
+  // Función para cargar el userId y estado del día 21 desde SharedPreferences
+  Future<void> _loadUserData() async {
+    int? id = await getUserId();
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool? day21Status = prefs.getBool('isDay21Completed');
+    
     setState(() {
       userId = id;
+      isDay21Completed = day21Status == true;
+      
       if (userId == null) {
         print('Error: userId is null');
         return;
       } else {
-        print('Success: todo bien con el id');
+        print('Success: userId cargado correctamente - $userId');
+        print('Day 21 completed status: $isDay21Completed');
       }
     });
+  }
+
+  // Función para obtener el perfil del usuario
+  Future<Map<String, dynamic>?> _getUserProfile() async {
+    try {
+      String? token = await getToken();
+      if (token == null) {
+        print('Error: No se encontró el token.');
+        return null;
+      }
+
+      String url = '${Config.apiUrl2}/users/getprofile/$userId';
+      final response = await http.get(Uri.parse(url), headers: {
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        print('Error al obtener perfil: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error al obtener perfil del usuario: $e');
+      return null;
+    }
+  }
+
+  // Función para mapear el género a ID
+  int _getGenderIdFromProfile(String gender) {
+    switch (gender.toLowerCase()) {
+      case 'masculino':
+        return 1;
+      case 'femenino':
+        return 2;
+      case 'otro':
+        return 3;
+      default:
+        return 1; 
+    }
   }
 
   // Función para seleccionar una opción
@@ -91,36 +138,34 @@ Future<void> submitTest() async {
     return;
   }
 
-  // URLs de las APIs
-  final checkRecordUrl =
-      Uri.parse('${Config.apiUrl}/userestresessions/$userId/nivel'); // Verificar registro
-  final saveTestUrl = Uri.parse('${Config.apiUrl}/guardarTestEstres'); // Guardar test
-  final updateEstresUrl = Uri.parse('${Config.apiUrl}/userestresessions/assign'); // Actualizar estres_nivel_id
+  String? token = await getToken(); 
+  if (token == null) {
+    print('Error: No se encontró el token.');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error: Token no disponible')),
+    );
+    return;
+  }
+
+
+  final saveTestUrl = Uri.parse('${Config.apiUrl2}/stress-test/save'); // Nueva API
+  final updateEstresUrl = Uri.parse('${Config.apiUrl2}/users/$userId/estres-level'); // Actualizar estres_nivel_id
 
   // Calcular el puntaje total
   int totalScore = selectedOptions.fold(0, (sum, value) => sum + value);
 
   try {
-    // Verificar si existe un registro para este usuario
-    final checkResponse = await http.get(checkRecordUrl);
-
-    if (checkResponse.statusCode != 200 && checkResponse.statusCode != 404) {
-      print('Error al verificar registro del usuario: ${checkResponse.body}');
+    // Obtener perfil del usuario desde apiUrl2
+    Map<String, dynamic>? userProfile = await _getUserProfile();
+    if (userProfile == null) {
+      print('Error: No se pudo obtener el perfil del usuario');
       return;
     }
 
-    bool recordExists = checkResponse.statusCode == 200;
+    // Obtener gender_id desde el perfil
+    int genderId = _getGenderIdFromProfile(userProfile['gender'] ?? 'Masculino');
 
-    // Obtener el gender_id del usuario
-    final genderResponse =
-        await http.get(Uri.parse('${Config.apiUrl}/userResponses/$userId'));
-    if (genderResponse.statusCode != 200) {
-      print('Error al obtener el gender_id: ${genderResponse.statusCode}');
-      return;
-    }
 
-    final List<dynamic> userData = json.decode(genderResponse.body);
-    int genderId = userData.isNotEmpty ? userData[0]['gender_id'] ?? 1 : 1;
 
     // Calcular el nivel de estrés y su ID
     final Map<String, dynamic> estresResult =
@@ -128,129 +173,96 @@ Future<void> submitTest() async {
     NivelEstres nivelEstres = estresResult['nivel'];
     int estresNivelId = estresResult['id'];
 
-  if (recordExists) {
-    // Si el registro ya existe, actualiza el nivel de estrés
-    final updateData = {
-      'user_id': userId,
-      'estres_nivel_id': estresNivelId,
-    };
-    final updateResponse = await http.post(
-      updateEstresUrl,
-      headers: {"Content-Type": "application/json"},
-      body: json.encode(updateData),
-    );
+    // Determinar el tipo de test basado en si el día 21 fue completado
+    String testType = (isDay21Completed == true) ? 'exit' : 'entry';
 
-    if (updateResponse.statusCode != 200) {
-      print('Error al actualizar el estres_nivel_id: ${updateResponse.body}');
-      return;
-    }
-
-    print('Nivel de estrés actualizado correctamente.');
-
-    // Guardar las respuestas en la tabla `test_estres_salida`
-    final saveExitTestUrl = Uri.parse('${Config.apiUrl}/guardarTestEstresSalida');
-    final Map<String, dynamic> exitTestData = {
-      'user_id': userId,
-      for (int i = 0; i < selectedOptions.length; i++)
-        'pregunta_${i + 1}': selectedOptions[i],
-      'estado': 'activo',
-    };
-
-    final exitTestResponse = await http.post(
-      saveExitTestUrl,
-      headers: {"Content-Type": "application/json"},
-      body: json.encode(exitTestData),
-    );
-
-    if (exitTestResponse.statusCode != 200) {
-      print('Error al guardar el test de salida: ${exitTestResponse.body}');
-      return;
-    }
-
-    print('Test de salida guardado correctamente.');
-
-    // Redirigir al HomeScreen
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => HomeScreen()),
-      (Route<dynamic> route) => false, // Elimina todas las rutas anteriores
-    );
-
-    return;
-}
- else {
-      // Si no existe un registro, guardar el test completo
-      final Map<String, dynamic> data = {
+    // Preparar datos para la nueva API
+    List<Map<String, dynamic>> testData = [];
+    for (int i = 0; i < selectedOptions.length; i++) {
+      testData.add({
         'user_id': userId,
-        for (int i = 0; i < selectedOptions.length; i++)
-          'pregunta_${i + 1}': selectedOptions[i],
-        'estado': 'activo',
-      };
+        'question_id': i + 1, // Las preguntas van del 1 al 23
+        'score': selectedOptions[i],
+        'test_type': testType,
+      });
+    }
 
-      // Guardar el test en el backend
-      final response = await http.post(
-        saveTestUrl,
-        headers: {"Content-Type": "application/json"},
-        body: json.encode(data),
+    // Guardar el test usando la nueva API
+    final saveResponse = await http.post(
+      saveTestUrl,
+      headers: {
+        "Content-Type": "application/json",
+        'Authorization': 'Bearer $token',
+      },
+      body: json.encode(testData),
+    );
+
+    if (saveResponse.statusCode != 201) {
+      print('Error al guardar el test: ${saveResponse.body}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al guardar el test')),
+      );
+      return;
+    }
+
+    print('Test guardado correctamente con tipo: $testType');
+
+    if (testType == 'exit') {
+      // Si es un test de salida (día 21 completado), actualizar el nivel de estrés
+      final updateData = {
+        'estres_level': estresNivelId,
+      };
+      final updateResponse = await http.put(
+        updateEstresUrl,
+        headers: {
+          "Content-Type": "application/json",
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(updateData),
       );
 
-      if (response.statusCode != 200) {
-        print('Error al guardar el test: ${response.body}');
+      if (updateResponse.statusCode != 200) {
+        print('Error al actualizar el estres_nivel_id: ${updateResponse.body}');
         return;
       }
 
-      print('Test guardado correctamente.');
+      print('Nivel de estrés actualizado correctamente.');
 
-      // Crear un nuevo registro con el nivel de estrés
-      final newRecordData = {
-        'user_id': userId,
-        'estres_nivel_id': estresNivelId,
-      };
-      final newRecordResponse = await http.post(
-        updateEstresUrl,
-        headers: {"Content-Type": "application/json"},
-        body: json.encode(newRecordData),
+      // Redirigir al HomeScreen para test de salida
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+        (Route<dynamic> route) => false, // Elimina todas las rutas anteriores
       );
 
-      if (newRecordResponse.statusCode != 200) {
-        print('Error al crear el registro: ${newRecordResponse.body}');
+      return;
+    } else {
+      final updateData = {
+        'estres_level': estresNivelId,
+      };
+      final updateResponse = await http.put(
+        updateEstresUrl,
+        headers: {
+          "Content-Type": "application/json",
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(updateData),
+      );
+
+      if (updateResponse.statusCode != 200) {
+        print('Error al crear el registro: ${updateResponse.body}');
         return;
       }
 
       print('Registro de nivel de estrés creado correctamente.');
 
-      // Actualizar testestresbool a true
+      // Generar programa usando la nueva API
+      await _generateProgram(userProfile, totalScore);
+
+      // Actualizar testestresbool a true solo en el primer test
       await _updateTestEstresBool();
 
-      // Generar reporte en paralelo
-      final generateReportUrl =
-          Uri.parse('${Config.apiUrl}/userprograma/report/$userId');
-      final Map<String, dynamic> reportData = {
-        for (int i = 0; i < selectedOptions.length; i++)
-          'pregunta_${i + 1}': selectedOptions[i]
-      };
-
-      Future<void> generateReport() async {
-        try {
-          final reportResponse = await http.post(
-            generateReportUrl,
-            headers: {"Content-Type": "application/json"},
-            body: json.encode(reportData),
-          );
-
-          if (reportResponse.statusCode != 200) {
-            print('Error al generar el reporte: ${reportResponse.body}');
-            return;
-          }
-          print('Reporte generado y guardado correctamente.');
-        } catch (e) {
-          print('Error al generar el reporte: $e');
-        }
-      }
-
-      generateReport();
-
-      // Navegar a la pantalla de programa de estrés
+      // Navegar a la pantalla de programa de estrés para test de entrada
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -260,6 +272,9 @@ Future<void> submitTest() async {
     }
   } catch (e) {
     print('Error al procesar el test: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error al procesar el test')),
+    );
   }
 }
 
@@ -285,7 +300,7 @@ Future<void> submitTest() async {
         nivelEstres = NivelEstres.severo;
         estresNivelId = 3;
       } else if (genderId == 2 || genderId == 3) { // Considerando 3 como otro género
-        nivelEstres = NivelEstres.leve;
+        nivelEstres = NivelEstres.severo;
         estresNivelId = 3;
       }
     }
@@ -293,37 +308,102 @@ Future<void> submitTest() async {
     return {'nivel': nivelEstres, 'id': estresNivelId};
   }
 
-  // Actualizar testestresbool a true en el backend
-  Future<void> _updateTestEstresBool() async {
+  // Generar programa usando la nueva API
+  Future<void> _generateProgram(Map<String, dynamic> userProfile, int totalScore) async {
     try {
-      String? token = await getToken(); // Obtener token de SharedPreferences
+      String? token = await getToken();
       if (token == null) {
-        print('Error: No se encontró el token.');
+        print('Error: No se encontró el token para generar programa.');
         return;
       }
 
-      final url = Uri.parse('${Config.apiUrl}/users/$userId');
-      final response = await http.put(
-        url,
+      // Crear resumen de respuestas basado en el puntaje total
+      String resumenRespuestas = _createResponseSummary(totalScore);
+
+      // Obtener la fecha actual para startDate
+      DateTime now = DateTime.now();
+      String startDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+      // Mapear el género para el userContext
+      String genderCode = userProfile['gender'] == 'Masculino' ? 'M' : 
+                         userProfile['gender'] == 'Femenino' ? 'F' : 'O';
+
+      final generateProgramUrl = Uri.parse('${Config.apiUrl2}/programs/generate');
+      
+      final Map<String, dynamic> programData = {
+        'userId': userId,
+        'goal': 'Reducir estrés laboral',
+        'constraints': [
+          'sin material externo',
+          'sesiones < 15 minutos'
+        ],
+        'count': 21,
+        'startDate': startDate,
+        'tagDistribution': [
+          {
+            'tag': 'relajacion',
+            'days': 7
+          },
+          {
+            'tag': 'pensamiento-positivo',
+            'days': 7
+          },
+          {
+            'tag': 'visualizacion',
+            'days': 7
+          }
+        ],
+        'userContext': {
+          'username': userProfile['username'] ?? '',
+          'age_range': userProfile['ageRange'] ?? '',
+          'hierarchical_level': userProfile['hierarchicalLevel'] ?? '',
+          'responsability_level': userProfile['responsabilityLevel'] ?? '',
+          'gender': genderCode,
+          'estres_nivel': userProfile['estresLevel'] ?? '',
+          'resumenRespuestas': resumenRespuestas
+        }
+      };
+
+      print('Generando programa con los siguientes datos: $programData');
+      final programResponse = await http.post(
+        generateProgramUrl,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: json.encode({'testestresbool': true}),
+        body: json.encode(programData),
       );
 
-      if (response.statusCode == 200) {
-        print('Campo testestresbool actualizado correctamente.');
+      if (programResponse.statusCode == 200 || programResponse.statusCode == 201) {
+        print('Programa generado correctamente.');
+      } else {
+        print('Error al generar el programa: ${programResponse.statusCode} - ${programResponse.body}');
+      }
+    } catch (e) {
+      print('Error al generar el programa: $e');
+    }
+  }
+
+  // Crear resumen de respuestas basado en el puntaje total
+  String _createResponseSummary(int totalScore) {
+    if (totalScore <= 92) {
+      return 'Usuario presenta niveles bajos de estrés. Respuestas indican manejo adecuado de situaciones cotidianas.';
+    } else if (totalScore <= 138) {
+      return 'Usuario presenta niveles moderados de estrés. Se observan algunas dificultades en el manejo de situaciones laborales.';
+    } else {
+      return 'Usuario presenta niveles altos de estrés. Respuestas indican dificultades significativas en el manejo de presión y situaciones laborales.';
+    }
+  }
+
+  // Actualizar testestresbool a true en el backend usando apiUrl2
+  Future<void> _updateTestEstresBool() async {
+    try {
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setBool('testestresbool', true);
-      } else {
-        print('Error al actualizar testestresbool: ${response.statusCode}');
-      }
     } catch (e) {
       print('Error al actualizar testestresbool: $e');
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -449,7 +529,6 @@ Future<void> submitTest() async {
                 ],
 
                 SizedBox(height: 20),
-
 
                 // Opciones de respuesta
                 Column(
@@ -636,7 +715,6 @@ Future<void> submitTest() async {
                   ),
                 ),
 
-
               ],
             ),
           ),
@@ -644,7 +722,4 @@ Future<void> submitTest() async {
       ),
     );
   }
-
 }
-
-

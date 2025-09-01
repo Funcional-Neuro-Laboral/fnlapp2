@@ -8,11 +8,13 @@ import '../config.dart';
 class FinalStepScreen extends StatefulWidget {
   final int userId;
   final int tecnicaId;
+  final int sessionId; // Nuevo: session_id
 
   const FinalStepScreen({
     Key? key,
     required this.userId,
     required this.tecnicaId,
+    required this.sessionId, // Agregar sessionId
   }) : super(key: key);
 
   @override
@@ -86,8 +88,9 @@ class _FinalStepScreenState extends State<FinalStepScreen>
   }
 
   Future<void> _sendFeedbackToServer() async {
+    // Nuevo endpoint con sessionId y userId
     final String apiUrl =
-        "${Config.apiUrl}/userprograma/${widget.userId}/${widget.tecnicaId}";
+        "${Config.apiUrl2}/programs/sessions/${widget.sessionId}/complete/${widget.userId}";
 
     final Map<String, dynamic> requestData = {
       "comentario": _commentController.text.trim(),

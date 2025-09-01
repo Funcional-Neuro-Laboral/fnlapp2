@@ -20,7 +20,7 @@ class ApiService {
   Future<http.Response> get(String endpoint) async {
     final currentToken = await _getCurrentToken();
     final response = await http.get(
-        Uri.parse('${Config.apiUrl}/$endpoint'),
+        Uri.parse('${Config.apiUrl2}/$endpoint'),
         headers: await _headers(currentToken)
     );
     await _handleResponse(response);

@@ -1,7 +1,8 @@
-import 'package:fnlapp/config.dart';
+//import 'package:fnlapp/config.dart';
 
 class ProfileData {
   final String email;
+  final String? username;
   final String hierarchicalLevel;
   String? profileImage;
   final int? idEmpresa;
@@ -9,42 +10,45 @@ class ProfileData {
   final String apellidos;
   String? nombreEmpresa;
   final String? gender;
+  final String? estresLevel;
 
   ProfileData({
     required this.email,
+    required this.username,
     required this.nombres,
     required this.apellidos,
     required this.hierarchicalLevel,
     this.profileImage,
     this.idEmpresa,
-    this.nombreEmpresa,
-    this.gender,
+    required this.nombreEmpresa,
+    required this.gender,
+    this.estresLevel,
   });
 
-  // --- FÁBRICA CORREGIDA PARA SER A PRUEBA DE NULOS ---
   factory ProfileData.fromJson(Map<String, dynamic> json) {
-    // Verifica si el perfil de la imagen es una URL completa o solo una ruta
-    String? profileImagePath = json['profileImage'];
-    if (profileImagePath != null && !profileImagePath.startsWith('http')) {
-      // Construye la URL completa si es necesario
-      profileImagePath =
-          Config.imagenesUrl + profileImagePath.replaceAll('\\', '/');
-    }
+    const String defaultImageUrl = 'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/user_img.jpg';
+  
+  // Verifica si el perfil tiene una imagen válida
+  String? profileImagePath = json['profileImage'];
+  String finalImageUrl = defaultImageUrl; // Usar imagen por defecto inicialmente
+  
+  if (profileImagePath != null && 
+      profileImagePath.isNotEmpty && 
+      profileImagePath.startsWith('https://')) {
+    finalImageUrl = profileImagePath;
+  }
 
     return ProfileData(
-      // Usamos '??' para proveer un valor por defecto si el campo es nulo.
       email: json['email'] ?? 'Correo no disponible',
       nombres: json['nombres'] ?? 'Usuario',
       apellidos: json['apellidos'] ?? '',
-
-      // Manejamos el nivel jerárquico de forma segura.
+      nombreEmpresa: json['companyName'] ?? 'Empresa no definida',
+      username: json['username'],
       hierarchicalLevel: json['hierarchicalLevel']?.toString() ?? 'No definido',
-
-      profileImage: profileImagePath,
-
-      // Nos aseguramos de que el id sea un entero nulable.
+      profileImage: finalImageUrl, // Usar la URL procesada
       idEmpresa: json['id_empresa'] as int?,
-      gender: json['gender'],
+      gender: json['gender']?.toString() ?? 'No especificado',
+      estresLevel: json['estresLevel'] as String?,
     );
   }
 

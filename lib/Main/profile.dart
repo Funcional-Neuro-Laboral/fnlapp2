@@ -20,7 +20,7 @@ class ProfileScreen extends StatefulWidget {
     required this.profileData,
     required this.onLogout,
     this.onImageSelected,
-    this.onProfileImageUpdated, // Agregar este parámetro
+    this.onProfileImageUpdated, 
   });
 
   @override
@@ -31,6 +31,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   File? _selectedImage;
   Uint8List? _selectedImageBytes; // Para web
   final ImagePicker _picker = ImagePicker();
+  
 
 Future<void> _uploadProfileImage() async {
   if (_selectedImage == null && _selectedImageBytes == null) {
@@ -100,30 +101,98 @@ Future<void> _uploadProfileImage() async {
     final response = await request.send();
     final responseBody = await response.stream.bytesToString();
 
+
     if (response.statusCode == 200) {
-      final jsonResponse = json.decode(responseBody);
+        final jsonResponse = json.decode(responseBody);
 
-      if (jsonResponse['profileImage'] != null) {
-        final newImageUrl = jsonResponse['profileImage'];
 
-        setState(() {
-          widget.profileData?.profileImage = newImageUrl;
-          _selectedImage = null;
-          _selectedImageBytes = null;
-        });
+        final newImageUrl = jsonResponse['data']['imageUrl'];
 
+        
+
+        imageCache.clear();
+        imageCache.clearLiveImages();
+
+        await _reloadProfileFromServer();
+
+        // PASO 2: Notificar al HomeScreen
         if (widget.onProfileImageUpdated != null) {
           widget.onProfileImageUpdated!(newImageUrl);
         }
 
-        imageCache.clear();
-        imageCache.clearLiveImages();
-      }
+        setState(() {
+          _selectedImage = null;
+          _selectedImageBytes = null;
+        });
+
+        print('Imagen de perfil actualizada exitosamente: $newImageUrl');
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Imagen de perfil actualizada exitosamente'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      
     } else {
       final errorResponse = json.decode(responseBody);
       throw Exception('Error del servidor: ${response.statusCode} - ${errorResponse['error']['message']}');
     }
   } catch (e) {
+    print('Error al subir imagen de perfil: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al actualizar imagen de perfil'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+}
+
+Future<void> _reloadProfileFromServer() async {
+  try {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt('userId');
+    final token = prefs.getString('token');
+
+    if (userId == null || token == null) {
+      throw Exception('No se pudieron obtener los datos del usuario');
+    }
+
+    String url = '${Config.apiUrl2}/users/getprofile/$userId';
+    final response = await http.get(
+      Uri.parse(url), 
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
+    );
+
+    if (response.statusCode == 200) {
+      var profileJson = json.decode(response.body);
+      var updatedProfile = ProfileData.fromJson(profileJson);
+      
+      // CRÍTICO: Actualizar directamente el objeto profileData del widget
+      setState(() {
+        if (widget.profileData != null) {
+          widget.profileData!.profileImage = updatedProfile.profileImage;
+        }
+      });
+
+      print('Perfil recargado desde el servidor. Nueva imagen: ${updatedProfile.profileImage}');
+    } else {
+      print('Error al recargar perfil: ${response.statusCode}');
+    }
+  } catch (e) {
+    print('Error al recargar perfil desde servidor: $e');
   }
 }
 
@@ -199,7 +268,7 @@ Future<void> _uploadProfileImage() async {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
+    //final screenHeight = MediaQuery.of(context).size.height;
     final isTablet = screenWidth > 600;
     final isWeb = screenWidth > 900;
 
@@ -332,7 +401,14 @@ Future<void> _uploadProfileImage() async {
     } else if (!kIsWeb && _selectedImage != null) {
       return FileImage(_selectedImage!);
     } else if (widget.profileData?.profileImage != null) {
-      return NetworkImage(widget.profileData!.profileImage!);
+      return NetworkImage(
+        widget.profileData!.profileImage!,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      );
     }
     return null;
   }
@@ -410,7 +486,7 @@ Future<void> _uploadProfileImage() async {
                       child: _buildInfoCard(
                         icon: Icons.email_outlined,
                         title: 'ID',
-                        value: widget.profileData?.email.split('@')[0] ?? 'No disponible',
+                        value: widget.profileData?.username ?? 'No disponible',
                         isWeb: isWeb,
                         isTablet: isTablet,
                       ),

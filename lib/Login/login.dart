@@ -54,10 +54,12 @@ class _LoginScreenState extends State<LoginScreen> {
         }),
       );
 
+      
       setState(() {
         isLoading = false;
       });
 
+      print('Response body: ${response.body}');
       if (response.statusCode == 200) {
         await _handleLoginResponse(context, response);
       } else if (response.statusCode == 401) {
@@ -87,11 +89,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final userId = user['id'];
       final email = user['email'];
-      final username = user['username'];
+      final username = user['username']; 
+      final isDay21Completed = user['isDay21Completed'] ?? false;
+
+      // Extraer permisos directamente de la respuesta del login
+      final responsebool = data['responsebool'] ?? false;
+      final testresresponsebool = data['testresresponsebool'] ?? false;
+      final permisopoliticas = data['permisopoliticas'] ?? false;
 
       if (token != null && username != null && userId != null && email != null) {
-        await _saveUserData(token, username, userId, email, refreshToken);
-        await _fetchAndSavePermissions(userId);
+        await _saveUserData(token, username, userId, email, refreshToken, isDay21Completed);
+        await _savePermissions(responsebool, testresresponsebool, permisopoliticas);
 
         // Inicializar el servicio de renovación de tokens
         await TokenService.instance.initializeTokenRefresh();
@@ -105,39 +113,25 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-    Future<void> _fetchAndSavePermissions(int userId) async {
-      try {
-        final response = await http.get(
-          Uri.parse('${Config.apiUrl}/users/getpermisos/$userId'),
-          headers: {'Content-Type': 'application/json'},
-        );
+  Future<void> _savePermissions(bool responsebool, bool testresresponsebool, bool permisopoliticas) async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      
+      // Guardar permisos usando los nombres que ya tienes en tu app
+      await prefs.setBool('userresponsebool', responsebool);
+      await prefs.setBool('testestresbool', testresresponsebool);
+      await prefs.setBool('permisopoliticas', permisopoliticas);
 
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-
-          // Verificar si la clave 'permisos' existe y no es nula
-          final permisos = data['permisos'];
-          
-          if (permisos != null) {
-            // Verificar que las claves dentro de 'permisos' no sean nulas
-            SharedPreferences prefs = await SharedPreferences.getInstance();
-            await prefs.setBool('permisopoliticas', permisos['permisopoliticas'] ?? false);
-            await prefs.setBool('userresponsebool', permisos['userresponsebool'] ?? false);
-            await prefs.setBool('testestresbool', permisos['testestresbool'] ?? false);
-
-            print('Permisos guardados: $permisos');
-          } else {
-            print('Error: No se encontraron permisos en la respuesta.');
-          }
-        } else {
-          print('Error en la solicitud: ${response.statusCode}');
-        }
-      } catch (e) {
-        print('Error obteniendo permisos: $e');
-      }
+      print('Permisos guardados desde login:');
+      print('  - userresponsebool: $responsebool');
+      print('  - testestresbool: $testresresponsebool');
+      print('  - permisopoliticas: $permisopoliticas');
+    } catch (e) {
+      print('Error guardando permisos: $e');
     }
+  }
 
-  Future<void> _saveUserData(String token, String username, int userId, String email, String? refreshToken) async {
+  Future<void> _saveUserData(String token, String username, int userId, String email, String? refreshToken, bool? isDay21Completed) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
 
     await prefs.setString('token', token);
@@ -146,8 +140,14 @@ class _LoginScreenState extends State<LoginScreen> {
     if (refreshToken != null) {
       await prefs.setString('refreshToken', refreshToken);
     } else {
-      await prefs.remove('refreshToken'); // Remover si existe
+      await prefs.remove('refreshToken');
     }
+
+    if (isDay21Completed != null) {
+      await prefs.setBool('isDay21Completed', isDay21Completed);
+    } else {
+      await prefs.remove('isDay21Completed'); 
+    } 
 
     await prefs.setString('username', username);
     await prefs.setInt('userId', userId);
