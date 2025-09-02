@@ -477,33 +477,179 @@ final List<Map<String, String>> questions = [
     }
   }
 
-Future<void> submitTest() async {
-  final url = Uri.parse('${Config.apiUrl}/guardarTestEstresSalida');
+  // Función para obtener el perfil del usuario
+  Future<Map<String, dynamic>?> _getUserProfile() async {
+    try {
+      String? token = await getToken();
+      if (token == null) {
+        print('Error: No se encontró el token.');
+        return null;
+      }
 
-  final Map<String, dynamic> data = {
-    'user_id': userId,
-    for (int i = 0; i < selectedOptions.length; i++) 'pregunta_${i + 1}': selectedOptions[i],
-    'estado': 'activo',
-  };
+      String url = '${Config.apiUrl2}/users/getprofile/$userId';
+      final response = await http.get(Uri.parse(url), headers: {
+        'Authorization': 'Bearer $token',
+      });
 
-  try {
-    final response = await http.post(
-      url,
-      headers: {"Content-Type": "application/json"},
-      body: json.encode(data),
-    );
-
-    if (response.statusCode == 200) {
-      print('Test de salida guardado correctamente');
-      Navigator.pop(context); // Regresar o realizar otra acción después de guardar
-    } else {
-      print('Error al guardar el test de salida: ${response.body}');
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        print('Error al obtener perfil: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error al obtener perfil del usuario: $e');
+      return null;
     }
-  } catch (e) {
-    print('Error al enviar el test: $e');
   }
-}
 
+// Función para mapear el género a ID
+  int _getGenderIdFromProfile(String gender) {
+    switch (gender.toLowerCase()) {
+      case 'masculino':
+        return 1;
+      case 'femenino':
+        return 2;
+      case 'otro':
+        return 3;
+      default:
+        return 1;
+    }
+  }
+
+// Función para calcular el nivel de estrés
+  Map<String, dynamic> _calcularNivelEstres(int totalScore, int genderId) {
+    int estresNivelId = 0;
+
+    if (totalScore <= 92) {
+      estresNivelId = 1;
+    } else if (totalScore > 92 && totalScore <= 138) {
+      if (genderId == 1) {
+        estresNivelId = 2;
+      } else if (genderId == 2 || genderId == 3) {
+        estresNivelId = totalScore <= 132 ? 2 : 3;
+      }
+    } else if (totalScore > 138) {
+      estresNivelId = 3;
+    }
+
+    return {'id': estresNivelId};
+  }
+
+  Future<void> submitTest() async {
+    // Validar userId antes de proceder
+    if (userId == null) {
+      print("Error: userId es null");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: No se ha cargado el ID del usuario')),
+      );
+      return;
+    }
+
+    // Validar si selectedOptions está correctamente poblado
+    if (selectedOptions.where((option) => option != null).length < 23) {
+      print("Error: No se han respondido todas las preguntas.");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Por favor responde todas las preguntas')),
+      );
+      return;
+    }
+
+    String? token = await getToken();
+    if (token == null) {
+      print('Error: No se encontró el token.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: Token no disponible')),
+      );
+      return;
+    }
+
+    final saveTestUrl = Uri.parse('${Config.apiUrl2}/stress-test/save'); // Endpoint para test de salida
+    final updateEstresUrl = Uri.parse('${Config.apiUrl2}/users/$userId/estres-level'); // Actualizar estres_nivel_id
+
+    // Calcular el puntaje total
+    int totalScore = selectedOptions.fold(0, (sum, value) => sum + (value ?? 0));
+
+    try {
+      // Obtener perfil del usuario desde apiUrl2
+      Map<String, dynamic>? userProfile = await _getUserProfile();
+      if (userProfile == null) {
+        print('Error: No se pudo obtener el perfil del usuario');
+        return;
+      }
+
+      // Obtener gender_id desde el perfil
+      int genderId = _getGenderIdFromProfile(userProfile['gender'] ?? 'Masculino');
+
+      // Calcular el nivel de estrés y su ID
+      final Map<String, dynamic> estresResult = _calcularNivelEstres(totalScore, genderId);
+      int estresNivelId = estresResult['id'];
+
+      // Preparar datos para la nueva API (tipo 'exit')
+      List<Map<String, dynamic>> testData = [];
+      for (int i = 0; i < selectedOptions.length; i++) {
+        testData.add({
+          'user_id': userId,
+          'question_id': i + 1,
+          'score': selectedOptions[i] ?? 0,
+          'test_type': 'exit',
+        });
+      }
+
+      // Guardar el test usando la nueva API
+      final saveResponse = await http.post(
+        saveTestUrl,
+        headers: {
+          "Content-Type": "application/json",
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(testData),
+      );
+
+      if (saveResponse.statusCode != 201) {
+        print('Error al guardar el test: ${saveResponse.body}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al guardar el test')),
+        );
+        return;
+      }
+
+      print('Test de salida guardado correctamente');
+
+      // Actualizar el nivel de estrés del usuario
+      final updateData = {
+        'estres_level': estresNivelId,
+      };
+      final updateResponse = await http.put(
+        updateEstresUrl,
+        headers: {
+          "Content-Type": "application/json",
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(updateData),
+      );
+
+      if (updateResponse.statusCode != 200) {
+        print('Error al actualizar el estres_nivel_id: ${updateResponse.body}');
+        return;
+      }
+
+      print('Nivel de estrés actualizado correctamente.');
+
+      // Regresar al home después de completar el test de salida
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/home',
+            (Route<dynamic> route) => false,
+      );
+
+    } catch (e) {
+      print('Error al procesar el test: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al procesar el test')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
