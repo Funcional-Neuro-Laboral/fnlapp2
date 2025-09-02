@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import '../widgets/chat_message.dart';
 import '../widgets/chat_box_footer.dart';
@@ -44,6 +45,21 @@ class _ChatScreenState extends State<ChatScreen> {
     _fetchMessages();
   }
 
+  // Función para crear el mensaje de bienvenida
+  Map<String, dynamic> _createWelcomeMessage() {
+    final now = DateTime.now();
+    final timeFormat = DateFormat('HH:mm').format(now);
+
+    return {
+      'id': 'welcome_message',
+      'text': '¡Hola ${widget.username}! 👋🐱 \nSoy Funcy y me gustaría saber en qué podría ayudarte el día de hoy.',
+      'time': timeFormat,
+      'user_id': 1,
+      'created_at': now.toString(),
+      'isWelcome': true,
+    };
+  }
+
   late WebSocketChannel _channel;
 
   void _connectWebSocket() {
@@ -70,7 +86,6 @@ class _ChatScreenState extends State<ChatScreen> {
       print("No se pudo conectar: $e");
     }
   }
-
 
   void _showTypingEffect(String fullMessage) {
     if (!mounted || fullMessage.isEmpty) return; // Verificar mounted
@@ -148,8 +163,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-
-  @override
   @override
   void dispose() {
     _typingTimer?.cancel();
@@ -157,7 +170,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollController.dispose();
     super.dispose();
   }
-
 
   void _onScroll() {
     _scrollOffset = _scrollController.offset;
@@ -180,47 +192,57 @@ class _ChatScreenState extends State<ChatScreen> {
       final response = await http.get(url);
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
+
+        List<Map<String, dynamic>> newMessages = data.map((item) {
+          return {
+            'id': item['id']?.toString() ?? '',
+            'text': item['content'] ?? '',
+            'time': item['created_at'] != null
+                ? DateFormat('HH:mm').format(DateTime.parse(item['created_at']))
+                : '',
+            'user_id': item['sender'] == 'FUNCY' ? 1 : widget.userId,
+            'created_at': item['created_at'] ?? '',
+          };
+        }).toList();
+
         setState(() {
           if (isLoadMore) {
-            messages.addAll(data.map((item) {
-              return {
-                'id': item['id']?.toString() ?? '',
-                'text': item['content'] ?? '',
-                'time': item['created_at'] != null
-                    ? DateFormat('HH:mm').format(DateTime.parse(item['created_at']))
-                    : '',
-                // Mapear según el sender: FUNCY = 1 (bot), USER = userId actual
-                'user_id': item['sender'] == 'FUNCY' ? 1 : widget.userId,
-                'created_at': item['created_at'] ?? '',
-              };
-            }).toList());
+            messages.addAll(newMessages);
             _loadingMore = false;
           } else {
-            messages = data.map((item) {
-              return {
-                'id': item['id']?.toString() ?? '',
-                'text': item['content'] ?? '',
-                'time': item['created_at'] != null
-                    ? DateFormat('HH:mm').format(DateTime.parse(item['created_at']))
-                    : '',
-                // Mapear según el sender: FUNCY = 1 (bot), USER = userId actual
-                'user_id': item['sender'] == 'FUNCY' ? 1 : widget.userId,
-                'created_at': item['created_at'] ?? '',
-              };
-            }).toList();
+            messages = newMessages;
+            // Siempre agregar el mensaje de bienvenida al final (será el primero en aparecer)
+            messages.add(_createWelcomeMessage());
           }
           _offset += _limit;
         });
       } else {
         print('Error al obtener mensajes: ${response.statusCode}');
+        // Si hay error, al menos mostrar el mensaje de bienvenida
+        if (!isLoadMore) {
+          setState(() {
+            messages = [_createWelcomeMessage()];
+          });
+        }
       }
     } catch (error) {
       print('Error en la solicitud HTTP: $error');
+      // Si hay error, al menos mostrar el mensaje de bienvenida
+      if (!isLoadMore) {
+        setState(() {
+          messages = [_createWelcomeMessage()];
+        });
+      }
     }
   }
 
   Future<void> _loadMoreMessages() async {
     if (_loadingMore) return;
+
+    // No cargar más mensajes si ya llegamos al mensaje de bienvenida
+    bool hasWelcomeMessage = messages.any((msg) => msg['isWelcome'] == true);
+    if (hasWelcomeMessage) return;
+
     await _fetchMessages(isLoadMore: true);
   }
 
@@ -256,77 +278,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  /*
-  Future<void> _getBotResponse(String userMessage) async {
-    if (userMessage.isEmpty) {
-      print('Mensaje del usuario es nulo o vacío');
-      return;
-    }
-
-    final List<Map<String, dynamic>> chatHistory = messages.map((msg) {
-      return {
-        'role': msg['user_id'] == widget.userId ? 'user' : 'assistant',
-        'content': msg['text']
-      };
-    }).toList();
-
-    final url = Uri.parse('${Config.apiUrl}/ask'); // Usar Config.apiUrl
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'prompt': userMessage,
-          'userId': widget.userId,
-          'chatHistory': chatHistory
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        final botMessage = responseData['response']?.toString().trim() ?? '';
-
-        final saveBotMessageResponse = await http.post(
-          Uri.parse('${Config.apiUrl}/guardarMensajeFromBot'), // Usar Config.apiUrl
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({
-            'content': botMessage,
-            'userId': widget.userId,
-          }),
-        );
-
-        if (saveBotMessageResponse.statusCode == 201) {
-          final responseData = json.decode(saveBotMessageResponse.body);
-          setState(() {
-            messages.insert(
-              0,
-              {
-                'id': responseData['id']?.toString() ?? '',
-                'text': botMessage,
-                'time': DateFormat('HH:mm').format(DateTime.now()),
-                'user_id': 1,
-                'created_at': responseData['created_at'] ?? '',
-              },
-            );
-          });
-
-          _scrollController.animateTo(
-            0.0,
-            duration: Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        } else {
-          print('Error al guardar el mensaje del bot: ${saveBotMessageResponse.statusCode}');
-        }
-      } else {
-        print('Error al obtener respuesta del bot: ${response.statusCode}');
-        print('Respuesta del servidor: ${response.body}');
-      }
-    } catch (error) {
-      print('Error en la solicitud HTTP: $error');
-    }
-  }
-*/
   @override
   Widget build(BuildContext context) {
     return Scaffold(
