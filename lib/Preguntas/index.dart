@@ -365,6 +365,10 @@ class _IndexScreenState extends State<IndexScreen> {
       );
 
       if (response.statusCode == 200) {
+
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('userresponsebool', true);
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Respuestas guardadas exitosamente.')),
         );
