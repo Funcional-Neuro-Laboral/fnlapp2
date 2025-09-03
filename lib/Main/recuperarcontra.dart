@@ -361,18 +361,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
           ),
         ),
-        SizedBox(height: 24), // Espacio entre botón y texto
-        Text(
-          'App para estudiantes',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: const Color(0x6652178F),
-            fontSize: 16,
-            fontFamily: 'Roboto',
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-        SizedBox(height: 16),
+        SizedBox(height: 24),
       ],
     );
   }
@@ -487,18 +476,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
           ),
         ),
-        SizedBox(height: 24), // Espacio entre botón y texto
-        Text(
-          'App para estudiantes',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: const Color(0x6652178F),
-            fontSize: 16,
-            fontFamily: 'Roboto',
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-        SizedBox(height: 16),
+        SizedBox(height: 24),
       ],
     );
   }
@@ -663,18 +641,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
           ),
         ),
-        SizedBox(height: 24), // Espacio entre botón y texto
-        Text(
-          'App para estudiantes',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: const Color(0x6652178F),
-            fontSize: 16,
-            fontFamily: 'Roboto',
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-        SizedBox(height: 16),
+        SizedBox(height: 24),
       ],
     );
   }
@@ -757,18 +724,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
           ),
         ),
-        SizedBox(height: 24), // Espacio entre botón y texto
-        Text(
-          'App para estudiantes',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: const Color(0x6652178F),
-            fontSize: 16,
-            fontFamily: 'Roboto',
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-        SizedBox(height: 16),
+        SizedBox(height: 24),
       ],
     );
   }
