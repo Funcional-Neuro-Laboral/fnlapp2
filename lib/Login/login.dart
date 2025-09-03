@@ -90,7 +90,8 @@ class _LoginScreenState extends State<LoginScreen> {
       final userId = user['id'];
       final email = user['email'];
       final username = user['username']; 
-      final isDay21Completed = user['isDay21Completed'] ?? false;
+      final isDay21Completed = data['isDay21Completed'] ?? false;
+
 
       // Extraer permisos directamente de la respuesta del login
       final responsebool = data['responsebool'] ?? false;

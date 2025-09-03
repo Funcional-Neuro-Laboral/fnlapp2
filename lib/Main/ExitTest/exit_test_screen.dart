@@ -619,6 +619,7 @@ final List<Map<String, String>> questions = [
       // Actualizar el nivel de estrés del usuario
       final updateData = {
         'estres_level': estresNivelId,
+        'type': 'final',
       };
       final updateResponse = await http.put(
         updateEstresUrl,

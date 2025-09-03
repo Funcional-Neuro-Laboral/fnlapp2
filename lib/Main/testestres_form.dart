@@ -211,6 +211,7 @@ Future<void> submitTest() async {
       // Si es un test de salida (día 21 completado), actualizar el nivel de estrés
       final updateData = {
         'estres_level': estresNivelId,
+        'type': 'final',
       };
       final updateResponse = await http.put(
         updateEstresUrl,
@@ -227,6 +228,10 @@ Future<void> submitTest() async {
       }
 
       print('Nivel de estrés actualizado correctamente.');
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isDay21Completed', false);
+
+      print("Test de salida completado, redirigiendo al HomeScreen.");
 
       // Redirigir al HomeScreen para test de salida
       Navigator.pushAndRemoveUntil(
@@ -239,6 +244,7 @@ Future<void> submitTest() async {
     } else {
       final updateData = {
         'estres_level': estresNivelId,
+        'type': 'initial',
       };
       final updateResponse = await http.put(
         updateEstresUrl,

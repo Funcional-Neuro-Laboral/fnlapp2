@@ -79,6 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
         SharedPreferences prefs = await SharedPreferences.getInstance();
         bool isDay21Completed = prefs.getBool('isDay21Completed') ?? false;
         
+        print('isDay21Completed: $isDay21Completed');
         setState(() {
           showExitTest = isDay21Completed;
           isExitTestEnabled = isDay21Completed;
