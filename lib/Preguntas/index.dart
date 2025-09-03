@@ -928,7 +928,7 @@ class _IndexScreenState extends State<IndexScreen> {
                                   : null,
                               child: Container(
                                 width: 158,
-                                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                 clipBehavior: Clip.antiAlias,
                                 decoration: ShapeDecoration(
                                   color: isNextEnabled
@@ -955,15 +955,18 @@ class _IndexScreenState extends State<IndexScreen> {
                                       : const [],
                                 ),
                                 child: Center(
-                                  child: Text(
-                                    nextLabel,
-                                    style: TextStyle(
-                                      color: isNextEnabled
-                                          ? Colors.white
-                                          : const Color(0xFF868686),
-                                      fontSize: 22,
-                                      fontFamily: 'Inter',
-                                      fontWeight: FontWeight.w600,
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      nextLabel,
+                                      style: TextStyle(
+                                        color: isNextEnabled
+                                            ? Colors.white
+                                            : const Color(0xFF868686),
+                                        fontSize: 22,
+                                        fontFamily: 'Inter',
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ),

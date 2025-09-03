@@ -451,39 +451,17 @@ Future<void> submitTest() async {
                     ],
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.only(bottom: 5.0),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            Icons.chevron_left,
-                            color: Colors.black,
-                            size: 40.0,
-                          ),
-                          onPressed: () {
-                            Navigator.pushAndRemoveUntil(
-                              context,
-                              MaterialPageRoute(builder: (context) => HomeScreen()),
-                                  (Route<dynamic> route) => false,
-                            );
-                          },
+                    padding: const EdgeInsets.symmetric(vertical: 10.0),
+                    child: Center(
+                      child: Text(
+                        'Pregunta ${currentQuestionIndex + 1} de ${questions.length}',
+                        style: TextStyle(
+                          color: const Color(0xFF4320AD),
+                          fontSize: 16,
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w700,
                         ),
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment(-0.05, 0.0), // Mueve ligeramente a la izquierda
-                            child: Text(
-                              'Pregunta ${currentQuestionIndex + 1} de ${questions.length}',
-                              style: TextStyle(
-                                color: const Color(0xFF4320AD),
-                                fontSize: 16,
-                                fontFamily: 'Inter',
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 48), // Equilibra el espacio del IconButton
-                      ],
+                      ),
                     ),
                   ),
                 ),
