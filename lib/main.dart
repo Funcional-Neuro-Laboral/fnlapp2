@@ -6,8 +6,17 @@ import 'package:fnlapp/Main/home.dart';
 import '../Util/api_service.dart';
 import 'package:fnlapp/SplashScreen/splashscreen.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
-
+class MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+  }
+}
 
 void main() {
   usePathUrlStrategy(); 
