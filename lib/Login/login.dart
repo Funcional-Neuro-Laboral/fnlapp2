@@ -384,18 +384,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                     ),
 
-                                    // Marca
-                                    Center(
-                                      child: Text(
-                                        'App para estudiantes',
-                                        style: TextStyle(
-                                          color: const Color(0x6652178F),
-                                          fontSize: 16,
-                                          fontFamily: 'Roboto',
-                                          fontWeight: FontWeight.w400,
-                                        ),
-                                      ),
-                                    ),
                                   ],
                                 ),
                               ),
