@@ -11,25 +11,26 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../config.dart';
 
-
 class StepScreen extends StatefulWidget {
-  final List<String> steps; // Recibir la lista de pasos como un JSON
-  final String tecnicaNombre; // Nombre de la técnica
-  final int dia; // Número del día
-  final int userId; // Nuevo: user_id
-  final int tecnicaId; // Nuevo: tecnica_id
+  final List<String> steps;
+  final String tecnicaNombre;
+  final String tecnicaTipo;
+  final int dia;
+  final int userId;
+  final int tecnicaId;
   final String url_img;
-  final int sessionId; // Nuevo: session_id para el endpoint
+  final int sessionId;
 
   const StepScreen({
     Key? key,
     required this.steps,
     required this.tecnicaNombre,
+    required this.tecnicaTipo,
     required this.dia,
     required this.userId,
     required this.tecnicaId,
     required this.url_img,
-    required this.sessionId, // Agregar sessionId
+    required this.sessionId,
   }) : super(key: key);
 
   @override
@@ -44,6 +45,55 @@ class _StepScreenState extends State<StepScreen> {
   final TextEditingController commentController = TextEditingController();
   double rating = 0;
   double textSize = 18.0;
+
+  // Helper method para obtener el tipo de dispositivo
+  DeviceType _getDeviceType(double width) {
+    if (width < 600) return DeviceType.mobile;
+    if (width < 1024) return DeviceType.tablet;
+    return DeviceType.desktop;
+  }
+
+  // Helper method para obtener dimensiones responsivas
+  ResponsiveDimensions _getResponsiveDimensions(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final deviceType = _getDeviceType(size.width);
+
+    switch (deviceType) {
+      case DeviceType.mobile:
+        return ResponsiveDimensions(
+          padding: 16.0,
+          imageHeight: size.height * 0.35,
+          fontSize: 16.0,
+          titleFontSize: 17.0,
+          iconSize: 24.0,
+          buttonWidth: size.width * 0.25,
+          buttonHeight: 60.0,
+          maxContentWidth: size.width,
+        );
+      case DeviceType.tablet:
+        return ResponsiveDimensions(
+          padding: 24.0,
+          imageHeight: size.height * 0.4,
+          fontSize: 18.0,
+          titleFontSize: 20.0,
+          iconSize: 28.0,
+          buttonWidth: size.width * 0.2,
+          buttonHeight: 70.0,
+          maxContentWidth: size.width * 0.8,
+        );
+      case DeviceType.desktop:
+        return ResponsiveDimensions(
+          padding: 32.0,
+          imageHeight: size.height * 0.45,
+          fontSize: 20.0,
+          titleFontSize: 24.0,
+          iconSize: 32.0,
+          buttonWidth: 140.0,
+          buttonHeight: 80.0,
+          maxContentWidth: 800.0,
+        );
+    }
+  }
 
   @override
   void initState() {
@@ -62,13 +112,11 @@ class _StepScreenState extends State<StepScreen> {
     });
   }
 
-  //mapeo temporal de 21 dias
   String _getImageUrlByDay() {
-    // Usar la misma lógica que en plan.dart
     if (widget.dia >= 1 && widget.dia <= 21) {
       return 'https://funkyrecursos.s3.us-east-2.amazonaws.com/recursos_nuevos2/DIA${widget.dia}.png';
     }
-    return widget.url_img; // Fallback a la URL original
+    return widget.url_img;
   }
 
   @override
@@ -102,7 +150,6 @@ class _StepScreenState extends State<StepScreen> {
           await player.play(DeviceFileSource(audioFile.path));
         }
 
-        // Escuchar cuando termine la reproducción
         player.onPlayerStateChanged.listen((state) {
           if (state == PlayerState.completed && mounted) {
             setState(() {
@@ -153,7 +200,6 @@ class _StepScreenState extends State<StepScreen> {
     });
 
     try {
-      // Navegar directamente a FinalStepScreen sin verificar estado
       if (mounted) {
         Navigator.push(
           context,
@@ -161,7 +207,7 @@ class _StepScreenState extends State<StepScreen> {
             builder: (context) => FinalStepScreen(
               userId: widget.userId,
               tecnicaId: widget.tecnicaId,
-              sessionId: widget.sessionId, // Pasar sessionId
+              sessionId: widget.sessionId,
             ),
           ),
         );
@@ -175,7 +221,7 @@ class _StepScreenState extends State<StepScreen> {
             builder: (context) => FinalStepScreen(
               userId: widget.userId,
               tecnicaId: widget.tecnicaId,
-              sessionId: widget.sessionId, // Pasar sessionId
+              sessionId: widget.sessionId,
             ),
           ),
         );
@@ -201,7 +247,6 @@ class _StepScreenState extends State<StepScreen> {
   }
 
   Future<void> _sendComment() async {
-    // Implementar envío de comentario
     debugPrint('Rating: $rating');
     debugPrint('Comentario: ${commentController.text}');
     Navigator.pop(context);
@@ -209,26 +254,101 @@ class _StepScreenState extends State<StepScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final dimensions = _getResponsiveDimensions(context);
+    final deviceType = _getDeviceType(MediaQuery.of(context).size.width);
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
+        child: deviceType == DeviceType.desktop
+            ? _buildDesktopLayout(dimensions)
+            : _buildMobileTabletLayout(dimensions, deviceType),
+      ),
+    );
+  }
+
+  Widget _buildDesktopLayout(ResponsiveDimensions dimensions) {
+    return Row(
+      children: [
+        // Panel izquierdo con imagen
+        Expanded(
+          flex: 2,
+          child: Container(
+            padding: EdgeInsets.all(dimensions.padding),
+            child: Column(
+              children: [
+                _buildHeader(dimensions),
+                const SizedBox(height: 24),
+                Expanded(
+                  child: _buildImageSection(dimensions),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Panel derecho con contenido y controles
+        Expanded(
+          flex: 3,
+          child: Container(
+            padding: EdgeInsets.all(dimensions.padding),
+            child: Column(
+              children: [
+                _buildProgressIndicator(dimensions),
+                const SizedBox(height: 24),
+                Expanded(
+                  child: _buildTextContent(dimensions),
+                ),
+                _buildControls(dimensions),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileTabletLayout(ResponsiveDimensions dimensions, DeviceType deviceType) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: dimensions.maxContentWidth),
         child: Column(
           children: [
-            _buildHeader(),
-            _buildProgressIndicator(),
+            _buildHeader(dimensions),
+            _buildProgressIndicator(dimensions),
             Expanded(
-              child: _buildStepContent(),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: dimensions.padding),
+                child: Column(
+                  children: [
+                    _buildImageSection(dimensions),
+                    SizedBox(height: dimensions.padding),
+                    _buildTextSizeControl(dimensions),
+                    SizedBox(height: dimensions.padding),
+                    Container(
+                      height: 1,
+                      width: double.infinity,
+                      color: Colors.black,
+                    ),
+                    SizedBox(height: dimensions.padding),
+                    _buildStepText(dimensions),
+                  ],
+                ),
+              ),
             ),
-            _buildControls(),
+            _buildControls(dimensions),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(ResponsiveDimensions dimensions) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.symmetric(
+          horizontal: dimensions.padding,
+          vertical: dimensions.padding * 0.75
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -242,14 +362,14 @@ class _StepScreenState extends State<StepScreen> {
       child: Row(
         children: [
           Container(
-            width: 32,
-            height: 32,
+            width: dimensions.iconSize + 8,
+            height: dimensions.iconSize + 8,
             child: IconButton(
               onPressed: () => Navigator.pop(context),
               icon: Icon(
                 Icons.arrow_back_ios_new,
                 color: Colors.black,
-                size: 20,
+                size: dimensions.iconSize * 0.8,
               ),
               padding: EdgeInsets.zero,
             ),
@@ -260,39 +380,37 @@ class _StepScreenState extends State<StepScreen> {
                 'Día ${widget.dia.toString().padLeft(2, '0')}',
                 style: TextStyle(
                   color: const Color(0xFF4320AD),
-                  fontSize: 18,
+                  fontSize: dimensions.fontSize + 2,
                   fontFamily: 'Inter',
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           ),
-          SizedBox(width: 32), // Para balancear el icono de back
+          SizedBox(width: dimensions.iconSize + 8),
         ],
       ),
     );
   }
 
-  Widget _buildProgressIndicator() {
+  Widget _buildProgressIndicator(ResponsiveDimensions dimensions) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), // Aumenté el margen vertical
+      margin: EdgeInsets.all(dimensions.padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Lado izquierdo con la información
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Fila con tiempo y tipo de relajación
                     Row(
                       children: [
                         Icon(
                           Icons.access_time,
-                          size: 16,
+                          size: dimensions.fontSize,
                           color: const Color(0xFF212121),
                         ),
                         SizedBox(width: 4),
@@ -300,7 +418,7 @@ class _StepScreenState extends State<StepScreen> {
                           '10 min',
                           style: TextStyle(
                             color: const Color(0xFF212121),
-                            fontSize: 14,
+                            fontSize: dimensions.fontSize * 0.85,
                             fontFamily: 'Inter',
                             fontWeight: FontWeight.w400,
                           ),
@@ -309,31 +427,31 @@ class _StepScreenState extends State<StepScreen> {
                         Container(
                           width: 7,
                           height: 7,
-                          decoration: ShapeDecoration(
-                            color: const Color(0xFFB7B7B7),
+                          decoration: const ShapeDecoration(
+                            color: Color(0xFFB7B7B7),
                             shape: OvalBorder(),
                           ),
                         ),
                         SizedBox(width: 8),
-                        Text(
-                          'Relajación',
-                          style: TextStyle(
-                            color: const Color(0xFF212121),
-                            fontSize: 14,
-                            fontFamily: 'Inter',
-                            fontWeight: FontWeight.w400,
+                        Flexible(
+                          child: Text(
+                            widget.tecnicaTipo,
+                            style: TextStyle(
+                              color: const Color(0xFF212121),
+                              fontSize: dimensions.fontSize * 0.85,
+                              fontFamily: 'Inter',
+                              fontWeight: FontWeight.w400,
+                            ),
                           ),
                         ),
                       ],
                     ),
                     SizedBox(height: 12),
-
-                    // Nombre del programa
                     Text(
                       widget.tecnicaNombre,
                       style: TextStyle(
                         color: const Color(0xFF5027D0),
-                        fontSize: 17,
+                        fontSize: dimensions.titleFontSize,
                         fontFamily: 'Inter',
                         fontWeight: FontWeight.w600,
                       ),
@@ -341,16 +459,14 @@ class _StepScreenState extends State<StepScreen> {
                   ],
                 ),
               ),
-
-              // Botón de voz a la derecha con sombra
               Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Color(0x28000000),
+                      color: const Color(0x28000000),
                       blurRadius: 5,
-                      offset: Offset(0, 4),
+                      offset: const Offset(0, 4),
                       spreadRadius: 0,
                     ),
                   ],
@@ -365,12 +481,12 @@ class _StepScreenState extends State<StepScreen> {
                   },
                   icon: Icon(
                     isPlaying ? Icons.volume_off : Icons.volume_up,
-                    size: 24,
+                    size: dimensions.iconSize,
                     color: Colors.black,
                   ),
                   style: IconButton.styleFrom(
                     backgroundColor: Colors.white,
-                    padding: const EdgeInsets.all(8),
+                    padding: EdgeInsets.all(dimensions.padding * 0.5),
                   ),
                 ),
               ),
@@ -381,236 +497,220 @@ class _StepScreenState extends State<StepScreen> {
     );
   }
 
-  Widget _buildStepContent() {
+  Widget _buildImageSection(ResponsiveDimensions dimensions) {
     return Container(
-      margin: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          // Imagen con bordes redondeados
-            Container(
-              width: double.infinity,
-              height: 300,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
+      width: double.infinity,
+      height: dimensions.imageHeight,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Image.network(
+          _getImageUrlByDay(),
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              color: Colors.grey[200],
+              child: const Center(
+                child: CircularProgressIndicator(),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Image.network(
-                  _getImageUrlByDay(), //temporal mientras se usa mapeo de 21 dias
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  height: 300,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      color: Colors.grey[200],
-                      child: const Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey[200],
-                      child: const Icon(
-                        Icons.image_not_supported,
-                        size: 50,
-                        color: Colors.grey,
-                      ),
-                    );
-                  },
-                ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: Colors.grey[200],
+              child: Icon(
+                Icons.image_not_supported,
+                size: dimensions.iconSize * 2,
+                color: Colors.grey,
               ),
-            ),
-          const SizedBox(height: 24),
+            );
+          },
+        ),
+      ),
+    );
+  }
 
-          // Título de tamaño de texto
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Tamaño de texto',
-              style: TextStyle(
-                color: const Color(0xFF212121),
-                fontSize: 14,
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w500,
-              ),
+  Widget _buildTextContent(ResponsiveDimensions dimensions) {
+    return Column(
+      children: [
+        _buildTextSizeControl(dimensions),
+        SizedBox(height: dimensions.padding),
+        Container(
+          height: 1,
+          width: double.infinity,
+          color: Colors.black,
+        ),
+        SizedBox(height: dimensions.padding),
+        Expanded(
+          child: _buildStepText(dimensions),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextSizeControl(ResponsiveDimensions dimensions) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Tamaño de texto',
+            style: TextStyle(
+              color: const Color(0xFF212121),
+              fontSize: dimensions.fontSize * 0.85,
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 12),
-
-          // Control deslizante de tamaño de texto
-          Row(
-            children: [
-              // Botón de disminuir tamaño
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    if (textSize > 18.0) { // Cambié de 16.0 a 18.0
-                      textSize = textSize == 22.0 ? 20.0 : 18.0; // Cambié los valores
-                    }
-                  });
-                },
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  child: Icon(
-                    Icons.remove,
-                    size: 30,
-                    color: Colors.black,
-                  ),
+        ),
+        SizedBox(height: 12),
+        Row(
+          children: [
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (textSize > 18.0) {
+                    textSize = textSize == 22.0 ? 20.0 : 18.0;
+                  }
+                });
+              },
+              child: Container(
+                width: dimensions.iconSize + 8,
+                height: dimensions.iconSize + 8,
+                child: Icon(
+                  Icons.remove,
+                  size: dimensions.iconSize,
+                  color: Colors.black,
                 ),
               ),
-              SizedBox(width: 12),
-
-              // Slider de tamaño
-              Expanded(
-                child: Column(
-                  children: [
-                    Container(
-                      height: 8,
-                      child: Stack(
-                        children: [
-                          // Track del slider
-                          Container(
-                            width: double.infinity,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return Container(
+                    height: 8,
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFCECECE),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        FractionallySizedBox(
+                          widthFactor: (textSize - 18.0) / 4.0,
+                          child: Container(
                             height: 8,
                             decoration: BoxDecoration(
-                              color: Color(0xFFCECECE),
+                              color: const Color(0xFF4320AD),
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          // Parte activa del slider
-                          FractionallySizedBox(
-                            widthFactor: (textSize - 18.0) / 4.0, // Cambié de 16.0 a 18.0
+                        ),
+                        Positioned(
+                          left: ((textSize - 18.0) / 4.0) * constraints.maxWidth - 6,
+                          top: -2,
+                          child: GestureDetector(
+                            onPanUpdate: (details) {
+                              double percentage = (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0);
+                              setState(() {
+                                double newSize = 18.0 + (percentage * 4.0);
+                                if (newSize <= 19.0) {
+                                  textSize = 18.0;
+                                } else if (newSize <= 21.0) {
+                                  textSize = 20.0;
+                                } else {
+                                  textSize = 22.0;
+                                }
+                              });
+                            },
                             child: Container(
-                              height: 8,
+                              width: 12,
+                              height: 12,
                               decoration: BoxDecoration(
                                 color: const Color(0xFF4320AD),
-                                borderRadius: BorderRadius.circular(8),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
                               ),
                             ),
                           ),
-                          // Botón deslizante
-                          Positioned(
-                            left: ((textSize - 18.0) / 4.0) * (MediaQuery.of(context).size.width - 120) - 6, // Cambié de 16.0 a 18.0
-                            top: -2,
-                            child: GestureDetector(
-                              onPanUpdate: (details) {
-                                RenderBox renderBox = context.findRenderObject() as RenderBox;
-                                double localX = details.localPosition.dx;
-                                double sliderWidth = MediaQuery.of(context).size.width - 120;
-                                double percentage = (localX / sliderWidth).clamp(0.0, 1.0);
-
-                                setState(() {
-                                  double newSize = 18.0 + (percentage * 4.0);
-                                  if (newSize <= 19.0) {
-                                    textSize = 18.0;
-                                  } else if (newSize <= 21.0) {
-                                    textSize = 20.0;
-                                  } else {
-                                    textSize = 22.0;
-                                  }
-                                });
-                              },
-                              child: Container(
-                                width: 12,
-                                height: 12,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF4320AD),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-
-              SizedBox(width: 12),
-
-              // Botón de aumentar tamaño
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    if (textSize < 22.0) {
-                      textSize = textSize == 18.0 ? 20.0 : 22.0;
-                    }
-                  });
+                  );
                 },
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  child: Icon(
-                    Icons.add,
-                    size: 30,
-                    color: Colors.black,
-                  ),
-                ),
               ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // Línea divisoria
-          Container(
-            height: 1,
-            width: double.infinity,
-            color: Colors.black,
-          ),
-          const SizedBox(height: 20),
-
-          // Contenido del paso
-          Expanded(
-            flex: 2,
-            child: SingleChildScrollView(
-              child: Align(
-                alignment: Alignment.centerLeft, // Alineación a la izquierda
-                child: Text(
-                  widget.steps[currentStep],
-                  style: TextStyle(
-                    fontSize: textSize,
-                    color: const Color(0xFF212121),
-                    fontFamily: 'Inter',
-                    fontWeight: FontWeight.w400,
-                  ),
-                  textAlign: TextAlign.left, // Texto alineado a la izquierda
+            ),
+            SizedBox(width: 12),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (textSize < 22.0) {
+                    textSize = textSize == 18.0 ? 20.0 : 22.0;
+                  }
+                });
+              },
+              child: Container(
+                width: dimensions.iconSize + 8,
+                height: dimensions.iconSize + 8,
+                child: Icon(
+                  Icons.add,
+                  size: dimensions.iconSize,
+                  color: Colors.black,
                 ),
               ),
             ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepText(ResponsiveDimensions dimensions) {
+    return SingleChildScrollView(
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          widget.steps[currentStep],
+          style: TextStyle(
+            fontSize: textSize,
+            color: const Color(0xFF212121),
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w400,
           ),
-        ],
+          textAlign: TextAlign.left,
+        ),
       ),
     );
   }
 
-  Widget _buildControls() {
+  Widget _buildControls(ResponsiveDimensions dimensions) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(dimensions.padding),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Botón anterior
           _buildControlButton(
             icon: Icons.skip_previous,
-            onPressed: currentStep > 0 ? _handlePreviousStep : null, // null deshabilita el botón
+            onPressed: currentStep > 0 ? _handlePreviousStep : null,
             isSecondary: true,
+            dimensions: dimensions,
           ),
-          const SizedBox(width: 16),
-
-          // Botón de reproducir/pausar
+          SizedBox(width: dimensions.padding),
           _buildControlButton(
             icon: isPlaying ? Icons.pause : Icons.play_arrow,
             onPressed: () async {
@@ -621,11 +721,9 @@ class _StepScreenState extends State<StepScreen> {
               }
             },
             isPrimary: true,
+            dimensions: dimensions,
           ),
-
-          const SizedBox(width: 16),
-
-          // Botón siguiente
+          SizedBox(width: dimensions.padding),
           _buildControlButton(
             icon: currentStep == widget.steps.length - 1
                 ? Icons.check
@@ -633,6 +731,7 @@ class _StepScreenState extends State<StepScreen> {
             onPressed: isLoading ? null : _handleNextStep,
             isSecondary: true,
             isLoading: isLoading,
+            dimensions: dimensions,
           ),
         ],
       ),
@@ -645,6 +744,7 @@ class _StepScreenState extends State<StepScreen> {
     bool isPrimary = false,
     bool isSecondary = false,
     bool isLoading = false,
+    required ResponsiveDimensions dimensions,
   }) {
     return ElevatedButton(
       onPressed: onPressed,
@@ -653,22 +753,47 @@ class _StepScreenState extends State<StepScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        minimumSize: Size(114, 72),
+        minimumSize: Size(dimensions.buttonWidth, dimensions.buttonHeight),
       ),
       child: isLoading
-          ? const SizedBox(
-        width: 20,
-        height: 20,
-        child: CircularProgressIndicator(
+          ? SizedBox(
+        width: dimensions.iconSize * 0.75,
+        height: dimensions.iconSize * 0.75,
+        child: const CircularProgressIndicator(
           strokeWidth: 2,
           valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
         ),
       )
           : Icon(
         icon,
-        size: 40,
+        size: dimensions.iconSize * 1.5,
         color: isPrimary ? Colors.white : Colors.black,
       ),
     );
   }
+}
+
+// Enums y clases auxiliares para la responsividad
+enum DeviceType { mobile, tablet, desktop }
+
+class ResponsiveDimensions {
+  final double padding;
+  final double imageHeight;
+  final double fontSize;
+  final double titleFontSize;
+  final double iconSize;
+  final double buttonWidth;
+  final double buttonHeight;
+  final double maxContentWidth;
+
+  ResponsiveDimensions({
+    required this.padding,
+    required this.imageHeight,
+    required this.fontSize,
+    required this.titleFontSize,
+    required this.iconSize,
+    required this.buttonWidth,
+    required this.buttonHeight,
+    required this.maxContentWidth,
+  });
 }

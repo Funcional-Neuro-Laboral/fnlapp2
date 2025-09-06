@@ -38,6 +38,7 @@ class Programa {
   final String? startDate;
   final String? completedDate;
   final String nombreTecnica;
+  final String tipoTecnica;
   final String? descripcion;
   final String? urlImg;
   final int dia;
@@ -51,6 +52,7 @@ class Programa {
     this.startDate,
     this.completedDate,
     required this.nombreTecnica,
+    required this.tipoTecnica,
     this.descripcion,
     this.urlImg,
     required this.dia,
@@ -66,6 +68,7 @@ class Programa {
       startDate: map['start_date'],
       completedDate: map['completed_date'],
       nombreTecnica: map['nombre_tecnica'] ?? 'Sin nombre',
+      tipoTecnica: map['tipo_tecnica'] ?? "Sin tipo",
       descripcion: map['descripcion'],
       urlImg: map['url_img'],
       dia: int.tryParse(map['dia'].toString()) ?? 0,
@@ -667,7 +670,7 @@ class _PlanScreenState extends State<PlanScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        _buildProgramInfo(),
+        _buildProgramInfo(programa),
       ],
     );
   }
@@ -702,22 +705,22 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
-  Widget _buildProgramInfo() { //Futuro usar value
+  Widget _buildProgramInfo(Programa programa) {
     return Row(
-      children: const [
+      children: [
         Text(
-          'Relajación guiada',
-          style: TextStyle(
+          programa.tipoTecnica,
+          style: const TextStyle(
             color: AppColors.textPrimary,
             fontSize: 13,
             fontFamily: 'Inter',
             fontWeight: FontWeight.w400,
           ),
         ),
-        SizedBox(width: 8),
-        _DotSeparator(),
-        SizedBox(width: 8),
-        Text(
+        const SizedBox(width: 8),
+        const _DotSeparator(),
+        const SizedBox(width: 8),
+        const Text(
           '5 - 10 min',
           style: TextStyle(
             color: AppColors.textPrimary,
@@ -773,6 +776,7 @@ class _PlanScreenState extends State<PlanScreen> {
         builder: (context) => StepScreen(
           steps: programa.parsedSteps,
           tecnicaNombre: programa.nombreTecnica,
+          tecnicaTipo: programa.tipoTecnica,
           dia: programa.dia,
           userId: programa.userId,
           tecnicaId: programa.id,
