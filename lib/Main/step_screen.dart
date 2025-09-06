@@ -10,6 +10,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../config.dart';
+import 'completed_dia_screen.dart';
 
 class StepScreen extends StatefulWidget {
   final List<String> steps;
@@ -201,19 +202,50 @@ class _StepScreenState extends State<StepScreen> {
 
     try {
       if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => FinalStepScreen(
-              userId: widget.userId,
-              tecnicaId: widget.tecnicaId,
-              sessionId: widget.sessionId,
-            ),
-          ),
-        );
+        final String apiUrl = "${Config.apiUrl2}/users/daily-activities?userId=${widget.userId}";
+
+        final response = await http.get(Uri.parse(apiUrl));
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final userProgramas = List<Map<String, dynamic>>.from(data['userProgramas']);
+
+          // Buscar el programa del día actual
+          final currentProgram = userProgramas.firstWhere(
+                (programa) => programa['dia'] == widget.dia,
+            orElse: () => {},
+          );
+
+          final bool isCompleted = currentProgram['completed'] ?? false;
+
+          if (isCompleted) {
+            // Si ya está completado, mostrar CompletedDiaScreen
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CompletedDiaScreen(),
+              ),
+            );
+          } else {
+            // Si no está completado, mostrar FinalStepScreen
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => FinalStepScreen(
+                  userId: widget.userId,
+                  tecnicaId: widget.tecnicaId,
+                  sessionId: widget.sessionId,
+                ),
+              ),
+            );
+          }
+        } else {
+          throw Exception('Error al verificar estado de completado');
+        }
       }
     } catch (e) {
       debugPrint("Error al navegar: $e");
+      // En caso de error, ir a FinalStepScreen por defecto
       if (mounted) {
         Navigator.push(
           context,
