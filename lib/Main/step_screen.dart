@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../config.dart';
 import 'completed_dia_screen.dart';
+import 'dart:async';
 
 class StepScreen extends StatefulWidget {
   final List<String> steps;
@@ -46,6 +47,13 @@ class _StepScreenState extends State<StepScreen> {
   final TextEditingController commentController = TextEditingController();
   double rating = 0;
   double textSize = 18.0;
+  bool isMuted = false;
+  bool _isPaused = false;
+  AudioPlayer? currentPlayer;
+  Timer? _delayTimer;
+  bool _isInDelay = false;
+  int _remainingSeconds = 10;
+  Timer? _countdownTimer;
 
   // Helper method para obtener el tipo de dispositivo
   DeviceType _getDeviceType(double width) {
@@ -124,6 +132,8 @@ class _StepScreenState extends State<StepScreen> {
   void dispose() {
     flutterTts?.stop();
     commentController.dispose();
+    currentPlayer?.dispose();
+    _cancelDelayTimer();
     super.dispose();
   }
 
@@ -132,7 +142,12 @@ class _StepScreenState extends State<StepScreen> {
 
     setState(() {
       isPlaying = true;
+      _isPaused = false;
+      _isInDelay = false;
     });
+
+    // Cancelar cualquier delay anterior
+    _cancelDelayTimer();
 
     try {
       final url = Uri.parse('${Config.apiUrl2}/general/speech/tts/?text=$text');
@@ -140,22 +155,21 @@ class _StepScreenState extends State<StepScreen> {
 
       if (response.statusCode == 200) {
         final audioBytes = response.bodyBytes;
-        final player = AudioPlayer();
+        currentPlayer = AudioPlayer();
+        await currentPlayer?.setVolume(isMuted ? 0.0 : 1.0);
 
         if (kIsWeb) {
-          await player.play(BytesSource(audioBytes));
+          await currentPlayer?.play(BytesSource(audioBytes));
         } else {
           final tempDir = await getTemporaryDirectory();
           final audioFile = File('${tempDir.path}/speech_${DateTime.now().millisecondsSinceEpoch}.mp3');
           await audioFile.writeAsBytes(audioBytes);
-          await player.play(DeviceFileSource(audioFile.path));
+          await currentPlayer?.play(DeviceFileSource(audioFile.path));
         }
 
-        player.onPlayerStateChanged.listen((state) {
-          if (state == PlayerState.completed && mounted) {
-            setState(() {
-              isPlaying = false;
-            });
+        currentPlayer?.onPlayerStateChanged.listen((state) {
+          if (state == PlayerState.completed && mounted && !_isPaused) {
+            _handleAudioComplete();
           }
         });
       }
@@ -169,22 +183,95 @@ class _StepScreenState extends State<StepScreen> {
     }
   }
 
-  Future<void> _stopAudio() async {
-    await flutterTts?.stop();
+  void _handleAudioComplete() {
+    if (currentStep < widget.steps.length - 1) {
+      // Iniciar delay de 10 segundos
+      _startDelayTimer();
+    } else {
+      // Es el último step, terminar
+      setState(() {
+        isPlaying = false;
+      });
+    }
+  }
+
+  void _startDelayTimer() {
+    setState(() {
+      _isInDelay = true;
+      _remainingSeconds = 10;
+    });
+
+    _delayTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _remainingSeconds--;
+        });
+
+        if (_remainingSeconds <= 0) {
+          timer.cancel();
+          if (mounted && !_isPaused) {
+            _autoAdvanceToNextStep();
+          }
+        }
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  void _autoAdvanceToNextStep() {
     setState(() {
       isPlaying = false;
+      _isInDelay = false;
     });
+    _handleNextStep();
+  }
+
+  void _cancelDelayTimer() {
+    _delayTimer?.cancel();
+    _delayTimer = null;
+    setState(() {
+      _isInDelay = false;
+      _remainingSeconds = 10;
+    });
+  }
+
+  Future<void> _stopAudio() async {
+    // Pausar el audio actual
+    await currentPlayer?.pause();
+
+    // Cancelar el delay si está activo
+    _cancelDelayTimer();
+
+    setState(() {
+      isPlaying = false;
+      _isPaused = true;
+    });
+  }
+
+  Future<void> _resumeAudio() async {
+    if (_isPaused && currentPlayer != null) {
+      await currentPlayer?.resume();
+      setState(() {
+        isPlaying = true;
+        _isPaused = false;
+      });
+    }
   }
 
   Future<void> _handleNextStep() async {
     if (currentStep < widget.steps.length - 1) {
+      // Detener cualquier audio o delay actual
+      await _stopAudio();
+
       setState(() {
         currentStep++;
       });
-      if (isPlaying) {
-        await _stopAudio();
-        await Future.delayed(const Duration(milliseconds: 300));
-      }
+
+      // Pequeña pausa para que se actualice la UI
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Reproducir el nuevo audio
       await _playAudioFromAPI(widget.steps[currentStep]);
     } else {
       await _navigateToNextScreen();
@@ -269,19 +356,17 @@ class _StepScreenState extends State<StepScreen> {
 
   void _handlePreviousStep() {
     if (currentStep > 0) {
+      // Detener audio y delay actual completamente
+      _cancelDelayTimer();
+      currentPlayer?.stop();
+
       setState(() {
         currentStep--;
+        isPlaying = false;
+        _isPaused = false;
+        _isInDelay = false;
       });
-      if (isPlaying) {
-        _stopAudio();
-      }
     }
-  }
-
-  Future<void> _sendComment() async {
-    debugPrint('Rating: $rating');
-    debugPrint('Comentario: ${commentController.text}');
-    Navigator.pop(context);
   }
 
   @override
@@ -504,15 +589,15 @@ class _StepScreenState extends State<StepScreen> {
                   ],
                 ),
                 child: IconButton(
-                  onPressed: () async {
-                    if (isPlaying) {
-                      await _stopAudio();
-                    } else {
-                      await _playAudioFromAPI(widget.steps[currentStep]);
-                    }
+                  onPressed: () {
+                    setState(() {
+                      isMuted = !isMuted;
+                      // Ajustar volumen del AudioPlayer actual
+                      currentPlayer?.setVolume(isMuted ? 0.0 : 1.0);
+                    });
                   },
                   icon: Icon(
-                    isPlaying ? Icons.volume_off : Icons.volume_up,
+                    isMuted ? Icons.volume_off : Icons.volume_up,
                     size: dimensions.iconSize,
                     color: Colors.black,
                   ),
@@ -744,14 +829,8 @@ class _StepScreenState extends State<StepScreen> {
           ),
           SizedBox(width: dimensions.padding),
           _buildControlButton(
-            icon: isPlaying ? Icons.pause : Icons.play_arrow,
-            onPressed: () async {
-              if (isPlaying) {
-                await _stopAudio();
-              } else {
-                await _playAudioFromAPI(widget.steps[currentStep]);
-              }
-            },
+            icon: _getPlayButtonIcon(),
+            onPressed: _getPlayButtonAction(),
             isPrimary: true,
             dimensions: dimensions,
           ),
@@ -768,6 +847,69 @@ class _StepScreenState extends State<StepScreen> {
         ],
       ),
     );
+  }
+
+  IconData _getPlayButtonIcon() {
+    if (_isInDelay && !_isPaused) {
+      return Icons.pause;
+    } else if (_isPaused || !isPlaying) {
+      return Icons.play_arrow;
+    } else {
+      return Icons.pause;
+    }
+  }
+
+  VoidCallback? _getPlayButtonAction() {
+    if (_isInDelay) {
+      // Durante el delay, el botón pausa/reanuda el delay
+      return () {
+        if (_isPaused) {
+          _resumeFromDelay();
+        } else {
+          _pauseDelay();
+        }
+      };
+    } else if (_isPaused) {
+      // Audio pausado, reanudar
+      return _resumeAudio;
+    } else if (isPlaying) {
+      // Audio reproduciéndose, pausar
+      return _stopAudio;
+    } else {
+      // No hay audio, iniciar reproducción
+      return () => _playAudioFromAPI(widget.steps[currentStep]);
+    }
+  }
+
+  void _pauseDelay() {
+    _delayTimer?.cancel();
+    setState(() {
+      _isPaused = true;
+    });
+  }
+
+  void _resumeFromDelay() {
+    setState(() {
+      _isPaused = false;
+    });
+
+    // Reanudar el timer con el tiempo restante
+    _delayTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _remainingSeconds--;
+        });
+
+        if (_remainingSeconds <= 0) {
+          timer.cancel();
+          if (mounted && !_isPaused) {
+            _autoAdvanceToNextStep();
+          }
+        }
+      } else {
+        timer.cancel();
+      }
+    });
   }
 
   Widget _buildControlButton({
