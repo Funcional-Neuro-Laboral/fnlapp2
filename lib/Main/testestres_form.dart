@@ -18,6 +18,7 @@ class TestEstresQuestionScreen extends StatefulWidget {
 }
 
 class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
+  bool isSubmitting = false;
   int currentQuestionIndex = 0;
   List<int> selectedOptions = List<int>.filled(
       23, 0); // Asigna un valor predeterminado (por ejemplo, 0)
@@ -122,167 +123,190 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
     }
   }
 
-Future<void> submitTest() async {
-  // Validar userId antes de proceder
-  if (userId == null) {
-    print("Error: userId es null");
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error: No se ha cargado el ID del usuario')),
-    );
-    return;
-  }
-
-  // Validar si selectedOptions está correctamente poblado
-  if (selectedOptions.isEmpty || selectedOptions.length < 23) {
-    print("Error: selectedOptions no tiene suficientes datos.");
-    return;
-  }
-
-  String? token = await getToken(); 
-  if (token == null) {
-    print('Error: No se encontró el token.');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error: Token no disponible')),
-    );
-    return;
-  }
-
-
-  final saveTestUrl = Uri.parse('${Config.apiUrl2}/stress-test/save'); // Nueva API
-  final updateEstresUrl = Uri.parse('${Config.apiUrl2}/users/$userId/estres-level'); // Actualizar estres_nivel_id
-
-  // Calcular el puntaje total
-  int totalScore = selectedOptions.fold(0, (sum, value) => sum + value);
-
-  try {
-    // Obtener perfil del usuario desde apiUrl2
-    Map<String, dynamic>? userProfile = await _getUserProfile();
-    if (userProfile == null) {
-      print('Error: No se pudo obtener el perfil del usuario');
+  Future<void> submitTest() async {
+    // Verificar si ya está en proceso de envío
+    if (isSubmitting) {
+      print("Test ya está siendo enviado");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Por favor espera, el test se está procesando...')),
+      );
       return;
     }
 
-    // Obtener gender_id desde el perfil
-    int genderId = _getGenderIdFromProfile(userProfile['gender'] ?? 'Masculino');
+    try {
+      // Activar el bloqueo
+      setState(() {
+        isSubmitting = true;
+      });
 
+      // Validar userId antes de proceder
+      if (userId == null) {
+        print("Error: userId es null");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: No se ha cargado el ID del usuario')),
+        );
+        return;
+      }
 
+      // Validar si selectedOptions está correctamente poblado
+      if (selectedOptions.isEmpty || selectedOptions.length < 23) {
+        print("Error: selectedOptions no tiene suficientes datos.");
+        return;
+      }
 
-    // Calcular el nivel de estrés y su ID
-    final Map<String, dynamic> estresResult =
-        _calcularNivelEstres(totalScore, genderId);
-    NivelEstres nivelEstres = estresResult['nivel'];
-    int estresNivelId = estresResult['id'];
+      String? token = await getToken();
+      if (token == null) {
+        print('Error: No se encontró el token.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: Token no disponible')),
+        );
+        return;
+      }
 
-    // Determinar el tipo de test basado en si el día 21 fue completado
-    String testType = (isDay21Completed == true) ? 'exit' : 'entry';
+      final saveTestUrl = Uri.parse(
+          '${Config.apiUrl2}/stress-test/save'); // Nueva API
+      final updateEstresUrl = Uri.parse('${Config
+          .apiUrl2}/users/$userId/estres-level'); // Actualizar estres_nivel_id
 
-    // Preparar datos para la nueva API
-    List<Map<String, dynamic>> testData = [];
-    for (int i = 0; i < selectedOptions.length; i++) {
-      testData.add({
-        'user_id': userId,
-        'question_id': i + 1, // Las preguntas van del 1 al 23
-        'score': selectedOptions[i],
-        'test_type': testType,
+      // Calcular el puntaje total
+      int totalScore = selectedOptions.fold(0, (sum, value) => sum + value);
+
+      // Obtener perfil del usuario desde apiUrl2
+      Map<String, dynamic>? userProfile = await _getUserProfile();
+      if (userProfile == null) {
+        print('Error: No se pudo obtener el perfil del usuario');
+        return;
+      }
+
+      // Obtener gender_id desde el perfil
+      int genderId = _getGenderIdFromProfile(
+          userProfile['gender'] ?? 'Masculino');
+
+      // Calcular el nivel de estrés y su ID
+      final Map<String, dynamic> estresResult =
+      _calcularNivelEstres(totalScore, genderId);
+      NivelEstres nivelEstres = estresResult['nivel'];
+      int estresNivelId = estresResult['id'];
+
+      // Determinar el tipo de test basado en si el día 21 fue completado
+      String testType = (isDay21Completed == true) ? 'exit' : 'entry';
+
+      // Preparar datos para la nueva API
+      List<Map<String, dynamic>> testData = [];
+      for (int i = 0; i < selectedOptions.length; i++) {
+        testData.add({
+          'user_id': userId,
+          'question_id': i + 1, // Las preguntas van del 1 al 23
+          'score': selectedOptions[i],
+          'test_type': testType,
+        });
+      }
+
+      // Guardar el test usando la nueva API
+      final saveResponse = await http.post(
+        saveTestUrl,
+        headers: {
+          "Content-Type": "application/json",
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(testData),
+      );
+
+      if (saveResponse.statusCode != 201) {
+        print('Error al guardar el test: ${saveResponse.body}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al guardar el test')),
+        );
+        return;
+      }
+
+      print('Test guardado correctamente con tipo: $testType');
+
+      if (testType == 'exit') {
+        // Si es un test de salida (día 21 completado), actualizar el nivel de estrés
+        final updateData = {
+          'estres_level': estresNivelId,
+          'type': 'final',
+        };
+        final updateResponse = await http.put(
+          updateEstresUrl,
+          headers: {
+            "Content-Type": "application/json",
+            'Authorization': 'Bearer $token',
+          },
+          body: json.encode(updateData),
+        );
+
+        if (updateResponse.statusCode != 200) {
+          print(
+              'Error al actualizar el estres_nivel_id: ${updateResponse.body}');
+          return;
+        }
+
+        print('Nivel de estrés actualizado correctamente.');
+        final SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isDay21Completed', false);
+
+        print("Test de salida completado, redirigiendo al HomeScreen.");
+
+        // Redirigir al HomeScreen para test de salida
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => HomeScreen()),
+              (Route<
+              dynamic> route) => false, // Elimina todas las rutas anteriores
+        );
+
+        return;
+      } else {
+        final updateData = {
+          'estres_level': estresNivelId,
+          'type': 'initial',
+        };
+        final updateResponse = await http.put(
+          updateEstresUrl,
+          headers: {
+            "Content-Type": "application/json",
+            'Authorization': 'Bearer $token',
+          },
+          body: json.encode(updateData),
+        );
+
+        if (updateResponse.statusCode != 200) {
+          print('Error al crear el registro: ${updateResponse.body}');
+          return;
+        }
+
+        print('Registro de nivel de estrés creado correctamente.');
+
+        // Generar programa usando la nueva API
+        await _generateProgram(userProfile, totalScore);
+
+        // Actualizar testestresbool a true solo en el primer test
+        await _updateTestEstresBool();
+
+        // Navegar a la pantalla de programa de estrés para test de entrada
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                CargarProgramaScreen(nivelEstres: nivelEstres),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error al procesar el test: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al procesar el test')),
+      );
+    } finally {
+      // Desactivar el bloqueo al finalizar, sea éxito o error
+      setState(() {
+        isSubmitting = false;
       });
     }
-
-    // Guardar el test usando la nueva API
-    final saveResponse = await http.post(
-      saveTestUrl,
-      headers: {
-        "Content-Type": "application/json",
-        'Authorization': 'Bearer $token',
-      },
-      body: json.encode(testData),
-    );
-
-    if (saveResponse.statusCode != 201) {
-      print('Error al guardar el test: ${saveResponse.body}');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al guardar el test')),
-      );
-      return;
-    }
-
-    print('Test guardado correctamente con tipo: $testType');
-
-    if (testType == 'exit') {
-      // Si es un test de salida (día 21 completado), actualizar el nivel de estrés
-      final updateData = {
-        'estres_level': estresNivelId,
-        'type': 'final',
-      };
-      final updateResponse = await http.put(
-        updateEstresUrl,
-        headers: {
-          "Content-Type": "application/json",
-          'Authorization': 'Bearer $token',
-        },
-        body: json.encode(updateData),
-      );
-
-      if (updateResponse.statusCode != 200) {
-        print('Error al actualizar el estres_nivel_id: ${updateResponse.body}');
-        return;
-      }
-
-      print('Nivel de estrés actualizado correctamente.');
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isDay21Completed', false);
-
-      print("Test de salida completado, redirigiendo al HomeScreen.");
-
-      // Redirigir al HomeScreen para test de salida
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => HomeScreen()),
-        (Route<dynamic> route) => false, // Elimina todas las rutas anteriores
-      );
-
-      return;
-    } else {
-      final updateData = {
-        'estres_level': estresNivelId,
-        'type': 'initial',
-      };
-      final updateResponse = await http.put(
-        updateEstresUrl,
-        headers: {
-          "Content-Type": "application/json",
-          'Authorization': 'Bearer $token',
-        },
-        body: json.encode(updateData),
-      );
-
-      if (updateResponse.statusCode != 200) {
-        print('Error al crear el registro: ${updateResponse.body}');
-        return;
-      }
-
-      print('Registro de nivel de estrés creado correctamente.');
-
-      // Generar programa usando la nueva API
-      await _generateProgram(userProfile, totalScore);
-
-      // Actualizar testestresbool a true solo en el primer test
-      await _updateTestEstresBool();
-
-      // Navegar a la pantalla de programa de estrés para test de entrada
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CargarProgramaScreen(nivelEstres: nivelEstres),
-        ),
-      );
-    }
-  } catch (e) {
-    print('Error al procesar el test: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error al procesar el test')),
-    );
   }
-}
 
   // Función para calcular el nivel de estrés
   Map<String, dynamic> _calcularNivelEstres(int totalScore, int genderId) {
@@ -645,7 +669,7 @@ Future<void> submitTest() async {
                           final String nextLabel = currentQuestionIndex < questions.length - 1 ? 'Siguiente' : 'Finalizar';
 
                           return GestureDetector(
-                            onTap: isNextEnabled
+                            onTap: isNextEnabled && !isSubmitting
                                 ? () {
                               if (currentQuestionIndex < questions.length - 1) {
                                 goToNextQuestion();
@@ -659,7 +683,7 @@ Future<void> submitTest() async {
                               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                               clipBehavior: Clip.antiAlias,
                               decoration: ShapeDecoration(
-                                color: isNextEnabled ? const Color(0xFF6D4BD8) : const Color(0xFFD7D7D7),
+                                color: (isNextEnabled && !isSubmitting) ? const Color(0xFF6D4BD8) : const Color(0xFFD7D7D7),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(40),
                                 ),
@@ -681,10 +705,21 @@ Future<void> submitTest() async {
                                     : const [],
                               ),
                               child: Center(
-                                child: Text(
+                                child: isSubmitting
+                                    ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>( Color(0xFF6D4BD8) ),
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                                    : Text(
                                   nextLabel,
                                   style: TextStyle(
-                                    color: isNextEnabled ? Colors.white : const Color(0xFF868686),
+                                    color: (isNextEnabled && !isSubmitting)
+                                        ? Colors.white
+                                        : const Color(0xFF868686),
                                     fontSize: 22,
                                     fontFamily: 'Inter',
                                     fontWeight: FontWeight.w600,
