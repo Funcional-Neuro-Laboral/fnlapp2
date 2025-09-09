@@ -6,9 +6,8 @@ import 'package:fnlapp/Main/home.dart';
 import '../Util/api_service.dart';
 import 'package:fnlapp/SplashScreen/splashscreen.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:flutter_web_plugins/url_strategy.dart';
 
 class MyHttpOverrides extends HttpOverrides {
   @override
@@ -18,11 +17,14 @@ class MyHttpOverrides extends HttpOverrides {
   }
 }
 
-void main() {
-  usePathUrlStrategy(); 
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await dotenv.load(fileName: ".env");
+
+  usePathUrlStrategy();
   runApp(const MyApp());
 }
-
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
