@@ -51,8 +51,8 @@ android {
         // Flutter-specific configurations for SDK versions
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = 7
-        versionName = "2.0.1"
+        versionCode = 15
+        versionName = "3.0.2"
     }
 
     // 🔹 Agregar aquí la configuración de firma antes del bloque buildTypes
