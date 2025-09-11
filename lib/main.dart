@@ -18,49 +18,8 @@ class MyHttpOverrides extends HttpOverrides {
   }
 }
 
-String _getEnvironmentFile() {
-  // Detectar automáticamente el entorno
-  if (kDebugMode) {
-    // En modo debug, usar configuración local
-    if (kIsWeb) {
-      return '.env.development'; // Web usa localhost
-    } else if (Platform.isAndroid) {
-      return '.env.android'; // Android usa 10.0.2.2
-    } else {
-      return '.env.development'; // iOS y otros usan localhost
-    }
-  } else {
-    // En modo release, usar producción
-    return '.env.production';
-  }
-}
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  final envFile = _getEnvironmentFile();
-
-  try {
-    await dotenv.load(fileName: envFile);
-    print("Archivo $envFile cargado exitosamente");
-  } catch (e) {
-    print("Error cargando $envFile: $e");
-    // Fallback a assets solo si es necesario
-    try {
-      await dotenv.load(fileName: "assets/$envFile");
-      print("Archivo assets/$envFile cargado exitosamente");
-    } catch (e2) {
-      print("Error cargando desde assets: $e2");
-      // Último fallback al .env original
-      try {
-        await dotenv.load(fileName: ".env");
-        print("Fallback: .env original cargado");
-      } catch (e3) {
-        print("Error crítico: No se pudo cargar ningún archivo de configuración");
-      }
-    }
-  }
-
   usePathUrlStrategy();
   runApp(const MyApp());
 }

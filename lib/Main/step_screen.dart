@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:fnlapp/Main/finalstepscreen.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
@@ -158,20 +158,33 @@ class _StepScreenState extends State<StepScreen> {
         currentPlayer = AudioPlayer();
         await currentPlayer?.setVolume(isMuted ? 0.0 : 1.0);
 
+        // Para just_audio, usar setAudioSource correctamente
         if (kIsWeb) {
-          await currentPlayer?.play(BytesSource(audioBytes));
+          // En web, usar AudioSource.uri con datos base64
+          final base64Audio = base64Encode(audioBytes);
+          final dataUri = 'data:audio/mp3;base64,$base64Audio';
+          await currentPlayer?.setAudioSource(
+              AudioSource.uri(Uri.parse(dataUri))
+          );
         } else {
+          // En móvil, crear archivo temporal y usar AudioSource.file
           final tempDir = await getTemporaryDirectory();
           final audioFile = File('${tempDir.path}/speech_${DateTime.now().millisecondsSinceEpoch}.mp3');
           await audioFile.writeAsBytes(audioBytes);
-          await currentPlayer?.play(DeviceFileSource(audioFile.path));
+          await currentPlayer?.setAudioSource(
+              AudioSource.file(audioFile.path)
+          );
         }
 
-        currentPlayer?.onPlayerStateChanged.listen((state) {
-          if (state == PlayerState.completed && mounted && !_isPaused) {
+        // Escuchar eventos de estado del reproductor
+        currentPlayer?.playerStateStream.listen((state) {
+          if (state.processingState == ProcessingState.completed && mounted && !_isPaused) {
             _handleAudioComplete();
           }
         });
+
+        // Iniciar reproducción
+        await currentPlayer?.play();
       }
     } catch (e) {
       debugPrint("Error en la reproducción de audio: $e");
@@ -191,6 +204,8 @@ class _StepScreenState extends State<StepScreen> {
       // Es el último step, terminar
       setState(() {
         isPlaying = false;
+        _isInDelay = false;
+        _isPaused = false;
       });
     }
   }
@@ -220,11 +235,21 @@ class _StepScreenState extends State<StepScreen> {
   }
 
   void _autoAdvanceToNextStep() {
-    setState(() {
-      isPlaying = false;
-      _isInDelay = false;
-    });
-    _handleNextStep();
+    // Solo avanzar si no es el último paso
+    if (currentStep < widget.steps.length - 1) {
+      setState(() {
+        isPlaying = false;
+        _isInDelay = false;
+      });
+      _handleNextStep();
+    } else {
+      // Si es el último paso, solo limpiar el estado
+      setState(() {
+        isPlaying = false;
+        _isInDelay = false;
+        _isPaused = false;
+      });
+    }
   }
 
   void _cancelDelayTimer() {
@@ -251,7 +276,7 @@ class _StepScreenState extends State<StepScreen> {
 
   Future<void> _resumeAudio() async {
     if (_isPaused && currentPlayer != null) {
-      await currentPlayer?.resume();
+      await currentPlayer?.play(); // Cambiado de resume() a play()
       setState(() {
         isPlaying = true;
         _isPaused = false;
@@ -354,11 +379,11 @@ class _StepScreenState extends State<StepScreen> {
     }
   }
 
-  void _handlePreviousStep() {
+  void _handlePreviousStep() async {
     if (currentStep > 0) {
       // Detener audio y delay actual completamente
       _cancelDelayTimer();
-      currentPlayer?.stop();
+      await currentPlayer?.stop();
 
       setState(() {
         currentStep--;
@@ -366,6 +391,16 @@ class _StepScreenState extends State<StepScreen> {
         _isPaused = false;
         _isInDelay = false;
       });
+
+      // Dispose del player actual para evitar reproducción automática
+      currentPlayer?.dispose();
+      currentPlayer = null;
+
+      // Pequeña pausa para que se actualice la UI
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Reproducir automáticamente el audio del paso anterior
+      await _playAudioFromAPI(widget.steps[currentStep]);
     }
   }
 
