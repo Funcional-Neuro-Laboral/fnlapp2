@@ -49,6 +49,8 @@ class _StepScreenState extends State<StepScreen> {
   Timer? _delayTimer;
   bool _isInDelay = false;
   int _remainingSeconds = 10;
+  Map<int, AudioSource> _cachedAudioSources = {};
+  bool _isPreloadingAudio = true;
 
   // Helper method para obtener el tipo de dispositivo
   DeviceType _getDeviceType(double width) {
@@ -102,6 +104,7 @@ class _StepScreenState extends State<StepScreen> {
   @override
   void initState() {
     super.initState();
+    _preloadAllAudio();
   }
 
   String _getImageUrlByDay() {
@@ -119,6 +122,54 @@ class _StepScreenState extends State<StepScreen> {
     super.dispose();
   }
 
+  Future<void> _preloadAllAudio() async {
+    setState(() {
+      _isPreloadingAudio = true;
+    });
+
+    try {
+      for (int i = 0; i < widget.steps.length; i++) {
+        final audioSource = await _downloadAudioForStep(widget.steps[i], i);
+        if (audioSource != null) {
+          _cachedAudioSources[i] = audioSource;
+        }
+      }
+    } catch (e) {
+      debugPrint("Error precargando audios: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPreloadingAudio = false;
+        });
+      }
+    }
+  }
+
+  Future<AudioSource?> _downloadAudioForStep(String text, int stepIndex) async {
+    try {
+      final url = Uri.parse('${Config.apiUrl2}/general/speech/tts/?text=$text');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final audioBytes = response.bodyBytes;
+
+        if (kIsWeb) {
+          final base64Audio = base64Encode(audioBytes);
+          final dataUri = 'data:audio/mp3;base64,$base64Audio';
+          return AudioSource.uri(Uri.parse(dataUri));
+        } else {
+          final tempDir = await getTemporaryDirectory();
+          final audioFile = File('${tempDir.path}/speech_step_${stepIndex}_${DateTime.now().millisecondsSinceEpoch}.mp3');
+          await audioFile.writeAsBytes(audioBytes);
+          return AudioSource.file(audioFile.path);
+        }
+      }
+    } catch (e) {
+      debugPrint("Error descargando audio para paso $stepIndex: $e");
+    }
+    return null;
+  }
+
   Future<void> _playAudioFromAPI(String text) async {
     if (isPlaying) return;
 
@@ -128,46 +179,52 @@ class _StepScreenState extends State<StepScreen> {
       _isInDelay = false;
     });
 
-    // Cancelar cualquier delay anterior
     _cancelDelayTimer();
 
     try {
-      final url = Uri.parse('${Config.apiUrl2}/general/speech/tts/?text=$text');
-      final response = await http.get(url);
+      // Usar audio precargado si está disponible
+      AudioSource? audioSource = _cachedAudioSources[currentStep];
 
-      if (response.statusCode == 200) {
-        final audioBytes = response.bodyBytes;
+      if (audioSource != null) {
         currentPlayer = AudioPlayer();
         await currentPlayer?.setVolume(isMuted ? 0.0 : 1.0);
+        await currentPlayer?.setAudioSource(audioSource);
+      } else {
+        // Fallback: descargar en tiempo real si no está en cache
+        final url = Uri.parse('${Config.apiUrl2}/general/speech/tts/?text=$text');
+        final response = await http.get(url);
 
-        // Para just_audio, usar setAudioSource correctamente
-        if (kIsWeb) {
-          // En web, usar AudioSource.uri con datos base64
-          final base64Audio = base64Encode(audioBytes);
-          final dataUri = 'data:audio/mp3;base64,$base64Audio';
-          await currentPlayer?.setAudioSource(
-              AudioSource.uri(Uri.parse(dataUri))
-          );
-        } else {
-          // En móvil, crear archivo temporal y usar AudioSource.file
-          final tempDir = await getTemporaryDirectory();
-          final audioFile = File('${tempDir.path}/speech_${DateTime.now().millisecondsSinceEpoch}.mp3');
-          await audioFile.writeAsBytes(audioBytes);
-          await currentPlayer?.setAudioSource(
-              AudioSource.file(audioFile.path)
-          );
-        }
+        if (response.statusCode == 200) {
+          final audioBytes = response.bodyBytes;
+          currentPlayer = AudioPlayer();
+          await currentPlayer?.setVolume(isMuted ? 0.0 : 1.0);
 
-        // Escuchar eventos de estado del reproductor
-        currentPlayer?.playerStateStream.listen((state) {
-          if (state.processingState == ProcessingState.completed && mounted && !_isPaused) {
-            _handleAudioComplete();
+          if (kIsWeb) {
+            final base64Audio = base64Encode(audioBytes);
+            final dataUri = 'data:audio/mp3;base64,$base64Audio';
+            await currentPlayer?.setAudioSource(
+                AudioSource.uri(Uri.parse(dataUri))
+            );
+          } else {
+            final tempDir = await getTemporaryDirectory();
+            final audioFile = File('${tempDir.path}/speech_${DateTime.now().millisecondsSinceEpoch}.mp3');
+            await audioFile.writeAsBytes(audioBytes);
+            await currentPlayer?.setAudioSource(
+                AudioSource.file(audioFile.path)
+            );
           }
-        });
-
-        // Iniciar reproducción
-        await currentPlayer?.play();
+        }
       }
+
+      // Escuchar eventos de estado del reproductor
+      currentPlayer?.playerStateStream.listen((state) {
+        if (state.processingState == ProcessingState.completed && mounted && !_isPaused) {
+          _handleAudioComplete();
+        }
+      });
+
+      // Iniciar reproducción
+      await currentPlayer?.play();
     } catch (e) {
       debugPrint("Error en la reproducción de audio: $e");
       if (mounted) {
@@ -177,6 +234,7 @@ class _StepScreenState extends State<StepScreen> {
       }
     }
   }
+
 
   void _handleAudioComplete() {
     if (currentStep < widget.steps.length - 1) {
@@ -256,6 +314,20 @@ class _StepScreenState extends State<StepScreen> {
     });
   }
 
+  Future<void> _stopCurrentAudio() async {
+    if (currentPlayer != null) {
+      await currentPlayer?.stop();
+      await currentPlayer?.dispose();
+      currentPlayer = null;
+    }
+    _cancelDelayTimer();
+    setState(() {
+      isPlaying = false;
+      _isPaused = false;
+      _isInDelay = false;
+    });
+  }
+
   Future<void> _resumeAudio() async {
     if (_isPaused && currentPlayer != null) {
       await currentPlayer?.play(); // Cambiado de resume() a play()
@@ -267,9 +339,10 @@ class _StepScreenState extends State<StepScreen> {
   }
 
   Future<void> _handleNextStep() async {
+    await _stopCurrentAudio();
     if (currentStep < widget.steps.length - 1) {
       // Detener cualquier audio o delay actual
-      await _stopAudio();
+
 
       setState(() {
         currentStep++;
@@ -286,6 +359,7 @@ class _StepScreenState extends State<StepScreen> {
   }
 
   Future<void> _navigateToNextScreen() async {
+    await _stopCurrentAudio();
     if (isPlaying) {
       await _stopAudio();
     }
@@ -364,8 +438,7 @@ class _StepScreenState extends State<StepScreen> {
   void _handlePreviousStep() async {
     if (currentStep > 0) {
       // Detener audio y delay actual completamente
-      _cancelDelayTimer();
-      await currentPlayer?.stop();
+      await _stopCurrentAudio();
 
       setState(() {
         currentStep--;
