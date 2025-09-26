@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_tts/flutter_tts.dart';
-import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:fnlapp/Main/finalstepscreen.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:http/http.dart' as http;
@@ -41,7 +38,6 @@ class StepScreen extends StatefulWidget {
 
 class _StepScreenState extends State<StepScreen> {
   int currentStep = 0;
-  FlutterTts? flutterTts;
   bool isPlaying = false;
   bool isLoading = false;
   final TextEditingController commentController = TextEditingController();
@@ -53,7 +49,6 @@ class _StepScreenState extends State<StepScreen> {
   Timer? _delayTimer;
   bool _isInDelay = false;
   int _remainingSeconds = 10;
-  Timer? _countdownTimer;
 
   // Helper method para obtener el tipo de dispositivo
   DeviceType _getDeviceType(double width) {
@@ -107,18 +102,6 @@ class _StepScreenState extends State<StepScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeTts();
-  }
-
-  void _initializeTts() {
-    flutterTts = FlutterTts();
-    flutterTts?.setCompletionHandler(() {
-      if (mounted) {
-        setState(() {
-          isPlaying = false;
-        });
-      }
-    });
   }
 
   String _getImageUrlByDay() {
@@ -130,7 +113,6 @@ class _StepScreenState extends State<StepScreen> {
 
   @override
   void dispose() {
-    flutterTts?.stop();
     commentController.dispose();
     currentPlayer?.dispose();
     _cancelDelayTimer();
