@@ -171,7 +171,7 @@ class _StepScreenState extends State<StepScreen> {
   }
 
   Future<void> _playAudioFromAPI(String text) async {
-    if (isPlaying) return;
+    if (isPlaying && !_isPaused) return;
 
     setState(() {
       isPlaying = true;
@@ -216,10 +216,15 @@ class _StepScreenState extends State<StepScreen> {
         }
       }
 
-      // Escuchar eventos de estado del reproductor
+      // Escuchar eventos de estado del reproductor - CORREGIDO
       currentPlayer?.playerStateStream.listen((state) {
-        if (state.processingState == ProcessingState.completed && mounted && !_isPaused) {
-          _handleAudioComplete();
+        if (mounted) {
+          final isCompleted = state.processingState == ProcessingState.completed;
+
+          // Solo manejar cuando el audio se completa, NO interferir con play/pause manual
+          if (isCompleted && !_isPaused && isPlaying) {
+            _handleAudioComplete();
+          }
         }
       });
 
@@ -230,6 +235,7 @@ class _StepScreenState extends State<StepScreen> {
       if (mounted) {
         setState(() {
           isPlaying = false;
+          _isPaused = false;
         });
       }
     }
@@ -302,16 +308,20 @@ class _StepScreenState extends State<StepScreen> {
   }
 
   Future<void> _stopAudio() async {
-    // Pausar el audio actual
-    await currentPlayer?.pause();
+    try {
+      // Pausar el audio actual
+      await currentPlayer?.pause();
 
-    // Cancelar el delay si está activo
-    _cancelDelayTimer();
+      // Cancelar el delay si está activo
+      _cancelDelayTimer();
 
-    setState(() {
-      isPlaying = false;
-      _isPaused = true;
-    });
+      setState(() {
+        isPlaying = false;
+        _isPaused = true;
+      });
+    } catch (e) {
+      debugPrint("Error al pausar audio: $e");
+    }
   }
 
   Future<void> _stopCurrentAudio() async {
@@ -328,13 +338,29 @@ class _StepScreenState extends State<StepScreen> {
     });
   }
 
+  // CORRECCIÓN AQUÍ: Método _resumeAudio completamente reescrito
   Future<void> _resumeAudio() async {
     if (_isPaused && currentPlayer != null) {
-      await currentPlayer?.play(); // Cambiado de resume() a play()
-      setState(() {
-        isPlaying = true;
-        _isPaused = false;
-      });
+      try {
+        // Primero actualizar el estado inmediatamente
+        setState(() {
+          isPlaying = true;
+          _isPaused = false;
+        });
+
+        // Luego reanudar la reproducción
+        await currentPlayer?.play();
+
+      } catch (e) {
+        debugPrint("Error al reanudar audio: $e");
+        // Si hay error, revertir el estado
+        if (mounted) {
+          setState(() {
+            isPlaying = false;
+            _isPaused = true;
+          });
+        }
+      }
     }
   }
 
@@ -342,7 +368,6 @@ class _StepScreenState extends State<StepScreen> {
     await _stopCurrentAudio();
     if (currentStep < widget.steps.length - 1) {
       // Detener cualquier audio o delay actual
-
 
       setState(() {
         currentStep++;
@@ -939,14 +964,25 @@ class _StepScreenState extends State<StepScreen> {
     );
   }
 
+  // CORRECCIÓN AQUÍ: Método _getPlayButtonIcon simplificado y más directo
   IconData _getPlayButtonIcon() {
-    if (_isInDelay && !_isPaused) {
-      return Icons.pause;
-    } else if (_isPaused || !isPlaying) {
+    // Si está en delay, mostrar pause/play según si está pausado
+    if (_isInDelay) {
+      return _isPaused ? Icons.play_arrow : Icons.pause;
+    }
+
+    // Si hay audio pausado, mostrar play
+    if (_isPaused && currentPlayer != null) {
       return Icons.play_arrow;
-    } else {
+    }
+
+    // Si está reproduciendo, mostrar pause
+    if (isPlaying && !_isPaused) {
       return Icons.pause;
     }
+
+    // Por defecto mostrar play
+    return Icons.play_arrow;
   }
 
   VoidCallback? _getPlayButtonAction() {
