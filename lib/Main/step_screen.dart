@@ -170,6 +170,27 @@ class _StepScreenState extends State<StepScreen> {
     return null;
   }
 
+  void _setupPlayerStateListener() {
+    currentPlayer?.playerStateStream.listen((state) {
+      if (mounted) {
+        // Manejar cambios de estado más granularmente
+        if (state.processingState == ProcessingState.completed &&
+            !_isPaused &&
+            isPlaying) {
+          _handleAudioComplete();
+        }
+
+        // Para móvil: sincronizar el estado del widget con el estado real del player
+        if (state.playing != isPlaying && !_isInDelay) {
+          setState(() {
+            isPlaying = state.playing;
+            _isPaused = !state.playing;
+          });
+        }
+      }
+    });
+  }
+
   Future<void> _playAudioFromAPI(String text) async {
     if (isPlaying && !_isPaused) return;
 
@@ -216,20 +237,21 @@ class _StepScreenState extends State<StepScreen> {
         }
       }
 
-      // Escuchar eventos de estado del reproductor - CORREGIDO
-      currentPlayer?.playerStateStream.listen((state) {
-        if (mounted) {
-          final isCompleted = state.processingState == ProcessingState.completed;
-
-          // Solo manejar cuando el audio se completa, NO interferir con play/pause manual
-          if (isCompleted && !_isPaused && isPlaying) {
-            _handleAudioComplete();
-          }
-        }
-      });
+      // Configurar el listener ANTES de iniciar la reproducción
+      _setupPlayerStateListener();
 
       // Iniciar reproducción
       await currentPlayer?.play();
+
+      // Para móvil: verificar que el estado se actualizó correctamente
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (mounted && currentPlayer?.playing == true) {
+        setState(() {
+          isPlaying = true;
+          _isPaused = false;
+        });
+      }
+
     } catch (e) {
       debugPrint("Error en la reproducción de audio: $e");
       if (mounted) {
@@ -240,7 +262,6 @@ class _StepScreenState extends State<StepScreen> {
       }
     }
   }
-
 
   void _handleAudioComplete() {
     if (currentStep < widget.steps.length - 1) {
@@ -315,10 +336,18 @@ class _StepScreenState extends State<StepScreen> {
       // Cancelar el delay si está activo
       _cancelDelayTimer();
 
-      setState(() {
-        isPlaying = false;
-        _isPaused = true;
-      });
+      if (mounted) {
+        setState(() {
+          isPlaying = false;
+          _isPaused = true;
+        });
+      }
+
+      // Pequeño delay y rebuild adicional para móvil
+      await Future.delayed(const Duration(milliseconds: 50));
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
       debugPrint("Error al pausar audio: $e");
     }
@@ -338,22 +367,30 @@ class _StepScreenState extends State<StepScreen> {
     });
   }
 
-  // CORRECCIÓN AQUÍ: Método _resumeAudio completamente reescrito
   Future<void> _resumeAudio() async {
     if (_isPaused && currentPlayer != null) {
       try {
-        // Primero actualizar el estado inmediatamente
-        setState(() {
-          isPlaying = true;
-          _isPaused = false;
-        });
+        // Actualizar estado inmediatamente
+        if (mounted) {
+          setState(() {
+            isPlaying = true;
+            _isPaused = false;
+          });
+        }
 
-        // Luego reanudar la reproducción
+        // Pequeño delay para asegurar que el setState se procese en móvil
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        // Reanudar reproducción
         await currentPlayer?.play();
+
+        // Forzar un rebuild adicional para móvil
+        if (mounted) {
+          setState(() {});
+        }
 
       } catch (e) {
         debugPrint("Error al reanudar audio: $e");
-        // Si hay error, revertir el estado
         if (mounted) {
           setState(() {
             isPlaying = false;
@@ -964,7 +1001,6 @@ class _StepScreenState extends State<StepScreen> {
     );
   }
 
-  // CORRECCIÓN AQUÍ: Método _getPlayButtonIcon simplificado y más directo
   IconData _getPlayButtonIcon() {
     // Si está en delay, mostrar pause/play según si está pausado
     if (_isInDelay) {
