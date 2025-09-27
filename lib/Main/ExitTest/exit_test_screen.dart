@@ -18,11 +18,11 @@ class _ExitTestScreenState extends State<ExitTestScreen> {
   bool showDetail = false;
   final List<int?> selectedOptions = List<int?>.filled(23, null);
   int? userId;
-  
+
 final List<Map<String, String>> questions = [
   {
     "question": "Tener que hacer reportes tanto para sus jefes como para las personas de su equipo le preocupa, porque siente que debe cumplir con las expectativas de todos y eso le genera tensión.",
-    "description": "Rendir cuentas a varias personas puede generar presión. Veamos cómo manejas esta situación.",
+    "description": "Rendir cuentas a varias personas puede generar presión. ¿Cómo manejas esta situación?",
     "option1": "Nunca",
     "detail1": "No sientes ninguna presión al hacer reportes, ¡genial!",
     "option2": "Raras veces",
@@ -40,7 +40,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "Si no puede controlar lo que sucede en su área de trabajo, se frustra, ya que le gusta tener todo bajo control y organizado.",
-    "description": "El control es importante para sentirse en paz. Veamos cómo te afecta perder el control en tu área.",
+    "description": "El control es importante para sentirse en paz. ¿Cómo te afecta perder el control en tu área?",
     "option1": "Nunca",
     "detail1": "Siempre tienes todo bajo control, ¡excelente!",
     "option2": "Raras veces",
@@ -58,7 +58,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "Si no cuenta con el equipo necesario para hacer su trabajo, se siente estresado porque no puede hacerlo de la mejor manera.",
-    "description": "Contar con las herramientas adecuadas es clave para hacer un buen trabajo. Revisemos cómo te afecta la falta de recursos.",
+    "description": "Contar con las herramientas adecuadas es clave para hacer un buen trabajo. ¿Cómo te afecta la falta de recursos?",
     "option1": "Nunca",
     "detail1": "Siempre tienes el equipo necesario para tu trabajo.",
     "option2": "Raras veces",
@@ -76,7 +76,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "Cuando su jefe no lo apoya o no habla bien de él frente a otros superiores, se siente solo y preocupado, pensando que no lo valoran.",
-    "description": "Sentirse respaldado por tu jefe es esencial para el bienestar en el trabajo. Veamos cómo te afecta la falta de apoyo.",
+    "description": "Sentirse respaldado por tu jefe es esencial para el bienestar en el trabajo. ¿Cómo te afecta la falta de apoyo?",
     "option1": "Nunca",
     "detail1": "Siempre sientes que tu jefe te apoya y te valora.",
     "option2": "Raras veces",
@@ -94,7 +94,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "Si siente que su jefe no lo trata con respeto o no valora su trabajo, le causa mucho estrés.",
-    "description": "Ser valorado y respetado en el trabajo es crucial para el bienestar. Veamos cómo te afecta cuando no te sientes valorado.",
+    "description": "Ser valorado y respetado en el trabajo es crucial para el bienestar. ¿Cómo te afecta cuando no te sientes valorado?",
     "option1": "Nunca",
     "detail1": "Siempre te sientes respetado y valorado por tu jefe.",
     "option2": "Raras veces",
@@ -112,7 +112,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "No sentirse parte de un equipo de trabajo unido le hace sentirse aislado y preocupado por no poder colaborar eficientemente con otros.",
-    "description": "Sentirse parte de un equipo unido es fundamental para el éxito en el trabajo. Revisemos cómo te afecta la falta de cohesión en tu equipo.",
+    "description": "Sentirse parte de un equipo unido es fundamental para el éxito en el trabajo. ¿Cómo te afecta la falta de cohesión en tu equipo?",
     "option1": "Nunca",
     "detail1": "Siempre te sientes parte de un equipo unido y colaborativo.",
     "option2": "Raras veces",
@@ -130,7 +130,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "Cuando su equipo de trabajo no lo apoya en alcanzar sus metas, se siente estresado y frustrado.",
-    "description": "El apoyo del equipo es esencial para alcanzar tus metas. Veamos cómo te afecta cuando no recibes el respaldo necesario.",
+    "description": "El apoyo del equipo es esencial para alcanzar tus metas. ¿Cómo te afecta cuando no recibes el respaldo necesario?",
     "option1": "Nunca",
     "detail1": "Siempre sientes el apoyo de tu equipo para alcanzar tus metas.",
     "option2": "Raras veces",
@@ -148,7 +148,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "Sentir que su equipo de trabajo no tiene buena reputación dentro de la empresa le provoca estrés, ya que desea que su equipo sea valorado.",
-    "description": "Tener una buena reputación en el trabajo es importante para la satisfacción personal. Veamos cómo te afecta la percepción de tu equipo.",
+    "description": "Tener una buena reputación en el trabajo es importante para la satisfacción personal. ¿Cómo te afecta la percepción de tu equipo?",
     "option1": "Nunca",
     "detail1": "Siempre consideras que tu equipo tiene una excelente reputación.",
     "option2": "Raras veces",
@@ -166,7 +166,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "La falta de claridad en la forma de trabajar dentro de la empresa le genera confusión y estrés.",
-    "description": "La claridad en los procesos de trabajo es clave para el rendimiento. Veamos cómo te afecta la falta de estructura.",
+    "description": "La claridad en los procesos de trabajo es clave para el rendimiento. ¿Cómo te afecta la falta de estructura?",
     "option1": "Nunca",
     "detail1": "Siempre sabes claramente cómo deben hacerse las cosas en la empresa.",
     "option2": "Raras veces",
@@ -184,7 +184,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "Las políticas impuestas por la gerencia que dificultan su trabajo le causan frustración y estrés.",
-    "description": "Las políticas de la empresa pueden facilitar o dificultar el trabajo. Veamos cómo te afecta cuando estas políticas son complicadas.",
+    "description": "Las políticas de la empresa pueden facilitar o dificultar el trabajo. ¿Cómo te afecta cuando estas políticas son complicadas?",
     "option1": "Nunca",
     "detail1": "Siempre encuentras las políticas claras y útiles para tu trabajo.",
     "option2": "Raras veces",
@@ -202,7 +202,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "Cuando siente que no tiene suficiente control sobre su trabajo, igual que sus compañeros, se siente estresado y sin poder sobre lo que sucede.",
-    "description": "Sentir que no tienes control sobre tu trabajo puede ser frustrante. Veamos cómo te afecta esta situación.",
+    "description": "Sentir que no tienes control sobre tu trabajo puede ser frustrante. ¿Cómo te afecta esta situación?",
     "option1": "Nunca",
     "detail1": "Siempre sientes que tienes control sobre tu trabajo, ¡genial!",
     "option2": "Raras veces",
@@ -220,7 +220,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "Si percibe que su supervisor no se preocupa por su bienestar, se siente menospreciado y estresado.",
-    "description": "Sentir que tu jefe se preocupa por tu bienestar es importante. Veamos cómo te afecta cuando no lo sientes así.",
+    "description": "Sentir que tu jefe se preocupa por tu bienestar es importante. ¿Cómo te afecta cuando no lo sientes así?",
     "option1": "Nunca",
     "detail1": "Siempre sientes que tu supervisor se preocupa por tu bienestar.",
     "option2": "Raras veces",
@@ -238,7 +238,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "No contar con el conocimiento técnico necesario para competir en la empresa le genera una sensación de inseguridad y estrés.",
-    "description": "Tener el conocimiento técnico adecuado es crucial para competir. Veamos cómo te afecta la falta de habilidades técnicas.",
+    "description": "Tener el conocimiento técnico adecuado es crucial para competir. ¿Cómo te afecta la falta de habilidades técnicas?",
     "option1": "Nunca",
     "detail1": "Siempre sientes que tienes el conocimiento técnico necesario para desempeñar tu trabajo.",
     "option2": "Raras veces",
@@ -256,7 +256,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "No tener un espacio privado para trabajar en tranquilidad le incomoda y le estresa.",
-    "description": "Tener un espacio adecuado para trabajar es esencial. Veamos cómo te afecta la falta de privacidad en tu área de trabajo.",
+    "description": "Tener un espacio adecuado para trabajar es esencial. ¿Cómo te afecta la falta de privacidad en tu área de trabajo?",
     "option1": "Nunca",
     "detail1": "Siempre cuentas con un espacio privado adecuado para trabajar.",
     "option2": "Raras veces",
@@ -274,7 +274,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "La carga de papeleo excesivo en la empresa le resulta abrumadora y le provoca estrés.",
-    "description": "El exceso de papeleo puede ser una fuente importante de estrés. Veamos cómo te afecta.",
+    "description": "El exceso de papeleo puede ser una fuente importante de estrés. ¿Cómo te afecta?",
     "option1": "Nunca",
     "detail1": "Nunca sientes que el papeleo te abruma, ¡genial!",
     "option2": "Raras veces",
@@ -292,7 +292,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "La falta de confianza de su supervisor en su trabajo le hace sentir inseguro y estresado.",
-    "description": "Tener la confianza de tu jefe es importante para tu seguridad laboral. Veamos cómo te afecta cuando sientes que tu supervisor no confía en ti.",
+    "description": "Tener la confianza de tu jefe es importante para tu seguridad laboral. ¿Cómo te afecta cuando sientes que tu supervisor no confía en ti?",
     "option1": "Nunca",
     "detail1": "Siempre sientes la confianza de tu supervisor en tu trabajo.",
     "option2": "Raras veces",
@@ -310,7 +310,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "Si su equipo de trabajo está desorganizado, se siente ansioso porque no puede trabajar de manera efectiva.",
-    "description": "La organización dentro del equipo es clave para el éxito. Veamos cómo te afecta cuando tu equipo está desorganizado.",
+    "description": "La organización dentro del equipo es clave para el éxito. ¿Cómo te afecta cuando tu equipo está desorganizado?",
     "option1": "Nunca",
     "detail1": "Siempre sientes que tu equipo está bien organizado, lo que facilita tu trabajo.",
     "option2": "Raras veces",
@@ -328,7 +328,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "Cuando su equipo no lo protege de las demandas laborales injustas de los jefes, se siente desamparado y estresado.",
-    "description": "El respaldo de tu equipo frente a las demandas laborales es clave. Veamos cómo te afecta cuando no sientes este apoyo.",
+    "description": "El respaldo de tu equipo frente a las demandas laborales es clave. ¿Cómo te afecta cuando no sientes este apoyo?",
     "option1": "Nunca",
     "detail1": "Siempre sientes que tu equipo te respalda frente a demandas injustas.",
     "option2": "Raras veces",
@@ -346,7 +346,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "La falta de dirección clara y objetivos definidos en la empresa le genera estrés e incertidumbre.",
-    "description": "Tener una dirección clara es esencial para el bienestar laboral. Veamos cómo te afecta la falta de objetivos claros en la empresa.",
+    "description": "Tener una dirección clara es esencial para el bienestar laboral. ¿Cómo te afecta la falta de objetivos claros en la empresa?",
     "option1": "Nunca",
     "detail1": "Siempre sientes que la empresa tiene una dirección clara y objetivos bien definidos.",
     "option2": "Raras veces",
@@ -364,7 +364,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "Si siente que su equipo lo presiona demasiado, se estresa porque siente que no puede cumplir con todo.",
-    "description": "El apoyo del equipo es esencial para manejar la carga laboral. Veamos cómo te afecta cuando sientes que te presionan demasiado.",
+    "description": "El apoyo del equipo es esencial para manejar la carga laboral. ¿Cómo te afecta cuando sientes que te presionan demasiado?",
     "option1": "Nunca",
     "detail1": "Nunca sientes que tu equipo te presiona más de lo necesario.",
     "option2": "Raras veces",
@@ -382,7 +382,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "Cuando no respetan a sus superiores, a él mismo, o a las personas que están por debajo de él, siente estrés e incomodidad.",
-    "description": "El respeto es esencial en el ambiente de trabajo. Veamos cómo te afecta cuando no lo sientes hacia ti o los demás.",
+    "description": "El respeto es esencial en el ambiente de trabajo. ¿Cómo te afecta cuando no lo sientes hacia ti o los demás?",
     "option1": "Nunca",
     "detail1": "Siempre sientes que se respeta a todos en el entorno laboral, lo que genera un ambiente sano.",
     "option2": "Raras veces",
@@ -400,7 +400,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "Si su equipo de trabajo no le brinda apoyo técnico cuando lo necesita, se siente frustrado y estresado.",
-    "description": "Contar con el apoyo técnico de tu equipo es esencial. Veamos cómo te afecta cuando no recibes este respaldo.",
+    "description": "Contar con el apoyo técnico de tu equipo es esencial. ¿Cómo te afecta cuando no recibes este respaldo?",
     "option1": "Nunca",
     "detail1": "Siempre cuentas con el apoyo técnico que necesitas, lo que te facilita el trabajo.",
     "option2": "Raras veces",
@@ -418,7 +418,7 @@ final List<Map<String, String>> questions = [
   },
   {
     "question": "La falta de tecnología adecuada para realizar un trabajo de calidad le genera una gran presión y estrés.",
-    "description": "Contar con la tecnología adecuada es clave para hacer un buen trabajo. Veamos cómo te afecta cuando no tienes las herramientas necesarias.",
+    "description": "Contar con la tecnología adecuada es clave para hacer un buen trabajo. ¿Cómo te afecta cuando no tienes las herramientas necesarias?",
     "option1": "Nunca",
     "detail1": "Siempre cuentas con la tecnología adecuada para hacer tu trabajo eficientemente.",
     "option2": "Raras veces",
