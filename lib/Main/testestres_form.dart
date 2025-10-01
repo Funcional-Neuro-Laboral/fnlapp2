@@ -662,7 +662,7 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                       else
                         const SizedBox(width: 88), // Espacio vacío cuando no hay más preguntas anteriores
 
-                      // ---- SIGUIENTE / FINALIZAR ----
+// ---- SIGUIENTE / FINALIZAR ----
                       Builder(
                         builder: (context) {
                           final bool isNextEnabled = selectedOptions[currentQuestionIndex] != 0;
@@ -679,8 +679,11 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                             }
                                 : null,
                             child: Container(
-                              width: 158,
-                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                              constraints: BoxConstraints(
+                                minWidth: 120,
+                                maxWidth: 180,
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                               clipBehavior: Clip.antiAlias,
                               decoration: ShapeDecoration(
                                 color: (isNextEnabled && !isSubmitting) ? const Color(0xFF6D4BD8) : const Color(0xFFD7D7D7),

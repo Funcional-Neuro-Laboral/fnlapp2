@@ -540,7 +540,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   padding: EdgeInsets.only(right: 8.0),
                   child: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
                       color: Colors.grey[600],
                     ),
                     onPressed: () {
@@ -591,7 +591,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   padding: EdgeInsets.only(right: 8.0),
                   child: IconButton(
                     icon: Icon(
-                      _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                      _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
                       color: Colors.grey[600],
                     ),
                     onPressed: () {
