@@ -4,7 +4,7 @@ Aplicación móvil multiplataforma para evaluaciones neurofuncionales laborales,
 
 ## Tecnologías Utilizadas
 
-### Dart
+### <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/dart/dart-original.svg" alt="Dart" width="30" height="30"/> Dart
 **Descripción:** Dart es un lenguaje de programación desarrollado por Google, optimizado para el desarrollo de aplicaciones client-side. Es un lenguaje orientado a objetos con sintaxis similar a C y fuerte tipado opcional.
 
 **Uso en el proyecto:** Lenguaje principal de desarrollo para:
@@ -14,7 +14,7 @@ Aplicación móvil multiplataforma para evaluaciones neurofuncionales laborales,
 - Integración con APIs REST del backend
 - Procesamiento local de datos de evaluaciones
 
-### Flutter
+### <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/flutter/flutter-original.svg" alt="Flutter" width="30" height="30"/> Flutter
 **Descripción:** Flutter es el framework de desarrollo multiplataforma de Google que utiliza Dart. Permite crear aplicaciones nativas compiladas para móvil, web y desktop desde una sola base de código.
 
 **Uso en el proyecto:** Framework principal para:
@@ -24,7 +24,7 @@ Aplicación móvil multiplataforma para evaluaciones neurofuncionales laborales,
 - Integración con sensores del dispositivo móvil
 - Renderizado de gráficos y visualizaciones de datos médicos
 
-### HTML
+### <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/html5/html5-original.svg" alt="HTML5" width="30" height="30"/> HTML
 **Descripción:** HTML (HyperText Markup Language) es el lenguaje de marcado estándar para crear páginas web y aplicaciones web.
 
 **Uso en el proyecto:** Utilizado para:
@@ -33,7 +33,7 @@ Aplicación móvil multiplataforma para evaluaciones neurofuncionales laborales,
 - Integración de contenido web en WebViews
 - Plantillas para exportación de documentos
 
-### C++
+### <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/cplusplus/cplusplus-original.svg" alt="C++" width="30" height="30"/> C++
 **Descripción:** C++ es un lenguaje de programación de propósito general que es una extensión del lenguaje C. Ofrece programación orientada a objetos y control de bajo nivel.
 
 **Uso en el proyecto:** Empleado para:
@@ -42,7 +42,7 @@ Aplicación móvil multiplataforma para evaluaciones neurofuncionales laborales,
 - Integración con bibliotecas nativas del sistema operativo
 - Operaciones matemáticas complejas en tiempo real
 
-### CMake
+### <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/cmake/cmake-original.svg" alt="CMake" width="30" height="30"/> CMake
 **Descripción:** CMake es un sistema de construcción multiplataforma diseñado para controlar el proceso de compilación de software usando archivos de configuración simples e independientes de la plataforma.
 
 **Uso en el proyecto:** Herramienta de build para:
@@ -51,7 +51,7 @@ Aplicación móvil multiplataforma para evaluaciones neurofuncionales laborales,
 - Configuración de builds para diferentes plataformas (iOS/Android)
 - Integración del código nativo con Flutter
 
-### Swift
+### <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/swift/swift-original.svg" alt="Swift" width="30" height="30"/> Swift
 **Descripción:** Swift es un lenguaje de programación desarrollado por Apple para el desarrollo de aplicaciones en iOS, macOS, watchOS y tvOS.
 
 **Uso en el proyecto:** Utilizado para:
@@ -60,7 +60,7 @@ Aplicación móvil multiplataforma para evaluaciones neurofuncionales laborales,
 - Optimizaciones específicas para dispositivos Apple
 - Acceso a funcionalidades exclusivas del ecosistema iOS
 
-### Ruby
+### <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/ruby/ruby-original.svg" alt="Ruby" width="30" height="30"/> Ruby
 **Descripción:** Ruby es un lenguaje de programación dinámico y de código abierto enfocado en la simplicidad y productividad, con una sintaxis elegante que es natural de leer y fácil de escribir.
 
 **Uso en el proyecto:** Empleado para:
