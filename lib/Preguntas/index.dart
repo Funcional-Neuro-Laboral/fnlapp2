@@ -550,7 +550,7 @@ class _IndexScreenState extends State<IndexScreen> {
 
                     // Imagen
                     Image.network(
-                      'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_like.png',
+                      'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_seguridad.png',
                       width: imageSize,
                       height: imageSize + 30,
                       fit: BoxFit.contain,
