@@ -708,9 +708,9 @@ class _IndexScreenState extends State<IndexScreen> {
         // Adaptación responsiva
         final contentWidth = isLargeTablet ? 900.0 : isTablet ? 700.0 : screenWidth;
         final horizontalPadding = isTablet ? 40.0 : 20.0;
-        final topPadding = isTablet ? 80.0 : 60.0;
+        final topPadding = isTablet ? 60.0 : 40.0;
         final titleFontSize = isLargeTablet ? 32.0 : isTablet ? 28.0 : 24.0;
-        final welcomeFontSize = isLargeTablet ? 22.0 : isTablet ? 20.0 : 18.0;
+        final questionCounterFontSize = isLargeTablet ? 20.0 : isTablet ? 18.0 : 18.0;
         final buttonFontSize = isLargeTablet ? 26.0 : isTablet ? 24.0 : 22.0;
         final optionFontSize = isLargeTablet ? 26.0 : isTablet ? 24.0 : isSmallDevice ? 20.0 : 22.0;
         final verticalPadding = isSmallDevice ? 12.0 : isTablet ? 24.0 : 20.0;
@@ -773,89 +773,97 @@ class _IndexScreenState extends State<IndexScreen> {
           alignment: Alignment.topCenter,
           child: SizedBox(
             width: contentWidth,
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.only(
-                        top: topPadding,
-                        left: horizontalPadding,
-                        right: horizontalPadding
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Barra de progreso
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: List.generate(6, (index) {
-                            return Expanded(
-                              child: Container(
-                                margin: EdgeInsets.symmetric(horizontal: isTablet ? 6.0 : 4.0),
-                                height: isTablet ? 8.0 : 6.0,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(isTablet ? 4.0 : 3.0),
-                                  color: index <= currentQuestionIndex
-                                      ? const Color(0xFF6D4BD8)
-                                      : const Color(0xFFE0E0E0),
-                                ),
-                              ),
-                            );
-                          }),
-                        ),
-                        SizedBox(height: isTablet ? 50.0 : 35.0),
-
-                        // Contenedor para la bienvenida y pregunta
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Bienvenida
-                            SizedBox(
-                              height: isTablet ? 30 : 20,
-                              child: currentQuestionIndex == 0
-                                  ? Align(
-                                alignment: Alignment.bottomLeft,
-                                child: Text(
-                                  'Te damos la bienvenida a FNL',
-                                  style: TextStyle(
-                                    color: Color(0xFF212121),
-                                    fontSize: welcomeFontSize,
-                                    fontFamily: 'Inter',
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              )
-                                  : const SizedBox.shrink(),
-                            ),
-
-                            SizedBox(height: isTablet ? 12.0 : 8.0),
-
-                            // Pregunta
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                preguntaTexto,
-                                style: TextStyle(
-                                  color: Color(0xFF5027D0),
-                                  fontSize: titleFontSize,
-                                  fontFamily: 'Inter',
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                textAlign: TextAlign.start,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+            child: Column(
+              children: [
+                // Header fijo (barra de progreso + pregunta)
+                Padding(
+                  padding: EdgeInsets.only(
+                    top: topPadding,
+                    left: horizontalPadding,
+                    right: horizontalPadding,
                   ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Barra de progreso con icono de retroceder
+                      Row(
+                        children: [
+                          // Icono de retroceder (solo visible si no es la primera pregunta)
+                          if (currentQuestionIndex > 0)
+                            GestureDetector(
+                              onTap: goToPreviousQuestion,
+                              child: Container(
+                                padding: EdgeInsets.all(isTablet ? 8.0 : 6.0),
+                                margin: EdgeInsets.only(right: isTablet ? 16.0 : 12.0),
+                                child: Icon(
+                                  Icons.arrow_back_ios,
+                                  color: Colors.black,
+                                  size: isTablet ? 24.0 : 20.0,
+                                ),
+                              ),
+                            )
+                          else
+                            SizedBox(width: isTablet ? 48.0 : 38.0),
 
-                  // Opciones
-                  Padding(
-                    padding: EdgeInsets.only(
-                        top: isTablet ? 24.0 : 16.0,
-                        bottom: isTablet ? 16.0 : 8.0
-                    ),
+                          // Barra de progreso expandida
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: List.generate(6, (index) {
+                                return Expanded(
+                                  child: Container(
+                                    margin: EdgeInsets.symmetric(horizontal: isTablet ? 6.0 : 4.0),
+                                    height: isTablet ? 8.0 : 6.0,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(isTablet ? 4.0 : 3.0),
+                                      color: index <= currentQuestionIndex
+                                          ? const Color(0xFF6D4BD8)
+                                          : const Color(0xFFE0E0E0),
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      SizedBox(height: isTablet ? 40.0 : 30.0),
+
+                      // Contador de preguntas
+                      Text(
+                        'Pregunta ${currentQuestionIndex + 1} de 6',
+                        style: TextStyle(
+                          color: Color(0xFF212121),
+                          fontSize: questionCounterFontSize,
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+
+                      SizedBox(height: isTablet ? 12.0 : 8.0),
+
+                      // Pregunta
+                      Text(
+                        preguntaTexto,
+                        style: TextStyle(
+                          color: Color(0xFF5027D0),
+                          fontSize: titleFontSize,
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.start,
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: isTablet ? 24.0 : 16.0),
+
+                // Opciones scrolleables (expandido para ocupar el espacio disponible)
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                     child: _buildQuestionField(
                       currentCategoryQuestions,
                       optionFontSize,
@@ -863,143 +871,88 @@ class _IndexScreenState extends State<IndexScreen> {
                       isTablet,
                     ),
                   ),
+                ),
 
-                  SizedBox(height: isTablet ? 120 : 90),
+                // Botón Siguiente/Finalizar fijo en la parte inferior
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    isTablet ? 20 : 12,
+                    horizontalPadding,
+                    isTablet ? 40 : 30,
+                  ),
+                  child: Builder(
+                    builder: (context) {
+                      final bool isNextEnabled = selectedOption != null ||
+                          selectedAnswers.containsKey(currentQuestionIndex);
+                      final String nextLabel =
+                      currentQuestionIndex < 5 ? 'Siguiente' : 'Finalizar';
 
-                  // Botones
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                        horizontalPadding,
-                        isTablet ? 20 : 12,
-                        horizontalPadding,
-                        isTablet ? 80 : 60
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Botón Atrás
-                        if (currentQuestionIndex > 0)
-                          GestureDetector(
-                            onTap: goToPreviousQuestion,
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: isTablet ? 40 : 32,
-                                  vertical: isTablet ? 16 : 12
+                      return GestureDetector(
+                        onTap: isNextEnabled
+                            ? () {
+                          if (currentQuestionIndex < 5) {
+                            goToNextQuestion();
+                          } else {
+                            saveResponses();
+                          }
+                        }
+                            : null,
+                        child: Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.symmetric(
+                            vertical: verticalPadding,
+                          ),
+                          decoration: ShapeDecoration(
+                            color: isNextEnabled
+                                ? const Color(0xFF6D4BD8)
+                                : const Color(0xFFD7D7D7),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(isTablet ? 40.0 : 40.0),
+                            ),
+                            shadows: isNextEnabled
+                                ? const [
+                              BoxShadow(
+                                color: Color(0x26000000),
+                                blurRadius: 6,
+                                offset: Offset(0, 2),
+                                spreadRadius: 2,
                               ),
-                              decoration: ShapeDecoration(
-                                color: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(80),
-                                ),
-                                shadows: const [
-                                  BoxShadow(
-                                    color: Color(0x4C000000),
-                                    blurRadius: 3,
-                                    offset: Offset(0, 2),
-                                    spreadRadius: 0,
-                                  ),
-                                  BoxShadow(
-                                    color: Color(0x26000000),
-                                    blurRadius: 10,
-                                    offset: Offset(0, 6),
-                                    spreadRadius: 4,
-                                  ),
-                                ],
+                              BoxShadow(
+                                color: Color(0x4C000000),
+                                blurRadius: 2,
+                                offset: Offset(0, 1),
+                                spreadRadius: 0,
                               ),
-                              child: Text(
-                                'Atrás',
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontSize: buttonFontSize,
-                                  fontFamily: 'Inter',
-                                  fontWeight: FontWeight.w600,
-                                ),
+                            ]
+                                : const [],
+                          ),
+                          child: Center(
+                            child: Text(
+                              nextLabel,
+                              style: TextStyle(
+                                color: isNextEnabled
+                                    ? Colors.white
+                                    : const Color(0xFF868686),
+                                fontSize: buttonFontSize,
+                                fontFamily: 'Inter',
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          )
-                        else
-                          SizedBox(width: isTablet ? 120 : 88),
-
-                        // Botón Siguiente/Finalizar
-                        Builder(
-                          builder: (context) {
-                            final bool isNextEnabled = selectedOption != null ||
-                                selectedAnswers.containsKey(currentQuestionIndex);
-                            final String nextLabel =
-                            currentQuestionIndex < 5 ? 'Siguiente' : 'Finalizar';
-
-                            return GestureDetector(
-                              onTap: isNextEnabled
-                                  ? () {
-                                if (currentQuestionIndex < 5) {
-                                  goToNextQuestion();
-                                } else {
-                                  saveResponses();
-                                }
-                              }
-                                  : null,
-                              child: Container(
-                                width: isTablet ? 200 : 158,
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: isTablet ? 24 : 16,
-                                    vertical: isTablet ? 16 : 12
-                                ),
-                                clipBehavior: Clip.antiAlias,
-                                decoration: ShapeDecoration(
-                                  color: isNextEnabled
-                                      ? const Color(0xFF6D4BD8)
-                                      : const Color(0xFFD7D7D7),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(40),
-                                  ),
-                                  shadows: isNextEnabled
-                                      ? const [
-                                    BoxShadow(
-                                      color: Color(0x26000000),
-                                      blurRadius: 6,
-                                      offset: Offset(0, 2),
-                                      spreadRadius: 2,
-                                    ),
-                                    BoxShadow(
-                                      color: Color(0x4C000000),
-                                      blurRadius: 2,
-                                      offset: Offset(0, 1),
-                                      spreadRadius: 0,
-                                    ),
-                                  ]
-                                      : const [],
-                                ),
-                                child: Center(
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(
-                                      nextLabel,
-                                      style: TextStyle(
-                                        color: isNextEnabled
-                                            ? Colors.white
-                                            : const Color(0xFF868686),
-                                        fontSize: buttonFontSize,
-                                        fontFamily: 'Inter',
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
+                          ),
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
       },
     );
   }
+
 
   Widget _buildQuestionField(
       List<Map<String, dynamic>> questions,
