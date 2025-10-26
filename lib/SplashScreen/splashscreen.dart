@@ -26,7 +26,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (token == null || token.isEmpty) {
       await prefs.remove('token');
-      Navigator.pushReplacementNamed(context, '/login');
+      Navigator.pushReplacementNamed(context, '/welcome');
       return;
     }
 

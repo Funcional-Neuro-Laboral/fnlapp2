@@ -9,6 +9,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'SplashScreen/welcome_screen.dart';
 
 class MyHttpOverrides extends HttpOverrides {
   @override
@@ -43,6 +44,7 @@ class MyApp extends StatelessWidget {
       // Definimos todas las rutas de forma estática
       routes: {
         '/': (context) => const SplashScreen(),
+        '/welcome': (context) => const WelcomeScreen(),
         '/login': (context) => LoginScreen(),
         '/home': (context) => HomeScreen(),
         // IndexScreen necesita parámetros, así que lo manejamos de esta forma
