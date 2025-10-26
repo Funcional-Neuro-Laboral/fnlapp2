@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:fnlapp/Main/models/test_notice.dart';
+import 'package:fnlapp/Main/widgets/test_completion_screen.dart';
+import 'package:fnlapp/Main/widgets/test_notice_dialog.dart';
 import 'package:fnlapp/Util/enums.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -8,6 +11,7 @@ import 'package:fnlapp/config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../Preguntas/questions_data.dart';
 import 'package:fnlapp/Main/home.dart';
+import '../Util/test_notices_data.dart';
 
 class TestEstresQuestionScreen extends StatefulWidget {
   const TestEstresQuestionScreen({Key? key}) : super(key: key);
@@ -20,11 +24,13 @@ class TestEstresQuestionScreen extends StatefulWidget {
 class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
   bool isSubmitting = false;
   int currentQuestionIndex = 0;
-  List<int> selectedOptions = List<int>.filled(
-      23, 0); // Asigna un valor predeterminado (por ejemplo, 0)
-
+  List<int> selectedOptions = List<int>.filled(23, 0); // Asigna un valor predeterminado (por ejemplo, 0)
   int? userId;
   bool? isDay21Completed;
+  bool showingNotice = false;
+  TestNotice? currentNotice;
+  int? previousNoticeIndex;
+  bool _imagesPrecached = false;
 
   @override
   void initState() {
@@ -32,16 +38,35 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
     _loadUserData(); // Cargamos el ID del usuario y estado del día 21
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Precargar las imágenes de los avisos solo una vez.
+    if (!_imagesPrecached) {
+      _precacheNoticeImages();
+      _imagesPrecached = true;
+    }
+  }
+
+  // Función para precargar las imágenes de los avisos en el caché.
+  void _precacheNoticeImages() {
+    for (var notice in testNotices) {
+      if (notice.imagePath != null && notice.imagePath!.isNotEmpty) {
+        precacheImage(NetworkImage(notice.imagePath!), context);
+      }
+    }
+  }
+
   // Función para cargar el userId y estado del día 21 desde SharedPreferences
   Future<void> _loadUserData() async {
     int? id = await getUserId();
     SharedPreferences prefs = await SharedPreferences.getInstance();
     bool? day21Status = prefs.getBool('isDay21Completed');
-    
+
     setState(() {
       userId = id;
       isDay21Completed = day21Status == true;
-      
+
       if (userId == null) {
         print('Error: userId is null');
         return;
@@ -88,7 +113,7 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       case 'otro':
         return 3;
       default:
-        return 1; 
+        return 1;
     }
   }
 
@@ -101,26 +126,77 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
   }
 
   void goToNextQuestion() {
-    if (selectedOptions[currentQuestionIndex] != 0 &&
-        currentQuestionIndex < questions.length - 1) {
-      setState(() {
-        currentQuestionIndex++;
-      });
+    if (selectedOptions[currentQuestionIndex] != 0) {
+      TestNotice? notice;
+      try {
+        notice = testNotices.firstWhere(
+              (n) => n.afterQuestion == currentQuestionIndex + 1,
+        );
+      } catch (e) {
+        notice = null;
+      }
+
+      if (notice != null) {
+        setState(() {
+          showingNotice = true;
+          currentNotice = notice;
+          previousNoticeIndex = currentQuestionIndex;
+        });
+      } else if (currentQuestionIndex < questions.length - 1) {
+        setState(() {
+          currentQuestionIndex++;
+        });
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content:
-                Text('Por favor selecciona una opción antes de continuar')),
+        const SnackBar(
+          content: Text('Por favor selecciona una opción antes de continuar'),
+        ),
       );
     }
+  }
+
+  void continueAfterNotice() {
+    setState(() {
+      showingNotice = false;
+      currentNotice = null;
+      previousNoticeIndex = null;
+      if (currentQuestionIndex < questions.length - 1) {
+        currentQuestionIndex++;
+      }
+    });
   }
 
   void goToPreviousQuestion() {
     if (currentQuestionIndex > 0) {
       setState(() {
         currentQuestionIndex--;
+        // Verificar si hay un aviso en la pregunta anterior
+        TestNotice? notice;
+        try {
+          notice = testNotices.firstWhere(
+                (n) => n.afterQuestion == currentQuestionIndex + 1,
+          );
+        } catch (e) {
+          notice = null;
+        }
+
+        if (notice != null) {
+          showingNotice = true;
+          currentNotice = notice;
+          previousNoticeIndex = currentQuestionIndex;
+        }
       });
     }
+  }
+
+  void goBackFromNotice() {
+    setState(() {
+      showingNotice = false;
+      currentNotice = null;
+      previousNoticeIndex = null;
+      // No cambiar currentQuestionIndex, solo ocultar el aviso
+    });
   }
 
   Future<void> submitTest() async {
@@ -134,6 +210,19 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       return;
     }
 
+    // Mostrar pantalla de finalización
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TestCompletionScreen(
+          onFinalize: _processTestSubmission,
+          onBack: () => Navigator.of(context).pop(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _processTestSubmission() async {
     try {
       // Activar el bloqueo
       setState(() {
@@ -355,11 +444,11 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       String startDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
       // Mapear el género para el userContext
-      String genderCode = userProfile['gender'] == 'Masculino' ? 'M' : 
+      String genderCode = userProfile['gender'] == 'Masculino' ? 'M' :
                          userProfile['gender'] == 'Femenino' ? 'F' : 'O';
 
       final generateProgramUrl = Uri.parse('${Config.apiUrl2}/programs/generate');
-      
+
       final Map<String, dynamic> programData = {
         'userId': userId,
         'goal': 'Reducir estrés laboral',
@@ -437,6 +526,16 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (showingNotice && currentNotice != null) {
+      return Scaffold(
+        body: TestNoticeDialog(
+          notice: currentNotice!,
+          onContinue: continueAfterNotice,
+          onBack: goBackFromNotice,
+        ),
+      );
+    }
+
     // Verificación inicial para asegurarse de que 'questions' no esté vacío y que el índice esté en rango
     if (questions.isEmpty || currentQuestionIndex >= questions.length) {
       return Scaffold(
@@ -453,16 +552,30 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
     double screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      body: Container(
-        color: Color(0xFFF6F6F6), // Fondo de todo el Scaffold
-        child: SingleChildScrollView( // Añadir el SingleChildScrollView para permitir el desplazamiento
-          child: Padding(
-            padding: const EdgeInsets.only(top: 5.0),  // Mantener margen horizontal
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final screenWidth = constraints.maxWidth;
+          final screenHeight = constraints.maxHeight;
+          final isTablet = screenWidth > 600;
+
+          // Tamaños responsivos
+          final headerPadding = isTablet ? 24.0 : 16.0;
+          final iconSize = isTablet ? 28.0 : 24.0;
+          final titleFontSize = isTablet ? 20.0 : 16.0;
+          final questionFontSize = isTablet ? 22.0 : 16.0;
+          final descriptionFontSize = isTablet ? 18.0 : 16.0;
+          final optionFontSize = isTablet ? 24.0 : 22.0;
+          final buttonFontSize = isTablet ? 24.0 : 22.0;
+          final horizontalPadding = isTablet ? 32.0 : 24.0;
+          final maxContentWidth = isTablet ? 800.0 : double.infinity;
+
+          return Container(
+            color: Color(0xFFF6F6F6),
             child: Column(
               children: [
-                // Row para colocar el icono "Atrás" a la izquierda y el texto centrado
+                // Header con icono de retroceso y título (fijo)
                 Container(
-                  margin: const EdgeInsets.only(top: 20.0),
+                  margin: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 10),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF6F6F6),
                     boxShadow: [
@@ -475,198 +588,194 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                     ],
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10.0),
-                    child: Center(
-                      child: Text(
-                        'Pregunta ${currentQuestionIndex + 1} de ${questions.length}',
-                        style: TextStyle(
-                          color: const Color(0xFF4320AD),
-                          fontSize: 16,
-                          fontFamily: 'Inter',
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                    padding: EdgeInsets.symmetric(
+                      vertical: 10.0,
+                      horizontal: headerPadding,
                     ),
-                  ),
-                ),
-
-                SizedBox(height: 20), // Espacio entre el encabezado y la pregunta
-
-                if (question['question'] != null) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0), // Espacio a la izquierda y derecha
-                    child: Text(
-                      question['question']!,
-                      textAlign: TextAlign.start, // Alineación ajustada un poco a la izquierda
-                      style: TextStyle(
-                        color: const Color(0xFF4320AD),
-                        fontSize: 18,
-                        fontFamily: 'Inter',
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0), // Espacio a la izquierda y derecha
-                    child: Text(
-                      'Pregunta no disponible',
-                      textAlign: TextAlign.start, // Alineación ajustada un poco a la izquierda
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.red,
-                      ),
-                    ),
-                  ),
-                ],
-
-                if (question['description'] != null) ...[
-                  SizedBox(height: 12), // Margen superior
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0), // Espacio a la izquierda y derecha
-                    child: Text(
-                      question['description']!,
-                      textAlign: TextAlign.start, // Alineación ajustada un poco a la izquierda
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                  ),
-                ],
-
-                SizedBox(height: 20),
-
-                // Opciones de respuesta
-                Column(
-                  children: List.generate(8, (index) {
-                    final optionKey = 'option${index + 1}';
-                    final detailKey = 'detail${index + 1}';
-                    final optionText = question[optionKey];
-                    final optionDetail = question[detailKey];
-
-                    if (optionText == null || optionDetail == null) {
-                      return SizedBox.shrink();
-                    }
-
-                    bool isSelected = selectedOptions[currentQuestionIndex] == (index + 1);
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: GestureDetector(
-                        onTap: () => selectOption(index + 1),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          width: screenWidth - 48, // Ajustar el ancho para que no se recorte
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 32),
-                          decoration: BoxDecoration(
-                            color: isSelected ? Color(0x8E5027D0) : Colors.white,
-                            border: Border.all(
-                              width: 2,
-                              color: Color(0xFF6D4BD8),
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                optionText,
-                                style: TextStyle(
-                                  color: isSelected ? Colors.white : Color(0xFF6D4BD8),
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                    child: Row(
+                      children: [
+                        if (currentQuestionIndex > 0)
+                          GestureDetector(
+                            onTap: goToPreviousQuestion,
+                            child: Container(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Icon(
+                                Icons.arrow_back_ios,
+                                color: Color(0xFF4320AD),
+                                size: iconSize,
                               ),
-                              if (isSelected)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: Text.rich(
-                                    TextSpan(
-                                      children: [
-                                        TextSpan(
-                                          text: "Detalle: ",
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text: optionDetail,
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w400,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ),
-
-                SizedBox(height: 20), // Espacio adicional
-
-                // Botones de navegación (Atrás y Siguiente/Finalizar)
-                // Botones de navegación
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 60),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // ---- ATRÁS ----
-                      if (currentQuestionIndex > 0)
-                        GestureDetector(
-                          onTap: goToPreviousQuestion,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                            decoration: ShapeDecoration(
-                              color: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(80),
-                              ),
-                              shadows: const [
-                                BoxShadow(
-                                  color: Color(0x4C000000),
-                                  blurRadius: 3,
-                                  offset: Offset(0, 2),
-                                  spreadRadius: 0,
-                                ),
-                                BoxShadow(
-                                  color: Color(0x26000000),
-                                  blurRadius: 10,
-                                  offset: Offset(0, 6),
-                                  spreadRadius: 4,
-                                ),
-                              ],
                             ),
-                            child: const Text(
-                              'Atrás',
+                          )
+                        else
+                          SizedBox(width: 40 + (isTablet ? 8 : 0)),
+
+                        Expanded(
+                          child: Center(
+                            child: Text(
+                              'Pregunta ${currentQuestionIndex + 1} de ${questions.length}',
                               style: TextStyle(
-                                color: Colors.black,
-                                fontSize: 22,
+                                color: const Color(0xFF4320AD),
+                                fontSize: titleFontSize,
+                                fontFamily: 'Inter',
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        SizedBox(width: 40 + (isTablet ? 8 : 0)),
+                      ],
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: isTablet ? 30 : 20),
+
+                // Pregunta (fija)
+                Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                    child: Column(
+                      children: [
+                        if (question['question'] != null)
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                            child: Text(
+                              question['question']!,
+                              textAlign: TextAlign.start,
+                              style: TextStyle(
+                                color: const Color(0xFF4320AD),
+                                fontSize: questionFontSize,
                                 fontFamily: 'Inter',
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
-                        )
-                      else
-                        const SizedBox(width: 88), // Espacio vacío cuando no hay más preguntas anteriores
 
-// ---- SIGUIENTE / FINALIZAR ----
-                      Builder(
+                        if (question['description'] != null) ...[
+                          SizedBox(height: isTablet ? 16 : 12),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                            child: Text(
+                              question['description']!,
+                              textAlign: TextAlign.start,
+                              style: TextStyle(
+                                fontSize: descriptionFontSize,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: isTablet ? 30 : 20),
+
+                // Opciones scrolleables
+                Expanded(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: maxContentWidth),
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                        child: Column(
+                          children: List.generate(8, (index) {
+                            final optionKey = 'option${index + 1}';
+                            final detailKey = 'detail${index + 1}';
+                            final optionText = question[optionKey];
+                            final optionDetail = question[detailKey];
+
+                            if (optionText == null || optionDetail == null) {
+                              return SizedBox.shrink();
+                            }
+
+                            bool isSelected = selectedOptions[currentQuestionIndex] == (index + 1);
+
+                            return Padding(
+                              padding: EdgeInsets.symmetric(vertical: isTablet ? 10.0 : 8.0),
+                              child: GestureDetector(
+                                onTap: () => selectOption(index + 1),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 300),
+                                  width: double.infinity,
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: isTablet ? 16 : 12,
+                                    horizontal: isTablet ? 40 : 32,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? Color(0x8E5027D0) : Colors.white,
+                                    border: Border.all(
+                                      width: 2,
+                                      color: Color(0xFF6D4BD8),
+                                    ),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        optionText,
+                                        style: TextStyle(
+                                          color: isSelected ? Colors.white : Color(0xFF6D4BD8),
+                                          fontSize: optionFontSize,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      if (isSelected)
+                                        Padding(
+                                          padding: EdgeInsets.only(top: isTablet ? 12.0 : 8.0),
+                                          child: Text.rich(
+                                            TextSpan(
+                                              children: [
+                                                TextSpan(
+                                                  text: "Detalle: ",
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: isTablet ? 16 : 14,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                TextSpan(
+                                                  text: optionDetail,
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: isTablet ? 16 : 14,
+                                                    fontWeight: FontWeight.w400,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Botón Siguiente/Finalizar (fijo)
+                Container(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    12,
+                    horizontalPadding,
+                    MediaQuery.of(context).padding.bottom + (isTablet ? 30 : 20),
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: maxContentWidth),
+                      child: Builder(
                         builder: (context) {
                           final bool isNextEnabled = selectedOptions[currentQuestionIndex] != 0;
-                          final String nextLabel = currentQuestionIndex < questions.length - 1 ? 'Siguiente' : 'Finalizar';
+                          final String nextLabel = currentQuestionIndex < questions.length - 1 ? 'Siguiente' : 'Continuar';
 
                           return GestureDetector(
                             onTap: isNextEnabled && !isSubmitting
@@ -674,17 +783,13 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                               if (currentQuestionIndex < questions.length - 1) {
                                 goToNextQuestion();
                               } else {
-                                submitTest(); // Llamar a la función que envía el test
+                                submitTest();
                               }
                             }
                                 : null,
                             child: Container(
-                              constraints: BoxConstraints(
-                                minWidth: 120,
-                                maxWidth: 180,
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                              clipBehavior: Clip.antiAlias,
+                              width: double.infinity,
+                              padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 16),
                               decoration: ShapeDecoration(
                                 color: (isNextEnabled && !isSubmitting) ? const Color(0xFF6D4BD8) : const Color(0xFFD7D7D7),
                                 shape: RoundedRectangleBorder(
@@ -698,22 +803,16 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                                     offset: Offset(0, 2),
                                     spreadRadius: 2,
                                   ),
-                                  BoxShadow(
-                                    color: Color(0x4C000000),
-                                    blurRadius: 2,
-                                    offset: Offset(0, 1),
-                                    spreadRadius: 0,
-                                  ),
                                 ]
                                     : const [],
                               ),
                               child: Center(
                                 child: isSubmitting
                                     ? SizedBox(
-                                  width: 20,
-                                  height: 20,
+                                  width: isTablet ? 24 : 20,
+                                  height: isTablet ? 24 : 20,
                                   child: CircularProgressIndicator(
-                                    valueColor: AlwaysStoppedAnimation<Color>( Color(0xFF6D4BD8) ),
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                     strokeWidth: 2,
                                   ),
                                 )
@@ -723,7 +822,7 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                                     color: (isNextEnabled && !isSubmitting)
                                         ? Colors.white
                                         : const Color(0xFF868686),
-                                    fontSize: 22,
+                                    fontSize: buttonFontSize,
                                     fontFamily: 'Inter',
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -733,14 +832,13 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                           );
                         },
                       ),
-                    ],
+                    ),
                   ),
                 ),
-
               ],
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
