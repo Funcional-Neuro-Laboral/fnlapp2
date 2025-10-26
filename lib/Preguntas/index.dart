@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:fnlapp/SharedPreferences/sharedpreference.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fnlapp/config.dart';
+import '../Main/widgets/index_summary.dart';
 import '../Util/api_service.dart';
 
 class IndexScreen extends StatefulWidget {
@@ -58,6 +59,20 @@ class _IndexScreenState extends State<IndexScreen> {
     _loadUserData();
     _loadUserProgress();
     fetchData();
+    _precacheImages();
+  }
+
+  Future<void> _precacheImages() async {
+    await Future.wait([
+      precacheImage(
+        NetworkImage('https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_seguridad.png'),
+        context,
+      ),
+      precacheImage(
+        NetworkImage('https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_espejo.png'),
+        context,
+      ),
+    ]);
   }
 
   Future<void> _loadUserProgress() async {
@@ -762,7 +777,7 @@ class _IndexScreenState extends State<IndexScreen> {
             preguntaTexto = '¿Cuál es tu posición en la organización?';
             break;
           case 4:
-            preguntaTexto = '¿Cuál es tu nivel de responsabilidad?';
+            preguntaTexto = '¿Cuál es tu nivel de responsabilidad en tu organización?';
             break;
           case 5:
             preguntaTexto = '¿A que sede perteneces?';
@@ -886,7 +901,7 @@ class _IndexScreenState extends State<IndexScreen> {
                       final bool isNextEnabled = selectedOption != null ||
                           selectedAnswers.containsKey(currentQuestionIndex);
                       final String nextLabel =
-                      currentQuestionIndex < 5 ? 'Siguiente' : 'Finalizar';
+                      currentQuestionIndex < 5 ? 'Siguiente' : 'Continuar';
 
                       return GestureDetector(
                         onTap: isNextEnabled
@@ -894,7 +909,18 @@ class _IndexScreenState extends State<IndexScreen> {
                           if (currentQuestionIndex < 5) {
                             goToNextQuestion();
                           } else {
-                            saveResponses();
+                            // Navegar a la pantalla de resumen
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => IndexSummaryScreen(
+                                  onFinalize: saveResponses,
+                                  onBack: () {
+                                    Navigator.pop(context); // Retroceder a la pantalla de preguntas
+                                  },
+                                ),
+                              ),
+                            );
                           }
                         }
                             : null,
