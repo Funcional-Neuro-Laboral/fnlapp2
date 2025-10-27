@@ -18,7 +18,10 @@ class ChatBoxFooter extends StatelessWidget {
           // Campo de texto expandido
           Expanded(
             child: Container(
-              height: 44,
+              constraints: BoxConstraints(
+                minHeight: 50,
+                maxHeight: 120,
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: ShapeDecoration(
                 color: const Color(0xFFF8F7FD),
@@ -47,9 +50,10 @@ class ChatBoxFooter extends StatelessWidget {
                   contentPadding: EdgeInsets.zero,
                   isDense: true,
                 ),
-                maxLines: null,
+                maxLines: 5, // Máximo de líneas visibles
                 minLines: 1,
-                textInputAction: TextInputAction.send,
+                keyboardType: TextInputType.multiline,
+                textInputAction: TextInputAction.newline,
                 onSubmitted: (message) {
                   String trimmedMessage = message.trim();
                   if (trimmedMessage.isNotEmpty) {
