@@ -174,26 +174,26 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                       const Spacer(flex: 2),
 
                       // Título "Funcy"
-                      const Text(
+                      Text(
                         'Funcy',
                         style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
+                          fontSize: screenWidth * 0.09, // Responsivo
+                          fontWeight: FontWeight.w700,
                           color: Colors.white,
-                          fontFamily: 'Inter',
+                          fontFamily: 'Poppins',
                         ),
                       ),
 
                       SizedBox(height: screenHeight * 0.01),
 
                       // Subtítulo
-                      const Text(
-                        'Tu consejero emocional',
+                      Text(
+                        'Un momento para ti',
                         style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w600,
+                          fontSize: screenWidth * 0.06, // Responsivo
+                          fontWeight: FontWeight.w700,
                           color: Colors.white,
-                          fontFamily: 'Inter',
+                          fontFamily: 'Poppins',
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -213,6 +213,42 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                             color: Colors.white,
                           );
                         },
+                      ),
+
+                      SizedBox(height: screenHeight * 0.02),
+
+                      // Nuevo texto descriptivo
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02),
+                        child: Stack(
+                          children: [
+                            // Contorno blanco
+                            Text(
+                              'Tu compañero para entender, cuidar y equilibrar tus emociones.',
+                              style: TextStyle(
+                                fontSize: screenWidth * 0.06,
+                                fontWeight: FontWeight.w900,
+                                fontFamily: 'Inter',
+                                foreground: Paint()
+                                  ..style = PaintingStyle.stroke
+                                  ..strokeWidth = 3
+                                  ..color = const Color(0xFF6D4BD8),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            // Relleno morado
+                            Text(
+                              'Tu compañero para entender, cuidar y equilibrar tus emociones.',
+                              style: TextStyle(
+                                fontSize: screenWidth * 0.06,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                fontFamily: 'Inter',
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
                       ),
 
                       const Spacer(flex: 3),
@@ -235,10 +271,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                             ),
                             elevation: 4,
                           ),
-                          child: const Text(
+                          child: Text(
                             'Empezar',
                             style: TextStyle(
-                              fontSize: 22,
+                              fontSize: screenWidth * 0.05, // Responsivo
                               fontWeight: FontWeight.w600,
                               fontFamily: 'Inter',
                             ),
