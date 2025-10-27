@@ -158,6 +158,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     _buildFeaturesList(size),
                     SizedBox(height: size.height * 0.04),
                     _buildSubscribeButton(size, isDesktop),
+                    SizedBox(height: size.height * 0.06), // Espacio adicional al final
                   ],
                 ),
               ),
