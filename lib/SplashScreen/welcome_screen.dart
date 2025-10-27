@@ -74,8 +74,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 begin: Alignment(0.50, -0.00),
                 end: Alignment(0.50, 1.00),
                 colors: [
-                  Color(0xFF5027D0),
-                  Color(0xFFC6BEE0),
+                  Color(0xC24320AD),
+                  Color(0xFFFDFCFF),
                 ],
               ),
             ),
@@ -173,23 +173,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                     children: [
                       const Spacer(flex: 2),
 
-                      // Imagen centrada
-                      Image.network(
-                        'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_bienvenida.png',
-                        width: screenWidth * 0.6,
-                        height: screenHeight * 0.4,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Icon(
-                            Icons.image_not_supported,
-                            size: screenWidth * 0.5,
-                            color: Colors.white,
-                          );
-                        },
-                      ),
-
-                      SizedBox(height: screenHeight * 0.04),
-
                       // Título "Funcy"
                       const Text(
                         'Funcy',
@@ -213,6 +196,23 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                           fontFamily: 'Inter',
                         ),
                         textAlign: TextAlign.center,
+                      ),
+
+                      SizedBox(height: screenHeight * 0.04),
+
+                      // Imagen centrada
+                      Image.network(
+                        'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_bienvenida.png',
+                        width: screenWidth * 0.5,
+                        height: screenHeight * 0.4,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(
+                            Icons.image_not_supported,
+                            size: screenWidth * 0.5,
+                            color: Colors.white,
+                          );
+                        },
                       ),
 
                       const Spacer(flex: 3),
@@ -249,6 +249,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                       SizedBox(height: screenHeight * 0.04),
                     ],
                   ),
+
                 ),
               ),
             ),
