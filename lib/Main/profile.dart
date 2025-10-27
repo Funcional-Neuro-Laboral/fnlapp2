@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:fnlapp/Main/subscription_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../Util/token_service.dart';
@@ -278,7 +279,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
 
-                SizedBox(height: size.height * 0.04),
+                SizedBox(height: size.height * 0.02),
 
                 // Contenido centrado con ancho máximo
                 Center(
@@ -291,9 +292,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _buildProfileImage(size),
                         SizedBox(height: size.height * 0.03),
                         _buildUserName(size),
-                        SizedBox(height: size.height * 0.04),
+                        SizedBox(height: size.height * 0.03),
                         _buildInfoGrid(size, isTablet, isDesktop),
-                        SizedBox(height: size.height * 0.05),
+                        SizedBox(height: size.height * 0.04),
+                        _buildSubscribeButton(size, isDesktop),
+                        SizedBox(height: size.height * 0.02),
                         _buildLogoutButton(size, isDesktop),
                         SizedBox(height: size.height * 0.03),
                       ],
@@ -590,6 +593,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
             fontSize: fontSize,
             fontWeight: FontWeight.w500,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubscribeButton(Size size, bool isDesktop) {
+    final buttonPadding = size.width < 400 ? 14.0 : size.width < 600 ? 16.0 : 18.0;
+    final fontSize = size.width < 400 ? 16.0 : size.width < 600 ? 16.0 : 18.0;
+
+    return Container(
+      width: double.infinity,
+      constraints: BoxConstraints(
+        maxWidth: isDesktop ? 400 : size.width * 0.8,
+      ),
+      child: ElevatedButton.icon(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => SubscriptionScreen()),
+          );
+        },
+        label: Text(
+          'Suscríbete',
+          style: GoogleFonts.inter(
+            fontSize: fontSize,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Color(0xFF4320AD),
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.symmetric(
+            horizontal: size.width < 400 ? 24 : 32,
+            vertical: buttonPadding,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(40),
+          ),
+          elevation: 4,
         ),
       ),
     );
