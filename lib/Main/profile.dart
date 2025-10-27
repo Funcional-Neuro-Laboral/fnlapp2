@@ -262,6 +262,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: const Color(0xFFF7F4F4),
       body: SafeArea(
         child: SingleChildScrollView(
+          padding: EdgeInsets.only(bottom: 110),
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
             child: Column(
