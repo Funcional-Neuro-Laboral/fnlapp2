@@ -6,6 +6,7 @@ import 'package:fnlapp/Main/step_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:fnlapp/Main/testestres_form.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../Util/translations.dart';
 
 // Constantes
 class AppConstants {
@@ -709,7 +710,7 @@ class _PlanScreenState extends State<PlanScreen> {
     return Row(
       children: [
         Text(
-          programa.tipoTecnica,
+          traducirTipoTecnica(programa.tipoTecnica),
           style: const TextStyle(
             color: AppColors.textPrimary,
             fontSize: 13,

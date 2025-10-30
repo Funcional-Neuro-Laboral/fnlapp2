@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../Util/translations.dart';
 import '../config.dart';
 import 'completed_dia_screen.dart';
 import 'dart:async';
@@ -704,7 +705,7 @@ class _StepScreenState extends State<StepScreen> {
                         SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            widget.tecnicaTipo,
+                            traducirTipoTecnica(widget.tecnicaTipo),
                             style: TextStyle(
                               color: const Color(0xFF212121),
                               fontSize: dimensions.fontSize * 0.85,
