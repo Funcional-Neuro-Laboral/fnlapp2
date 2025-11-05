@@ -216,7 +216,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       MaterialPageRoute(
         builder: (context) => TestCompletionScreen(
           onFinalize: _processTestSubmission,
-          onBack: () => Navigator.of(context).pop(),
         ),
       ),
     );
@@ -563,7 +562,7 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
           final iconSize = isTablet ? 28.0 : 24.0;
           final titleFontSize = isTablet ? 20.0 : 16.0;
           final questionFontSize = isTablet ? 22.0 : 16.0;
-          final descriptionFontSize = isTablet ? 18.0 : 16.0;
+          final descriptionFontSize = isTablet ? 19.0 : 16.0;
           final optionFontSize = isTablet ? 24.0 : 22.0;
           final buttonFontSize = isTablet ? 24.0 : 22.0;
           final horizontalPadding = isTablet ? 32.0 : 24.0;
