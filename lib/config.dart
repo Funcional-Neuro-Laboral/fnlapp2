@@ -9,6 +9,11 @@ class Config {
   //static const String imagenesUrl = 'http://localhost:3000/api';
   //static const String wsUrl = 'ws://127.0.0.1:8000/ws';
 
+  //static const String apiUrl = 'http://10.0.2.2:3000/api';
+  //static const String apiUrl2 = 'http://10.0.2.2:8000/api';
+  //static const String imagenesUrl = 'http://10.0.2.2:3000/api';
+  //static const String wsUrl = 'ws://10.0.2.2:8000/ws';
+
   static const String apiUrl = 'https://funcyfnl.ddns.net/api';
   static const String apiUrl2 = 'https://funcyfnl.ddns.net/api';
   static const String imagenesUrl = 'https://funcyfnl.ddns.net/api';

@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../Util/token_service.dart';
 import 'models/profile_data.dart';
+import 'models/subscription_data.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config.dart';
@@ -33,8 +34,117 @@ class _ProfileScreenState extends State<ProfileScreen> {
   File? _selectedImage;
   Uint8List? _selectedImageBytes;
   final ImagePicker _picker = ImagePicker();
+  SubscriptionData? _subscriptionData;
+  bool _loadingSubscription = true;
 
-  // Mantén todos los métodos existentes (_uploadProfileImage, _reloadProfileFromServer, etc.)
+  @override
+  void initState() {
+    super.initState();
+    _loadSubscriptionData();
+  }
+
+  // ========== MÉTODOS DE SUSCRIPCIÓN ==========
+
+  Future<void> _loadSubscriptionData() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      if (token == null) {
+        throw Exception('No se pudo obtener el token');
+      }
+
+      final response = await http.get(
+        Uri.parse('${Config.apiUrl2}/subscriptions/current'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        setState(() {
+          _subscriptionData = SubscriptionData.fromJson(jsonData);
+          _loadingSubscription = false;
+        });
+      } else {
+        throw Exception('Error al cargar suscripción');
+      }
+    } catch (e) {
+      print('Error al cargar datos de suscripción: $e');
+      setState(() {
+        _loadingSubscription = false;
+      });
+    }
+  }
+
+  Future<void> _cancelSubscription() async {
+    final confirmed = await _showCancelDialog();
+    if (confirmed != true) return;
+
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      final response = await http.post(
+        Uri.parse('${Config.apiUrl2}/subscriptions/cancel'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        await _loadSubscriptionData();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Suscripción cancelada exitosamente'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Error al cancelar suscripción');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cancelar suscripción'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<bool?> _showCancelDialog() {
+    return showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Cancelar suscripción'),
+          content: Text('¿Estás seguro de que deseas cancelar tu suscripción Funcy PRO?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('No'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: Text('Sí, cancelar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ========== MÉTODOS DE IMAGEN DE PERFIL ==========
+
   Future<void> _uploadProfileImage() async {
     if (_selectedImage == null && _selectedImageBytes == null) {
       return;
@@ -67,8 +177,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _selectedImageBytes![3] == 0x47) {
             filename = 'profile_image.png';
             contentType = 'image/png';
-          }
-          else if (_selectedImageBytes![0] == 0xFF &&
+          } else if (_selectedImageBytes![0] == 0xFF &&
               _selectedImageBytes![1] == 0xD8 &&
               _selectedImageBytes![2] == 0xFF) {
             contentType = 'image/jpeg';
@@ -159,13 +268,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       String url = '${Config.apiUrl2}/users/getprofile/$userId';
       final response = await http.get(
-          Uri.parse(url),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-          }
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
       );
 
       if (response.statusCode == 200) {
@@ -221,7 +330,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         await _uploadProfileImage();
       }
     } catch (e) {
-      // Error handling
+      print('Error al seleccionar imagen: $e');
     }
   }
 
@@ -251,6 +360,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  ImageProvider? _getImageProvider() {
+    if (kIsWeb && _selectedImageBytes != null) {
+      return MemoryImage(_selectedImageBytes!);
+    } else if (!kIsWeb && _selectedImage != null) {
+      return FileImage(_selectedImage!);
+    } else if (widget.profileData?.profileImage != null) {
+      return NetworkImage(
+        widget.profileData!.profileImage!,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      );
+    }
+    return null;
+  }
+
+  // ========== DIÁLOGO DE LOGOUT ==========
+
+  Future<bool?> _showLogoutDialog() async {
+    return showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Cerrar sesión'),
+          content: Text('¿Deseas cerrar sesión en todos tus dispositivos?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('Solo este dispositivo'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text('Todos los dispositivos'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ========== BUILD PRINCIPAL ==========
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -269,8 +426,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(height: size.height * 0.05),
-
-                // Título responsivo
                 Text(
                   'Perfil',
                   style: GoogleFonts.inter(
@@ -279,10 +434,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-
                 SizedBox(height: size.height * 0.02),
-
-                // Contenido centrado con ancho máximo
                 Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
@@ -293,10 +445,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _buildProfileImage(size),
                         SizedBox(height: size.height * 0.03),
                         _buildUserName(size),
+                        SizedBox(height: size.height * 0.02),
+                        _buildSubscriptionBadge(size),
                         SizedBox(height: size.height * 0.03),
                         _buildInfoGrid(size, isTablet, isDesktop),
                         SizedBox(height: size.height * 0.04),
-                        _buildSubscribeButton(size, isDesktop),
+                        _buildSubscriptionButton(size, isDesktop),
                         SizedBox(height: size.height * 0.02),
                         _buildLogoutButton(size, isDesktop),
                         SizedBox(height: size.height * 0.03),
@@ -311,6 +465,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+
+  // ========== WIDGETS DE UI ==========
 
   Widget _buildProfileImage(Size size) {
     final imageSize = size.width < 400 ? 125.0 : size.width < 600 ? 140.0 : 160.0;
@@ -358,24 +514,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  ImageProvider? _getImageProvider() {
-    if (kIsWeb && _selectedImageBytes != null) {
-      return MemoryImage(_selectedImageBytes!);
-    } else if (!kIsWeb && _selectedImage != null) {
-      return FileImage(_selectedImage!);
-    } else if (widget.profileData?.profileImage != null) {
-      return NetworkImage(
-        widget.profileData!.profileImage!,
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-        },
-      );
-    }
-    return null;
-  }
-
   Widget _buildUserName(Size size) {
     return Text(
       "${widget.profileData?.nombres ?? 'Usuario'} ${widget.profileData?.apellidos ?? ''}",
@@ -384,6 +522,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
         color: const Color(0xFF212121),
         fontSize: size.width < 400 ? 20.0 : size.width < 600 ? 24.0 : 28.0,
         fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
+  Widget _buildSubscriptionBadge(Size size) {
+    if (_loadingSubscription) {
+      return SizedBox(
+        height: 30,
+        width: 30,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+
+    final isPro = _subscriptionData?.isPro ?? false;
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: size.width < 400 ? 12 : 16,
+        vertical: size.width < 400 ? 6 : 8,
+      ),
+      decoration: BoxDecoration(
+        gradient: isPro
+            ? LinearGradient(
+          colors: [Color(0xFF52178F), Color(0xFFA88BC7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        )
+            : null,
+        color: isPro ? null : Colors.grey.shade300,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: isPro
+            ? [
+          BoxShadow(
+            color: Color(0xFF8A67C8).withOpacity(0.3),
+            blurRadius: 8,
+            offset: Offset(0, 4),
+          ),
+        ]
+            : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isPro ? Icons.workspace_premium : Icons.account_circle,
+            color: Colors.white,
+            size: size.width < 400 ? 16 : 18,
+          ),
+          SizedBox(width: 6),
+          Text(
+            isPro ? 'Funcy PRO' : 'Plan FREE',
+            style: GoogleFonts.inter(
+              color: Colors.white,
+              fontSize: size.width < 400 ? 13 : 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -408,33 +604,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildDesktopLayout(double cardSpacing, Size size) {
     return Row(
       children: [
-        Expanded(child: _buildInfoCard(
-          icon: Icons.email_outlined,
-          title: 'ID',
-          value: widget.profileData?.username ?? 'No disponible',
-          size: size,
-        )),
+        Expanded(
+          child: _buildInfoCard(
+            icon: Icons.email_outlined,
+            title: 'ID',
+            value: widget.profileData?.username ?? 'No disponible',
+            size: size,
+          ),
+        ),
         SizedBox(width: cardSpacing),
-        Expanded(child: _buildInfoCard(
-          icon: Icons.female,
-          title: 'Género',
-          value: widget.profileData?.gender ?? 'No disponible',
-          size: size,
-        )),
+        Expanded(
+          child: _buildInfoCard(
+            icon: Icons.female,
+            title: 'Género',
+            value: widget.profileData?.gender ?? 'No disponible',
+            size: size,
+          ),
+        ),
         SizedBox(width: cardSpacing),
-        Expanded(child: _buildInfoCard(
-          icon: Icons.person,
-          title: 'Puesto',
-          value: widget.profileData?.hierarchicalLevel ?? 'No disponible',
-          size: size,
-        )),
+        Expanded(
+          child: _buildInfoCard(
+            icon: Icons.person,
+            title: 'Puesto',
+            value: widget.profileData?.hierarchicalLevel ?? 'No disponible',
+            size: size,
+          ),
+        ),
         SizedBox(width: cardSpacing),
-        Expanded(child: _buildInfoCard(
-          icon: Icons.business_outlined,
-          title: 'Centro',
-          value: widget.profileData?.nombreEmpresa ?? 'No disponible',
-          size: size,
-        )),
+        Expanded(
+          child: _buildInfoCard(
+            icon: Icons.business_outlined,
+            title: 'Centro',
+            value: widget.profileData?.nombreEmpresa ?? 'No disponible',
+            size: size,
+          ),
+        ),
       ],
     );
   }
@@ -444,37 +648,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         Row(
           children: [
-            Expanded(child: _buildInfoCard(
-              icon: Icons.email_outlined,
-              title: 'ID',
-              value: widget.profileData?.username ?? 'No disponible',
-              size: size,
-            )),
+            Expanded(
+              child: _buildInfoCard(
+                icon: Icons.email_outlined,
+                title: 'ID',
+                value: widget.profileData?.username ?? 'No disponible',
+                size: size,
+              ),
+            ),
             SizedBox(width: cardSpacing),
-            Expanded(child: _buildInfoCard(
-              icon: Icons.female,
-              title: 'Género',
-              value: widget.profileData?.gender ?? 'No disponible',
-              size: size,
-            )),
+            Expanded(
+              child: _buildInfoCard(
+                icon: Icons.female,
+                title: 'Género',
+                value: widget.profileData?.gender ?? 'No disponible',
+                size: size,
+              ),
+            ),
           ],
         ),
         SizedBox(height: cardSpacing),
         Row(
           children: [
-            Expanded(child: _buildInfoCard(
-              icon: Icons.person,
-              title: 'Puesto',
-              value: widget.profileData?.hierarchicalLevel ?? 'No disponible',
-              size: size,
-            )),
+            Expanded(
+              child: _buildInfoCard(
+                icon: Icons.person,
+                title: 'Puesto',
+                value: widget.profileData?.hierarchicalLevel ?? 'No disponible',
+                size: size,
+              ),
+            ),
             SizedBox(width: cardSpacing),
-            Expanded(child: _buildInfoCard(
-              icon: Icons.business_outlined,
-              title: 'Centro',
-              value: widget.profileData?.nombreEmpresa ?? 'No disponible',
-              size: size,
-            )),
+            Expanded(
+              child: _buildInfoCard(
+                icon: Icons.business_outlined,
+                title: 'Centro',
+                value: widget.profileData?.nombreEmpresa ?? 'No disponible',
+                size: size,
+              ),
+            ),
           ],
         ),
       ],
@@ -497,13 +709,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(size.width < 600 ? 10 : 12),
-        boxShadow: size.width >= 600 ? [
+        boxShadow: size.width >= 600
+            ? [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
-        ] : null,
+        ]
+            : null,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -553,6 +767,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildSubscriptionButton(Size size, bool isDesktop) {
+    if (_loadingSubscription) {
+      return SizedBox(
+        height: 50,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final isPro = _subscriptionData?.isPro ?? false;
+    final buttonPadding = size.width < 400 ? 14.0 : size.width < 600 ? 16.0 : 18.0;
+    final fontSize = size.width < 400 ? 16.0 : size.width < 600 ? 16.0 : 18.0;
+
+    return Container(
+      width: double.infinity,
+      constraints: BoxConstraints(
+        maxWidth: isDesktop ? 400 : size.width * 0.8,
+      ),
+      child: ElevatedButton.icon(
+        onPressed: isPro
+            ? _cancelSubscription
+            : () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => SubscriptionScreen()),
+          );
+          if (result == true) {
+            await _loadSubscriptionData();
+          }
+        },
+        icon: Icon(
+          isPro ? Icons.cancel : Icons.workspace_premium,
+          size: size.width < 400 ? 18 : 20,
+        ),
+        label: Text(
+          isPro ? 'Cancelar suscripción' : 'Suscríbete a Funcy PRO',
+          style: GoogleFonts.inter(
+            fontSize: fontSize,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isPro ? Colors.red : Color(0xFF4320AD),
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.symmetric(
+            horizontal: size.width < 400 ? 24 : 32,
+            vertical: buttonPadding,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(40),
+          ),
+          elevation: 4,
+        ),
+      ),
+    );
+  }
+
   Widget _buildLogoutButton(Size size, bool isDesktop) {
     final buttonPadding = size.width < 400 ? 14.0 : size.width < 600 ? 16.0 : 18.0;
     final fontSize = size.width < 400 ? 16.0 : size.width < 600 ? 16.0 : 18.0;
@@ -596,71 +866,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildSubscribeButton(Size size, bool isDesktop) {
-    final buttonPadding = size.width < 400 ? 14.0 : size.width < 600 ? 16.0 : 18.0;
-    final fontSize = size.width < 400 ? 16.0 : size.width < 600 ? 16.0 : 18.0;
-
-    return Container(
-      width: double.infinity,
-      constraints: BoxConstraints(
-        maxWidth: isDesktop ? 400 : size.width * 0.8,
-      ),
-      child: ElevatedButton.icon(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => SubscriptionScreen()),
-          );
-        },
-        label: Text(
-          'Suscríbete',
-          style: GoogleFonts.inter(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Color(0xFF4320AD),
-          foregroundColor: Colors.white,
-          padding: EdgeInsets.symmetric(
-            horizontal: size.width < 400 ? 24 : 32,
-            vertical: buttonPadding,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(40),
-          ),
-          elevation: 4,
-        ),
-      ),
-    );
-  }
-
-  Future<bool?> _showLogoutDialog() async {
-    return showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Cerrar sesión'),
-          content: Text('¿Deseas cerrar sesión en todos tus dispositivos?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Solo este dispositivo'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text('Todos los dispositivos'),
-            ),
-          ],
-        );
-      },
     );
   }
 }
