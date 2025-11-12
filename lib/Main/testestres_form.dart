@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fnlapp/Main/models/test_notice.dart';
+import 'package:fnlapp/Main/subscription_screen.dart';
 import 'package:fnlapp/Main/widgets/test_completion_screen.dart';
 import 'package:fnlapp/Main/widgets/test_notice_dialog.dart';
 import 'package:fnlapp/Util/enums.dart';
@@ -9,9 +10,12 @@ import 'package:fnlapp/SharedPreferences/sharedpreference.dart';
 import 'package:fnlapp/Main/cargarprograma.dart';
 import 'package:fnlapp/config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../Preguntas/index.dart';
 import '../Preguntas/questions_data.dart';
 import 'package:fnlapp/Main/home.dart';
+import '../Util/api_service.dart';
 import '../Util/test_notices_data.dart';
+import '../services/subscription_service.dart';
 
 class TestEstresQuestionScreen extends StatefulWidget {
   const TestEstresQuestionScreen({Key? key}) : super(key: key);
@@ -252,10 +256,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         return;
       }
 
-      final saveTestUrl = Uri.parse(
-          '${Config.apiUrl2}/stress-test/save'); // Nueva API
-      final updateEstresUrl = Uri.parse('${Config
-          .apiUrl2}/users/$userId/estres-level'); // Actualizar estres_nivel_id
+      final saveTestUrl = Uri.parse('${Config.apiUrl2}/stress-test/save');
+      final updateEstresUrl = Uri.parse('${Config.apiUrl2}/users/$userId/estres-level');
 
       // Calcular el puntaje total
       int totalScore = selectedOptions.fold(0, (sum, value) => sum + value);
@@ -268,12 +270,10 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       }
 
       // Obtener gender_id desde el perfil
-      int genderId = _getGenderIdFromProfile(
-          userProfile['gender'] ?? 'Masculino');
+      int genderId = _getGenderIdFromProfile(userProfile['gender'] ?? 'Masculino');
 
       // Calcular el nivel de estrés y su ID
-      final Map<String, dynamic> estresResult =
-      _calcularNivelEstres(totalScore, genderId);
+      final Map<String, dynamic> estresResult = _calcularNivelEstres(totalScore, genderId);
       NivelEstres nivelEstres = estresResult['nivel'];
       int estresNivelId = estresResult['id'];
 
@@ -327,8 +327,7 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         );
 
         if (updateResponse.statusCode != 200) {
-          print(
-              'Error al actualizar el estres_nivel_id: ${updateResponse.body}');
+          print('Error al actualizar el estres_nivel_id: ${updateResponse.body}');
           return;
         }
 
@@ -342,12 +341,12 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => HomeScreen()),
-              (Route<
-              dynamic> route) => false, // Elimina todas las rutas anteriores
+              (Route<dynamic> route) => false, // Elimina todas las rutas anteriores
         );
 
         return;
       } else {
+        // Test de entrada
         final updateData = {
           'estres_level': estresNivelId,
           'type': 'initial',
@@ -368,20 +367,67 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
 
         print('Registro de nivel de estrés creado correctamente.');
 
-        // Generar programa usando la nueva API
-        await _generateProgram(userProfile, totalScore);
+        // Verificar acceso a programas antes de generar
+        final hasAccess = await SubscriptionService.hasAccessToPrograms();
 
-        // Actualizar testestresbool a true solo en el primer test
-        await _updateTestEstresBool();
+        if (!hasAccess) {
+          // Usuario no tiene acceso, mostrar diálogo de suscripción
+          final shouldNavigate = await _showSubscriptionDialog();
 
-        // Navegar a la pantalla de programa de estrés para test de entrada
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) =>
-                CargarProgramaScreen(nivelEstres: nivelEstres),
-          ),
-        );
+          if (shouldNavigate == true) {
+            // Usuario eligió suscribirse, navegar a pantalla de suscripción
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SubscriptionScreen(showBackButton: false),
+              ),
+            );
+
+            if (result == true) {
+              // Suscripción exitosa, generar programa
+              await _generateProgram(userProfile, totalScore);
+              await _updateTestEstresBool();
+
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CargarProgramaScreen(nivelEstres: nivelEstres),
+                ),
+              );
+            } else {
+              // No se completó la suscripción, volver a index
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => IndexScreen(
+                  username: '',
+                  apiServiceWithToken: ApiService(),
+                )),
+                    (Route<dynamic> route) => false,
+              );
+            }
+          } else {
+            // Usuario canceló, volver a index
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => IndexScreen(
+                username: '',
+                apiServiceWithToken: ApiService(),
+              )),
+                  (Route<dynamic> route) => false,
+            );
+          }
+        } else {
+          // Usuario tiene acceso (ya suscrito)
+          await _generateProgram(userProfile, totalScore);
+          await _updateTestEstresBool();
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CargarProgramaScreen(nivelEstres: nivelEstres),
+            ),
+          );
+        }
       }
     } catch (e) {
       print('Error al procesar el test: $e');
@@ -394,6 +440,38 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         isSubmitting = false;
       });
     }
+  }
+
+  Future<bool?> _showSubscriptionDialog() {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.workspace_premium, color: Color(0xFF5027D0)),
+              SizedBox(width: 8),
+              Text('Funcy PRO'),
+            ],
+          ),
+          content: Text(
+            'Para obtener tu programa personalizado de 30 dias, debes suscribirte a Funcy PRO.\n\n¿Deseas suscribirte ahora?',
+            style: TextStyle(fontSize: 16),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF5027D0),
+                foregroundColor: Colors.white,
+              ),
+              child: Text('Suscribirme'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // Función para calcular el nivel de estrés

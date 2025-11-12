@@ -40,18 +40,23 @@ class RouteWrapper extends StatelessWidget {
         }
 
         if (routeName == '/index') {
+          // Si ya completó todo, ir a home
           if (permisopoliticas && userresponsebool && testestresbool) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               Navigator.pushReplacementNamed(context, '/home');
             });
             return const SizedBox();
-          } else if (!permisopoliticas || !userresponsebool) {
+          }
+          // Si falta el test de estrés, ir al test
+          else if (permisopoliticas && userresponsebool && !testestresbool) {
+            return TestEstresQuestionScreen();
+          }
+          // Si faltan políticas o respuestas iniciales, ir al index
+          else {
             return IndexScreen(
               username: 'username',
               apiServiceWithToken: ApiService(),
             );
-          } else {
-            return TestEstresQuestionScreen();
           }
         }
 
