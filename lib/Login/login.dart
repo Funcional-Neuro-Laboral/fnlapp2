@@ -383,6 +383,36 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ),
                                       ),
                                     ),
+                                    SizedBox(height: 16),
+
+                                    // Enlace para ir a registro
+                                    Center(
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          Navigator.pushReplacementNamed(context, '/register');
+                                        },
+                                        child: RichText(
+                                          text: TextSpan(
+                                            style: TextStyle(
+                                              color: const Color(0xFF333333),
+                                              fontSize: 14,
+                                              fontFamily: 'Inter',
+                                            ),
+                                            children: [
+                                              TextSpan(text: '¿No tienes cuenta? '),
+                                              TextSpan(
+                                                text: 'Regístrate',
+                                                style: TextStyle(
+                                                  color: const Color(0xFF290B47),
+                                                  fontWeight: FontWeight.w600,
+                                                  decoration: TextDecoration.underline,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
 
                                   ],
                                 ),

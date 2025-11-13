@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:fnlapp/Login/login.dart';
+import 'package:fnlapp/Login/register.dart';
 import 'package:fnlapp/Preguntas/index.dart';
 import 'package:fnlapp/Main/cargarprograma.dart';
 import 'package:fnlapp/Main/home.dart';
 import '../Util/api_service.dart';
 import 'package:fnlapp/SplashScreen/splashscreen.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'SplashScreen/welcome_screen.dart';
@@ -46,6 +46,7 @@ class MyApp extends StatelessWidget {
         '/': (context) => const SplashScreen(),
         '/welcome': (context) => const WelcomeScreen(),
         '/login': (context) => LoginScreen(),
+        '/register': (context) => RegisterScreen(),
         '/home': (context) => HomeScreen(),
         // IndexScreen necesita parámetros, así que lo manejamos de esta forma
         '/index': (context) => IndexScreen(
