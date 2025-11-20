@@ -51,8 +51,8 @@ android {
         // Flutter-specific configurations for SDK versions
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = 26
-        versionName = "3.2.0"
+        versionCode = 27
+        versionName = "3.3.0"
     }
 
 
