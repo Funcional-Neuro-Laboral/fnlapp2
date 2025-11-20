@@ -527,6 +527,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildSubscriptionBadge(Size size) {
+    // Verificar si el usuario es de company_id 8
+    int? companyId = widget.profileData?.idEmpresa;
+    
+    // Si NO es company_id 8, no mostrar el badge
+    if (companyId != 8) {
+      return SizedBox.shrink();
+    }
+
     if (_loadingSubscription) {
       return SizedBox(
         height: 30,
@@ -768,6 +776,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildSubscriptionButton(Size size, bool isDesktop) {
+    // Verificar si el usuario es de company_id 8
+    int? companyId = widget.profileData?.idEmpresa;
+    
+    // Si NO es company_id 8, no mostrar el botón
+    if (companyId != 8) {
+      return SizedBox.shrink();
+    }
+
     if (_loadingSubscription) {
       return SizedBox(
         height: 50,

@@ -87,6 +87,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) {
     purchaseDetailsList.forEach((PurchaseDetails purchaseDetails) async {
+      print("🔥🔥🔥 PURCHASE DETECTED 🔥🔥🔥");
+      print("Product ID: ${purchaseDetails.productID}");
+      print("Purchase ID: ${purchaseDetails.purchaseID}");
+      print("Server Verification Data: ${purchaseDetails.verificationData.serverVerificationData}");
+      print("Source: ${purchaseDetails.verificationData.source}");
+      print("Status: ${purchaseDetails.status}");
+
       if (purchaseDetails.status == PurchaseStatus.pending) {
         _showPendingUI();
       } else if (purchaseDetails.status == PurchaseStatus.error) {

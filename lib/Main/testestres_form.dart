@@ -367,35 +367,50 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
 
         print('Registro de nivel de estrés creado correctamente.');
 
-        // Verificar acceso a programas antes de generar
-        final hasAccess = await SubscriptionService.hasAccessToPrograms();
+        // Obtener company_id del perfil del usuario
+        int? companyId = userProfile['company_id'] ?? userProfile['id_empresa'];
 
-        if (!hasAccess) {
-          // Usuario no tiene acceso, mostrar diálogo de suscripción
-          final shouldNavigate = await _showSubscriptionDialog();
+        // Verificar acceso a programas SOLO si company_id == 8
+        if (companyId == 8) {
+          final hasAccess = await SubscriptionService.hasAccessToPrograms();
 
-          if (shouldNavigate == true) {
-            // Usuario eligió suscribirse, navegar a pantalla de suscripción
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => SubscriptionScreen(showBackButton: false),
-              ),
-            );
+          if (!hasAccess) {
+            // Usuario no tiene acceso, mostrar diálogo de suscripción
+            final shouldNavigate = await _showSubscriptionDialog();
 
-            if (result == true) {
-              // Suscripción exitosa, generar programa
-              await _generateProgram(userProfile, totalScore);
-              await _updateTestEstresBool();
-
-              Navigator.pushReplacement(
+            if (shouldNavigate == true) {
+              // Usuario eligió suscribirse, navegar a pantalla de suscripción
+              final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => CargarProgramaScreen(nivelEstres: nivelEstres),
+                  builder: (context) => SubscriptionScreen(showBackButton: false),
                 ),
               );
+
+              if (result == true) {
+                // Suscripción exitosa, generar programa
+                await _generateProgram(userProfile, totalScore);
+                await _updateTestEstresBool();
+
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CargarProgramaScreen(nivelEstres: nivelEstres),
+                  ),
+                );
+              } else {
+                // No se completó la suscripción, volver a index
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => IndexScreen(
+                    username: '',
+                    apiServiceWithToken: ApiService(),
+                  )),
+                      (Route<dynamic> route) => false,
+                );
+              }
             } else {
-              // No se completó la suscripción, volver a index
+              // Usuario canceló, volver a index
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (context) => IndexScreen(
@@ -406,18 +421,19 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
               );
             }
           } else {
-            // Usuario canceló, volver a index
-            Navigator.pushAndRemoveUntil(
+            // Usuario tiene acceso (ya suscrito)
+            await _generateProgram(userProfile, totalScore);
+            await _updateTestEstresBool();
+
+            Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => IndexScreen(
-                username: '',
-                apiServiceWithToken: ApiService(),
-              )),
-                  (Route<dynamic> route) => false,
+              MaterialPageRoute(
+                builder: (context) => CargarProgramaScreen(nivelEstres: nivelEstres),
+              ),
             );
           }
         } else {
-          // Usuario tiene acceso (ya suscrito)
+          // Usuario NO es de company_id 8, generar programa directamente sin verificar suscripción
           await _generateProgram(userProfile, totalScore);
           await _updateTestEstresBool();
 
