@@ -2,10 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../config.dart';
+import '../services/google_play_verification_service.dart';
+import '../services/subscription_service.dart';
 import 'dart:async';
 
 class SubscriptionScreen extends StatefulWidget {
@@ -93,13 +91,31 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         _showPendingUI();
       } else if (purchaseDetails.status == PurchaseStatus.error) {
         _handleError(purchaseDetails.error!);
+        // Completar la compra incluso si hay error para limpiar el estado
+        if (purchaseDetails.pendingCompletePurchase) {
+          await _inAppPurchase.completePurchase(purchaseDetails);
+        }
       } else if (purchaseDetails.status == PurchaseStatus.purchased ||
           purchaseDetails.status == PurchaseStatus.restored) {
-        await _deliverProduct(purchaseDetails);
-      }
-
-      if (purchaseDetails.pendingCompletePurchase) {
-        await _inAppPurchase.completePurchase(purchaseDetails);
+        // Compra exitosa - verificar con backend
+        await _verifyPurchaseWithBackend(purchaseDetails);
+      } else if (purchaseDetails.status == PurchaseStatus.canceled) {
+        // Compra cancelada
+        setState(() {
+          _isLoading = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Compra cancelada'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        // Completar la compra cancelada para limpiar el estado
+        if (purchaseDetails.pendingCompletePurchase) {
+          await _inAppPurchase.completePurchase(purchaseDetails);
+        }
       }
     });
   }
@@ -119,61 +135,108 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
-  Future<void> _deliverProduct(PurchaseDetails purchaseDetails) async {
-    try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
+  /// Verifica la compra con el backend usando GooglePlayVerificationService
+  /// Según la documentación, este método debe:
+  /// 1. Obtener purchaseToken y productId de la compra
+  /// 2. Verificar con el backend usando el servicio
+  /// 3. Si es exitoso, completar la compra en Google Play
+  /// 4. Verificar acceso inmediatamente
+  Future<void> _verifyPurchaseWithBackend(PurchaseDetails purchaseDetails) async {
+    setState(() {
+      _isLoading = true;
+    });
 
-      if (token == null) {
-        throw Exception('No se pudo obtener el token de autenticación');
+    try {
+      // Obtener purchaseToken y productId
+      // Para Android, el purchaseToken puede venir de:
+      // - purchaseID (recomendado según documentación)
+      // - verificationData.serverVerificationData (alternativa para Android)
+      String purchaseToken = purchaseDetails.purchaseID ?? '';
+      
+      // Si purchaseID está vacío, intentar con serverVerificationData (para Android)
+      if (purchaseToken.isEmpty) {
+        purchaseToken = purchaseDetails.verificationData.serverVerificationData;
+      }
+      
+      final String productId = purchaseDetails.productID;
+
+      // Validar que tenemos un purchaseToken válido
+      if (purchaseToken.isEmpty) {
+        throw Exception('No se recibió el token de compra de Google Play');
       }
 
-      // Enviar comprobante de compra al backend
-      final response = await http.post(
-        Uri.parse('${Config.apiUrl2}/subscriptions/subscribe'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'plan_type': 'PRO',
-          'purchase_token': purchaseDetails.verificationData.serverVerificationData,
-          'product_id': purchaseDetails.productID,
-          'platform': defaultTargetPlatform == TargetPlatform.android ? 'android' : 'ios',
-        }),
+      // Verificar con el backend usando el servicio
+      final result = await GooglePlayVerificationService.verifyPurchase(
+        purchaseToken: purchaseToken,
+        productId: productId,
       );
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        final jsonResponse = json.decode(response.body);
+      if (result['success'] == true) {
+        // Suscripción activada exitosamente en el backend
+        // Ahora completar la compra en Google Play
+        if (purchaseDetails.pendingCompletePurchase) {
+          await _inAppPurchase.completePurchase(purchaseDetails);
+        }
 
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Mostrar mensaje de éxito
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('¡Suscripción activada exitosamente!'),
+              content: Text(result['message'] ?? '¡Suscripción PRO activada correctamente!'),
               backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
+              duration: Duration(seconds: 3),
             ),
           );
-        }
 
-        // Retornar true para que profile.dart recargue los datos
-        Navigator.of(context).pop(true);
+          // Verificar acceso inmediatamente para confirmar
+          final hasAccess = await SubscriptionService.hasAccessToPrograms();
+          if (hasAccess) {
+            // Navegar de vuelta indicando éxito
+            Navigator.of(context).pop(true);
+          } else {
+            // Si por alguna razón no tiene acceso aún, esperar un momento y verificar de nuevo
+            await Future.delayed(Duration(seconds: 1));
+            final hasAccessRetry = await SubscriptionService.hasAccessToPrograms();
+            if (hasAccessRetry) {
+              Navigator.of(context).pop(true);
+            } else {
+              // Mostrar mensaje informativo
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Suscripción activada. Por favor, espera unos segundos...'),
+                  backgroundColor: Colors.blue,
+                ),
+              );
+              Navigator.of(context).pop(true);
+            }
+          }
+        }
       } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['error']?['message'] ?? 'Error al activar suscripción');
+        throw Exception(result['message'] ?? 'Error al activar suscripción');
       }
     } catch (e) {
-      print('Error al procesar suscripción: $e');
+      print('Error al verificar compra con backend: $e');
+      
+      setState(() {
+        _isLoading = false;
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al activar suscripción: ${e.toString()}'),
+            content: Text('Error al verificar compra: ${e.toString()}'),
             backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
+            duration: Duration(seconds: 4),
           ),
         );
       }
+
+      // No completar la compra si falla la verificación
+      // Esto permite que el usuario pueda reintentar
     }
   }
 
