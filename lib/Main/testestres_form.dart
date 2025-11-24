@@ -28,7 +28,8 @@ class TestEstresQuestionScreen extends StatefulWidget {
 class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
   bool isSubmitting = false;
   int currentQuestionIndex = 0;
-  List<int> selectedOptions = List<int>.filled(23, 0); // Asigna un valor predeterminado (por ejemplo, 0)
+  List<int> selectedOptions = List<int>.filled(
+      23, 0); // Asigna un valor predeterminado (por ejemplo, 0)
   int? userId;
   bool? isDay21Completed;
   bool showingNotice = false;
@@ -107,6 +108,50 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
     }
   }
 
+  // Función para verificar si el usuario es de company 8 usando múltiples métodos
+  Future<bool> _isCompany8User() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // MÉTODO 1: Verificar desde SharedPreferences (guardado en IndexScreen)
+      int? branchId = prefs.getInt('branch_id');
+      int? companyId = prefs.getInt('company_id');
+
+      print(
+          'DEBUG: SharedPreferences - company_id = $companyId, branch_id = $branchId');
+
+      // Lista de branch_ids que pertenecen a la empresa ID 8 (General)
+      List<int> company8BranchIds = [9];
+
+      if (companyId == 8 ||
+          (branchId != null && company8BranchIds.contains(branchId))) {
+        print(
+            'DEBUG: Usuario identificado como company 8 desde SharedPreferences');
+        return true;
+      }
+
+      // MÉTODO 2: Verificar desde userProfile usando companyName
+      Map<String, dynamic>? userProfile = await _getUserProfile();
+      if (userProfile != null) {
+        String? companyName = userProfile['companyName'];
+        print('DEBUG: companyName desde perfil = $companyName');
+
+        // "General" es el nombre de la empresa ID 8
+        if (companyName != null && companyName.toLowerCase() == 'general') {
+          print(
+              'DEBUG: Usuario identificado como company 8 por companyName="General"');
+          return true;
+        }
+      }
+
+      print('DEBUG: Usuario NO es de company 8');
+      return false;
+    } catch (e) {
+      print('Error al verificar company 8: $e');
+      return false;
+    }
+  }
+
   // Función para mapear el género a ID
   int _getGenderIdFromProfile(String gender) {
     switch (gender.toLowerCase()) {
@@ -134,7 +179,7 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       TestNotice? notice;
       try {
         notice = testNotices.firstWhere(
-              (n) => n.afterQuestion == currentQuestionIndex + 1,
+          (n) => n.afterQuestion == currentQuestionIndex + 1,
         );
       } catch (e) {
         notice = null;
@@ -179,7 +224,7 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         TestNotice? notice;
         try {
           notice = testNotices.firstWhere(
-                (n) => n.afterQuestion == currentQuestionIndex + 1,
+            (n) => n.afterQuestion == currentQuestionIndex + 1,
           );
         } catch (e) {
           notice = null;
@@ -257,7 +302,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       }
 
       final saveTestUrl = Uri.parse('${Config.apiUrl2}/stress-test/save');
-      final updateEstresUrl = Uri.parse('${Config.apiUrl2}/users/$userId/estres-level');
+      final updateEstresUrl =
+          Uri.parse('${Config.apiUrl2}/users/$userId/estres-level');
 
       // Calcular el puntaje total
       int totalScore = selectedOptions.fold(0, (sum, value) => sum + value);
@@ -270,10 +316,12 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       }
 
       // Obtener gender_id desde el perfil
-      int genderId = _getGenderIdFromProfile(userProfile['gender'] ?? 'Masculino');
+      int genderId =
+          _getGenderIdFromProfile(userProfile['gender'] ?? 'Masculino');
 
       // Calcular el nivel de estrés y su ID
-      final Map<String, dynamic> estresResult = _calcularNivelEstres(totalScore, genderId);
+      final Map<String, dynamic> estresResult =
+          _calcularNivelEstres(totalScore, genderId);
       NivelEstres nivelEstres = estresResult['nivel'];
       int estresNivelId = estresResult['id'];
 
@@ -327,7 +375,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         );
 
         if (updateResponse.statusCode != 200) {
-          print('Error al actualizar el estres_nivel_id: ${updateResponse.body}');
+          print(
+              'Error al actualizar el estres_nivel_id: ${updateResponse.body}');
           return;
         }
 
@@ -341,7 +390,7 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => HomeScreen()),
-              (Route<dynamic> route) => false, // Elimina todas las rutas anteriores
+          (Route<dynamic> route) => false, // Elimina todas las rutas anteriores
         );
 
         return;
@@ -367,11 +416,13 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
 
         print('Registro de nivel de estrés creado correctamente.');
 
-        // Obtener company_id del perfil del usuario
-        int? companyId = userProfile['company_id'] ?? userProfile['id_empresa'];
+        // Verificar si el usuario pertenece a la empresa 8 (General)
+        bool isCompany8 = await _isCompany8User();
 
-        // Verificar acceso a programas SOLO si company_id == 8
-        if (companyId == 8) {
+        print('DEBUG: isCompany8 = $isCompany8');
+
+        // Verificar acceso a programas SOLO si es de company_id 8
+        if (isCompany8) {
           final hasAccess = await SubscriptionService.hasAccessToPrograms();
 
           if (!hasAccess) {
@@ -433,7 +484,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
             );
           }
         } else {
-          // Usuario NO es de company_id 8, generar programa directamente sin verificar suscripción
+          // Usuario NO es de company_id 8 (empresas con suscripción corporativa)
+          // Generar programa directamente sin verificar suscripción individual
           await _generateProgram(userProfile, totalScore);
           await _updateTestEstresBool();
 
@@ -610,8 +662,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
   // Actualizar testestresbool a true en el backend usando apiUrl2
   Future<void> _updateTestEstresBool() async {
     try {
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('testestresbool', true);
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('testestresbool', true);
     } catch (e) {
       print('Error al actualizar testestresbool: $e');
     }
@@ -701,7 +753,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                           )
                         else
                           SizedBox(width: 40 + (isTablet ? 8 : 0)),
-
                         Expanded(
                           child: Center(
                             child: Text(
@@ -715,7 +766,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                             ),
                           ),
                         ),
-
                         SizedBox(width: 40 + (isTablet ? 8 : 0)),
                       ],
                     ),
@@ -744,7 +794,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                               ),
                             ),
                           ),
-
                         if (question['description'] != null) ...[
                           SizedBox(height: isTablet ? 16 : 12),
                           Padding(
@@ -873,53 +922,55 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                           return GestureDetector(
                             onTap: isNextEnabled && !isSubmitting
                                 ? () {
-                              if (currentQuestionIndex < questions.length - 1) {
-                                goToNextQuestion();
-                              } else {
-                                submitTest();
-                              }
-                            }
+                                    if (currentQuestionIndex < questions.length - 1) {
+                                      goToNextQuestion();
+                                    } else {
+                                      submitTest();
+                                    }
+                                  }
                                 : null,
                             child: Container(
                               width: double.infinity,
                               padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 16),
                               decoration: ShapeDecoration(
-                                color: (isNextEnabled && !isSubmitting) ? const Color(0xFF6D4BD8) : const Color(0xFFD7D7D7),
+                                color: (isNextEnabled && !isSubmitting)
+                                    ? const Color(0xFF6D4BD8)
+                                    : const Color(0xFFD7D7D7),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(40),
                                 ),
                                 shadows: isNextEnabled
                                     ? const [
-                                  BoxShadow(
-                                    color: Color(0x26000000),
-                                    blurRadius: 6,
-                                    offset: Offset(0, 2),
-                                    spreadRadius: 2,
-                                  ),
-                                ]
+                                        BoxShadow(
+                                          color: Color(0x26000000),
+                                          blurRadius: 6,
+                                          offset: Offset(0, 2),
+                                          spreadRadius: 2,
+                                        ),
+                                      ]
                                     : const [],
                               ),
                               child: Center(
                                 child: isSubmitting
                                     ? SizedBox(
-                                  width: isTablet ? 24 : 20,
-                                  height: isTablet ? 24 : 20,
-                                  child: CircularProgressIndicator(
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                    strokeWidth: 2,
-                                  ),
-                                )
+                                        width: isTablet ? 24 : 20,
+                                        height: isTablet ? 24 : 20,
+                                        child: CircularProgressIndicator(
+                                          valueColor:AlwaysStoppedAnimation<Color>(Colors.white),
+                                          strokeWidth: 2,
+                                        ),
+                                      )
                                     : Text(
-                                  nextLabel,
-                                  style: TextStyle(
-                                    color: (isNextEnabled && !isSubmitting)
-                                        ? Colors.white
-                                        : const Color(0xFF868686),
-                                    fontSize: buttonFontSize,
-                                    fontFamily: 'Inter',
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                                        nextLabel,
+                                        style: TextStyle(
+                                          color:(isNextEnabled && !isSubmitting)
+                                                  ? Colors.white
+                                                  : const Color(0xFF868686),
+                                          fontSize: buttonFontSize,
+                                          fontFamily: 'Inter',
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                               ),
                             ),
                           );

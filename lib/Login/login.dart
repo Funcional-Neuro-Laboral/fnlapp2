@@ -54,7 +54,6 @@ class _LoginScreenState extends State<LoginScreen> {
         }),
       );
 
-      
       setState(() {
         isLoading = false;
       });
@@ -89,9 +88,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final userId = user['id'];
       final email = user['email'];
-      final username = user['username']; 
+      final username = user['username'];
+      final companyId = user['company_id']; // Puede ser string o int
       final isDay21Completed = data['isDay21Completed'] ?? false;
-
 
       // Extraer permisos directamente de la respuesta del login
       final responsebool = data['responsebool'] ?? false;
@@ -101,6 +100,17 @@ class _LoginScreenState extends State<LoginScreen> {
       if (token != null && username != null && userId != null && email != null) {
         await _saveUserData(token, username, userId, email, refreshToken, isDay21Completed);
         await _savePermissions(responsebool, testresresponsebool, permisopoliticas);
+
+        // Guardar company_id si está disponible
+        if (companyId != null) {
+          SharedPreferences prefs = await SharedPreferences.getInstance();
+          int? companyIdInt =
+              companyId is String ? int.tryParse(companyId) : companyId;
+          if (companyIdInt != null) {
+            await prefs.setInt('company_id', companyIdInt);
+            print('company_id guardado en SharedPreferences: $companyIdInt');
+          }
+        }
 
         // Inicializar el servicio de renovación de tokens
         await TokenService.instance.initializeTokenRefresh();
@@ -117,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _savePermissions(bool responsebool, bool testresresponsebool, bool permisopoliticas) async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      
+
       // Guardar permisos usando los nombres que ya tienes en tu app
       await prefs.setBool('userresponsebool', responsebool);
       await prefs.setBool('testestresbool', testresresponsebool);
@@ -147,8 +157,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (isDay21Completed != null) {
       await prefs.setBool('isDay21Completed', isDay21Completed);
     } else {
-      await prefs.remove('isDay21Completed'); 
-    } 
+      await prefs.remove('isDay21Completed');
+    }
 
     await prefs.setString('username', username);
     await prefs.setInt('userId', userId);
@@ -360,29 +370,29 @@ class _LoginScreenState extends State<LoginScreen> {
                                     isLoading
                                         ? Center(child: CircularProgressIndicator())
                                         : Container(
-                                      width: double.infinity,
-                                      child: ElevatedButton(
-                                        onPressed: () => _login(context),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF6D4BD8),
-                                          padding: EdgeInsets.symmetric(vertical: 12),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(40),
+                                            width: double.infinity,
+                                            child: ElevatedButton(
+                                              onPressed: () => _login(context),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:const Color(0xFF6D4BD8),
+                                                padding: EdgeInsets.symmetric(vertical: 12),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(40),
+                                                ),
+                                                elevation: 6,
+                                                shadowColor: Color(0x26000000),
+                                              ),
+                                              child: Text(
+                                                'Iniciar Sesión',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 24,
+                                                  fontFamily: 'Inter',
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
                                           ),
-                                          elevation: 6,
-                                          shadowColor: Color(0x26000000),
-                                        ),
-                                        child: Text(
-                                          'Iniciar Sesión',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 24,
-                                            fontFamily: 'Inter',
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
                                     SizedBox(height: 16),
 
                                     // Enlace para ir a registro
@@ -413,7 +423,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ),
                                       ),
                                     ),
-
                                   ],
                                 ),
                               ),
@@ -454,17 +463,17 @@ class _LoginScreenState extends State<LoginScreen> {
               hintText: hintText,
               suffixIcon: obscureText
                   ? ValueListenableBuilder<bool>(
-                valueListenable: passwordVisible,
-                builder: (context, value, child) {
-                  return IconButton(
-                    icon: Icon(
-                      value ? Icons.visibility : Icons.visibility_off,
-                      color: Colors.grey[600],
-                    ),
-                    onPressed: () => passwordVisible.value = !value,
-                  );
-                },
-              )
+                      valueListenable: passwordVisible,
+                      builder: (context, value, child) {
+                        return IconButton(
+                          icon: Icon(
+                            value ? Icons.visibility : Icons.visibility_off,
+                            color: Colors.grey[600],
+                          ),
+                          onPressed: () => passwordVisible.value = !value,
+                        );
+                      },
+                    )
                   : null,
             ),
             obscureText: obscureText && !isPasswordVisible,

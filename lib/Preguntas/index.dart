@@ -78,6 +78,8 @@ class _IndexScreenState extends State<IndexScreen> {
   Future<void> _loadUserProgress() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
 
+    if (!mounted) return;
+
     setState(() {
       agreedToTerms = prefs.getBool('permisopoliticas') ?? false;
       bool userresponsebool = prefs.getBool('userresponsebool') ?? false;
@@ -170,6 +172,7 @@ class _IndexScreenState extends State<IndexScreen> {
   Future<void> fetchData() async {
     try {
       await fetchQuestions();
+      if (!mounted) return;
       setState(() {
         loading = false;
       });
@@ -197,6 +200,7 @@ class _IndexScreenState extends State<IndexScreen> {
               .map((item) => Map<String, dynamic>.from(item))
               .toList();
 
+          if (!mounted) return;
           setState(() {
             questionCategories['level'] = hierarchicalLevels;
           });
@@ -231,6 +235,7 @@ class _IndexScreenState extends State<IndexScreen> {
         final List<dynamic> sedesData = json.decode(response.body);
 
         if (sedesData.isNotEmpty) {
+          if (!mounted) return;
           setState(() {
             questionCategories['sede'] = sedesData
                 .map((item) => Map<String, dynamic>.from(item))
@@ -256,6 +261,7 @@ class _IndexScreenState extends State<IndexScreen> {
       var areas = areasData as List;
 
       if (areas.isNotEmpty) {
+        if (!mounted) return;
         setState(() {
           questionCategories['area'] = areas
               .map((item) => Map<String, dynamic>.from(item))
@@ -340,13 +346,30 @@ class _IndexScreenState extends State<IndexScreen> {
 
     String? token = await getToken();
 
+    // Convertir todos los valores a int (pueden ser String desde la UI)
+    int? ageRangeId = selectedAnswers[0] is String
+        ? int.tryParse(selectedAnswers[0])
+        : selectedAnswers[0];
+    int? genderId = selectedAnswers[1] is String
+        ? int.tryParse(selectedAnswers[1])
+        : selectedAnswers[1];
+    int? hierarchicalLevelId = selectedAnswers[3] is String
+        ? int.tryParse(selectedAnswers[3])
+        : selectedAnswers[3];
+    int? responsabilityLevelId = selectedAnswers[4] is String
+        ? int.tryParse(selectedAnswers[4])
+        : selectedAnswers[4];
+    int? branchId = selectedAnswers[5] is String
+        ? int.tryParse(selectedAnswers[5])
+        : selectedAnswers[5];
+
     final Map<String, dynamic> dataToSend = {
       "userId": userId,
-      "age_range_id": selectedAnswers[0],
-      "hierarchical_level_id": selectedAnswers[3],
-      "responsability_level_id": selectedAnswers[4],
-      "gender_id": selectedAnswers[1],
-      "branch_id": selectedAnswers[5],
+      "age_range_id": ageRangeId,
+      "hierarchical_level_id": hierarchicalLevelId,
+      "responsability_level_id": responsabilityLevelId,
+      "gender_id": genderId,
+      "branch_id": branchId,
     };
 
     print('Data to send: $dataToSend');
@@ -364,6 +387,12 @@ class _IndexScreenState extends State<IndexScreen> {
       if (response.statusCode == 200) {
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setBool('userresponsebool', true);
+
+        // Guardar branch_id en SharedPreferences para uso posterior
+        if (branchId != null) {
+          await prefs.setInt('branch_id', branchId);
+          print('branch_id guardado en SharedPreferences: $branchId');
+        }
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Respuestas guardadas exitosamente.')),
@@ -395,8 +424,8 @@ class _IndexScreenState extends State<IndexScreen> {
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : agreedToTerms
-          ? _buildQuestionsScreen()
-          : _buildWelcomeScreen(),
+              ? _buildQuestionsScreen()
+              : _buildWelcomeScreen(),
     );
   }
 
@@ -586,8 +615,7 @@ class _IndexScreenState extends State<IndexScreen> {
                         width: isTablet ? 200.0 : 165.0,
                         padding: EdgeInsets.symmetric(
                             horizontal: isTablet ? 40 : 32,
-                            vertical: isTablet ? 12 : 8
-                        ),
+                            vertical: isTablet ? 12 : 8),
                         decoration: ShapeDecoration(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -617,19 +645,18 @@ class _IndexScreenState extends State<IndexScreen> {
                     GestureDetector(
                       onTap: agreedToAll
                           ? () {
-                        _handleAcceptAll();
-                        setState(() {
-                          agreedToTerms = true;
-                          currentQuestionIndex = 0;
-                        });
-                      }
+                              _handleAcceptAll();
+                              setState(() {
+                                agreedToTerms = true;
+                                currentQuestionIndex = 0;
+                              });
+                            }
                           : null,
                       child: Container(
                         width: buttonWidth,
                         padding: EdgeInsets.symmetric(
                             horizontal: isTablet ? 40 : 32,
-                            vertical: isTablet ? 16 : 12
-                        ),
+                            vertical: isTablet ? 16 : 12),
                         clipBehavior: Clip.antiAlias,
                         decoration: ShapeDecoration(
                           color: agreedToAll ? const Color(0xFF5027D0) : const Color(0xFFD7D7D7),
@@ -690,10 +717,10 @@ class _IndexScreenState extends State<IndexScreen> {
                 ),
                 child: isChecked
                     ? Icon(
-                  Icons.check,
-                  size: isTablet ? 22 : 18,
-                  color: Colors.white,
-                )
+                        Icons.check,
+                        size: isTablet ? 22 : 18,
+                        color: Colors.white,
+                      )
                     : null,
               ),
             ),
@@ -901,28 +928,28 @@ class _IndexScreenState extends State<IndexScreen> {
                       final bool isNextEnabled = selectedOption != null ||
                           selectedAnswers.containsKey(currentQuestionIndex);
                       final String nextLabel =
-                      currentQuestionIndex < 5 ? 'Siguiente' : 'Continuar';
+                          currentQuestionIndex < 5 ? 'Siguiente' : 'Continuar';
 
                       return GestureDetector(
                         onTap: isNextEnabled
                             ? () {
-                          if (currentQuestionIndex < 5) {
-                            goToNextQuestion();
-                          } else {
-                            // Navegar a la pantalla de resumen
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => IndexSummaryScreen(
-                                  onFinalize: saveResponses,
-                                  onBack: () {
-                                    Navigator.pop(context); // Retroceder a la pantalla de preguntas
-                                  },
-                                ),
-                              ),
-                            );
-                          }
-                        }
+                                if (currentQuestionIndex < 5) {
+                                  goToNextQuestion();
+                                } else {
+                                  // Navegar a la pantalla de resumen
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => IndexSummaryScreen(
+                                        onFinalize: saveResponses,
+                                        onBack: () {
+                                          Navigator.pop(context); // Retroceder a la pantalla de preguntas
+                                        },
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
                             : null,
                         child: Container(
                           width: double.infinity,
@@ -938,19 +965,19 @@ class _IndexScreenState extends State<IndexScreen> {
                             ),
                             shadows: isNextEnabled
                                 ? const [
-                              BoxShadow(
-                                color: Color(0x26000000),
-                                blurRadius: 6,
-                                offset: Offset(0, 2),
-                                spreadRadius: 2,
-                              ),
-                              BoxShadow(
-                                color: Color(0x4C000000),
-                                blurRadius: 2,
-                                offset: Offset(0, 1),
-                                spreadRadius: 0,
-                              ),
-                            ]
+                                    BoxShadow(
+                                      color: Color(0x26000000),
+                                      blurRadius: 6,
+                                      offset: Offset(0, 2),
+                                      spreadRadius: 2,
+                                    ),
+                                    BoxShadow(
+                                      color: Color(0x4C000000),
+                                      blurRadius: 2,
+                                      offset: Offset(0, 1),
+                                      spreadRadius: 0,
+                                    ),
+                                  ]
                                 : const [],
                           ),
                           child: Center(
@@ -979,13 +1006,12 @@ class _IndexScreenState extends State<IndexScreen> {
     );
   }
 
-
   Widget _buildQuestionField(
-      List<Map<String, dynamic>> questions,
-      double fontSize,
-      double verticalPadding,
-      bool isTablet,
-      ) {
+    List<Map<String, dynamic>> questions,
+    double fontSize,
+    double verticalPadding,
+    bool isTablet,
+  ) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: isTablet ? 32.0 : 16.0),
       child: ListView.builder(

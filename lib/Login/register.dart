@@ -136,6 +136,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final userId = user['id'];
       final email = user['email'];
       final username = user['username'];
+      final companyId = user['company_id']; // Puede ser string o int
       final isDay21Completed = data['isDay21Completed'] ?? false;
 
       // Extraer permisos directamente de la respuesta del login
@@ -151,6 +152,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
             token, username, userId, email, refreshToken, isDay21Completed);
         await _savePermissions(
             responsebool, testresresponsebool, permisopoliticas);
+
+        // Guardar company_id si está disponible
+        if (companyId != null) {
+          SharedPreferences prefs = await SharedPreferences.getInstance();
+          int? companyIdInt =
+              companyId is String ? int.tryParse(companyId) : companyId;
+          if (companyIdInt != null) {
+            await prefs.setInt('company_id', companyIdInt);
+            print('company_id guardado en SharedPreferences: $companyIdInt');
+          }
+        }
 
         // Inicializar el servicio de renovación de tokens
         await TokenService.instance.initializeTokenRefresh();
