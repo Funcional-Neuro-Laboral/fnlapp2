@@ -20,7 +20,7 @@ class HomeScreen extends StatefulWidget {
   _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   NivelEstres nivelEstres = NivelEstres.desconocido;
   List<dynamic> programas = [];
   bool isLoading = true;
@@ -192,6 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
           profileData: profileData,
           onLogout: _handleLogout,
           onProfileImageUpdated: _updateProfileImage,
+          isDay21Completed: showExitTest,
         );
       case 4:
         if (showExitTest) {

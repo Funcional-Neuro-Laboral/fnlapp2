@@ -16,6 +16,7 @@ import 'package:fnlapp/Main/home.dart';
 import '../Util/api_service.dart';
 import '../Util/test_notices_data.dart';
 import '../services/subscription_service.dart';
+import 'package:fnlapp/Main/certificate_screen.dart';
 
 class TestEstresQuestionScreen extends StatefulWidget {
   const TestEstresQuestionScreen({Key? key}) : super(key: key);
@@ -152,6 +153,25 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
     }
   }
 
+  // Función para formatear fecha en español
+  String _formatDate(DateTime date) {
+    const months = [
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre'
+    ];
+    return '${date.day} de ${months[date.month - 1]} de ${date.year}';
+  }
+
   // Función para mapear el género a ID
   int _getGenderIdFromProfile(String gender) {
     switch (gender.toLowerCase()) {
@@ -259,15 +279,22 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       return;
     }
 
-    // Mostrar pantalla de finalización
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => TestCompletionScreen(
-          onFinalize: _processTestSubmission,
+    // Solo mostrar TestCompletionScreen para test de entrada
+    // Para test de salida, procesar directamente
+    if (isDay21Completed == true) {
+      // Test de salida: procesar directamente sin pantalla de completion
+      await _processTestSubmission();
+    } else {
+      // Test de entrada: mostrar pantalla de finalización
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => TestCompletionScreen(
+            onFinalize: _processTestSubmission,
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   Future<void> _processTestSubmission() async {
@@ -384,13 +411,26 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         final SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isDay21Completed', false);
 
-        print("Test de salida completado, redirigiendo al HomeScreen.");
+        print("Test de salida completado, navegando a CertificateScreen.");
 
-        // Redirigir al HomeScreen para test de salida
-        Navigator.pushAndRemoveUntil(
+        // Obtener nombre del usuario para el certificado
+        String userName = userProfile['fullName'] ??
+            userProfile['name'] ??
+            '${userProfile['names'] ?? 'Usuario'} ${userProfile['lastnames'] ?? ''}';
+
+        // Formatear fecha actual
+        String completionDate = _formatDate(DateTime.now());
+
+        // Navegar a la pantalla de certificado después del test de salida
+        Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => HomeScreen()),
-          (Route<dynamic> route) => false, // Elimina todas las rutas anteriores
+          MaterialPageRoute(
+            builder: (context) => CertificateScreen(
+              username: userName.trim(),
+              completionDate: completionDate,
+              programName: 'Programa de Manejo de Estrés Laboral - 21 Días',
+            ),
+          ),
         );
 
         return;
@@ -434,7 +474,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
               final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => SubscriptionScreen(showBackButton: false),
+                  builder: (context) =>
+                      SubscriptionScreen(showBackButton: false),
                 ),
               );
 
@@ -446,29 +487,32 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => CargarProgramaScreen(nivelEstres: nivelEstres),
+                    builder: (context) =>
+                        CargarProgramaScreen(nivelEstres: nivelEstres),
                   ),
                 );
               } else {
                 // No se completó la suscripción, volver a index
                 Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(builder: (context) => IndexScreen(
-                    username: '',
-                    apiServiceWithToken: ApiService(),
-                  )),
-                      (Route<dynamic> route) => false,
+                  MaterialPageRoute(
+                      builder: (context) => IndexScreen(
+                            username: '',
+                            apiServiceWithToken: ApiService(),
+                          )),
+                  (Route<dynamic> route) => false,
                 );
               }
             } else {
               // Usuario canceló, volver a index
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (context) => IndexScreen(
-                  username: '',
-                  apiServiceWithToken: ApiService(),
-                )),
-                    (Route<dynamic> route) => false,
+                MaterialPageRoute(
+                    builder: (context) => IndexScreen(
+                          username: '',
+                          apiServiceWithToken: ApiService(),
+                        )),
+                (Route<dynamic> route) => false,
               );
             }
           } else {
@@ -479,7 +523,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => CargarProgramaScreen(nivelEstres: nivelEstres),
+                builder: (context) =>
+                    CargarProgramaScreen(nivelEstres: nivelEstres),
               ),
             );
           }
@@ -492,7 +537,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => CargarProgramaScreen(nivelEstres: nivelEstres),
+              builder: (context) =>
+                  CargarProgramaScreen(nivelEstres: nivelEstres),
             ),
           );
         }
@@ -554,7 +600,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       if (genderId == 1) {
         nivelEstres = NivelEstres.moderado;
         estresNivelId = 2;
-      } else if (genderId == 2 || genderId == 3) { // Considerando 3 como otro género
+      } else if (genderId == 2 || genderId == 3) {
+        // Considerando 3 como otro género
         nivelEstres =
             totalScore <= 132 ? NivelEstres.moderado : NivelEstres.severo;
         estresNivelId = totalScore <= 132 ? 2 : 3;
@@ -563,7 +610,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       if (genderId == 1) {
         nivelEstres = NivelEstres.severo;
         estresNivelId = 3;
-      } else if (genderId == 2 || genderId == 3) { // Considerando 3 como otro género
+      } else if (genderId == 2 || genderId == 3) {
+        // Considerando 3 como otro género
         nivelEstres = NivelEstres.severo;
         estresNivelId = 3;
       }
@@ -573,7 +621,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
   }
 
   // Generar programa usando la nueva API
-  Future<void> _generateProgram(Map<String, dynamic> userProfile, int totalScore) async {
+  Future<void> _generateProgram(
+      Map<String, dynamic> userProfile, int totalScore) async {
     try {
       String? token = await getToken();
       if (token == null) {
@@ -586,36 +635,29 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
 
       // Obtener la fecha actual para startDate
       DateTime now = DateTime.now();
-      String startDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+      String startDate =
+          "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
       // Mapear el género para el userContext
-      String genderCode = userProfile['gender'] == 'Masculino' ? 'M' :
-                         userProfile['gender'] == 'Femenino' ? 'F' : 'O';
+      String genderCode = userProfile['gender'] == 'Masculino'
+          ? 'M'
+          : userProfile['gender'] == 'Femenino'
+              ? 'F'
+              : 'O';
 
-      final generateProgramUrl = Uri.parse('${Config.apiUrl2}/programs/generate');
+      final generateProgramUrl =
+          Uri.parse('${Config.apiUrl2}/programs/generate');
 
       final Map<String, dynamic> programData = {
         'userId': userId,
         'goal': 'Reducir estrés laboral',
-        'constraints': [
-          'sin material externo',
-          'sesiones < 15 minutos'
-        ],
+        'constraints': ['sin material externo', 'sesiones < 15 minutos'],
         'count': 21,
         'startDate': startDate,
         'tagDistribution': [
-          {
-            'tag': 'relajacion',
-            'days': 7
-          },
-          {
-            'tag': 'pensamiento-positivo',
-            'days': 7
-          },
-          {
-            'tag': 'visualizacion',
-            'days': 7
-          }
+          {'tag': 'relajacion', 'days': 7},
+          {'tag': 'pensamiento-positivo', 'days': 7},
+          {'tag': 'visualizacion', 'days': 7}
         ],
         'userContext': {
           'username': userProfile['username'] ?? '',
@@ -638,10 +680,12 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         body: json.encode(programData),
       );
 
-      if (programResponse.statusCode == 200 || programResponse.statusCode == 201) {
+      if (programResponse.statusCode == 200 ||
+          programResponse.statusCode == 201) {
         print('Programa generado correctamente.');
       } else {
-        print('Error al generar el programa: ${programResponse.statusCode} - ${programResponse.body}');
+        print(
+            'Error al generar el programa: ${programResponse.statusCode} - ${programResponse.body}');
       }
     } catch (e) {
       print('Error al generar el programa: $e');
@@ -685,7 +729,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
     if (questions.isEmpty || currentQuestionIndex >= questions.length) {
       return Scaffold(
         body: Center(
-          child: Text("No hay preguntas disponibles"), // Mensaje de error si no hay preguntas
+          child: Text(
+              "No hay preguntas disponibles"), // Mensaje de error si no hay preguntas
         ),
       );
     }
@@ -720,7 +765,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
               children: [
                 // Header con icono de retroceso y título (fijo)
                 Container(
-                  margin: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 10),
+                  margin: EdgeInsets.only(
+                      top: MediaQuery.of(context).padding.top + 10),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF6F6F6),
                     boxShadow: [
@@ -782,7 +828,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                       children: [
                         if (question['question'] != null)
                           Padding(
-                            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: horizontalPadding),
                             child: Text(
                               question['question']!,
                               textAlign: TextAlign.start,
@@ -797,7 +844,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                         if (question['description'] != null) ...[
                           SizedBox(height: isTablet ? 16 : 12),
                           Padding(
-                            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: horizontalPadding),
                             child: Text(
                               question['description']!,
                               textAlign: TextAlign.start,
@@ -821,7 +869,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                     child: ConstrainedBox(
                       constraints: BoxConstraints(maxWidth: maxContentWidth),
                       child: SingleChildScrollView(
-                        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: horizontalPadding),
                         child: Column(
                           children: List.generate(8, (index) {
                             final optionKey = 'option${index + 1}';
@@ -833,10 +882,13 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                               return SizedBox.shrink();
                             }
 
-                            bool isSelected = selectedOptions[currentQuestionIndex] == (index + 1);
+                            bool isSelected =
+                                selectedOptions[currentQuestionIndex] ==
+                                    (index + 1);
 
                             return Padding(
-                              padding: EdgeInsets.symmetric(vertical: isTablet ? 10.0 : 8.0),
+                              padding: EdgeInsets.symmetric(
+                                  vertical: isTablet ? 10.0 : 8.0),
                               child: GestureDetector(
                                 onTap: () => selectOption(index + 1),
                                 child: AnimatedContainer(
@@ -847,7 +899,9 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                                     horizontal: isTablet ? 40 : 32,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: isSelected ? Color(0x8E5027D0) : Colors.white,
+                                    color: isSelected
+                                        ? Color(0x8E5027D0)
+                                        : Colors.white,
                                     border: Border.all(
                                       width: 2,
                                       color: Color(0xFF6D4BD8),
@@ -855,19 +909,23 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                                     borderRadius: BorderRadius.circular(16),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         optionText,
                                         style: TextStyle(
-                                          color: isSelected ? Colors.white : Color(0xFF6D4BD8),
+                                          color: isSelected
+                                              ? Colors.white
+                                              : Color(0xFF6D4BD8),
                                           fontSize: optionFontSize,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                       if (isSelected)
                                         Padding(
-                                          padding: EdgeInsets.only(top: isTablet ? 12.0 : 8.0),
+                                          padding: EdgeInsets.only(
+                                              top: isTablet ? 12.0 : 8.0),
                                           child: Text.rich(
                                             TextSpan(
                                               children: [
@@ -875,7 +933,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                                                   text: "Detalle: ",
                                                   style: TextStyle(
                                                     color: Colors.white,
-                                                    fontSize: isTablet ? 16 : 14,
+                                                    fontSize:
+                                                        isTablet ? 16 : 14,
                                                     fontWeight: FontWeight.w600,
                                                   ),
                                                 ),
@@ -883,7 +942,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                                                   text: optionDetail,
                                                   style: TextStyle(
                                                     color: Colors.white,
-                                                    fontSize: isTablet ? 16 : 14,
+                                                    fontSize:
+                                                        isTablet ? 16 : 14,
                                                     fontWeight: FontWeight.w400,
                                                   ),
                                                 ),
@@ -909,20 +969,26 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                     horizontalPadding,
                     12,
                     horizontalPadding,
-                    MediaQuery.of(context).padding.bottom + (isTablet ? 30 : 20),
+                    MediaQuery.of(context).padding.bottom +
+                        (isTablet ? 30 : 20),
                   ),
                   child: Center(
                     child: ConstrainedBox(
                       constraints: BoxConstraints(maxWidth: maxContentWidth),
                       child: Builder(
                         builder: (context) {
-                          final bool isNextEnabled = selectedOptions[currentQuestionIndex] != 0;
-                          final String nextLabel = currentQuestionIndex < questions.length - 1 ? 'Siguiente' : 'Continuar';
+                          final bool isNextEnabled =
+                              selectedOptions[currentQuestionIndex] != 0;
+                          final String nextLabel =
+                              currentQuestionIndex < questions.length - 1
+                                  ? 'Siguiente'
+                                  : 'Continuar';
 
                           return GestureDetector(
                             onTap: isNextEnabled && !isSubmitting
                                 ? () {
-                                    if (currentQuestionIndex < questions.length - 1) {
+                                    if (currentQuestionIndex <
+                                        questions.length - 1) {
                                       goToNextQuestion();
                                     } else {
                                       submitTest();
@@ -931,7 +997,8 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                                 : null,
                             child: Container(
                               width: double.infinity,
-                              padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 16),
+                              padding: EdgeInsets.symmetric(
+                                  vertical: isTablet ? 18 : 16),
                               decoration: ShapeDecoration(
                                 color: (isNextEnabled && !isSubmitting)
                                     ? const Color(0xFF6D4BD8)
@@ -956,14 +1023,17 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                                         width: isTablet ? 24 : 20,
                                         height: isTablet ? 24 : 20,
                                         child: CircularProgressIndicator(
-                                          valueColor:AlwaysStoppedAnimation<Color>(Colors.white),
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                  Colors.white),
                                           strokeWidth: 2,
                                         ),
                                       )
                                     : Text(
                                         nextLabel,
                                         style: TextStyle(
-                                          color:(isNextEnabled && !isSubmitting)
+                                          color:
+                                              (isNextEnabled && !isSubmitting)
                                                   ? Colors.white
                                                   : const Color(0xFF868686),
                                           fontSize: buttonFontSize,

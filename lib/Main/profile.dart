@@ -12,18 +12,21 @@ import '../config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:fnlapp/Main/certificate_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final ProfileData? profileData;
   final Function onLogout;
   final Function(String)? onImageSelected;
   final Function(String)? onProfileImageUpdated;
+  final bool isDay21Completed;
 
   ProfileScreen({
     required this.profileData,
     required this.onLogout,
     this.onImageSelected,
     this.onProfileImageUpdated,
+    this.isDay21Completed = false,
   });
 
   @override
@@ -465,6 +468,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _buildSubscriptionButton(size, isDesktop),
                         SizedBox(height: size.height * 0.02),
                         _buildLogoutButton(size, isDesktop),
+                        SizedBox(height: size.height * 0.02),
+                        // Botón de certificado (visible solo si completó el programa)
+                        _buildCertificateButton(size, isDesktop),
                         SizedBox(height: size.height * 0.03),
                       ],
                     ),
@@ -944,5 +950,100 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+  }
+
+  /// Botón para ver el certificado (disponible después de completar el programa)
+  Widget _buildCertificateButton(Size size, bool isDesktop) {
+    final buttonPadding = size.width < 400
+        ? 14.0
+        : size.width < 600
+            ? 16.0
+            : 18.0;
+    final fontSize = size.width < 400
+        ? 14.0
+        : size.width < 600
+            ? 15.0
+            : 16.0;
+
+    // Si no ha completado el programa, no mostrar el botón
+    if (!widget.isDay21Completed) {
+      return SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      constraints: BoxConstraints(
+        maxWidth: isDesktop ? 400 : size.width * 0.8,
+      ),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF6D4BD8), Color(0xFF5027D0)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(40),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0xFF6D4BD8).withOpacity(0.3),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ElevatedButton.icon(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CertificateScreen(
+                username: widget.profileData?.fullName ?? 'Usuario',
+                completionDate:
+                    '${DateTime.now().day} de ${_getMonthName(DateTime.now().month)} de ${DateTime.now().year}',
+                programName: 'Programa de Manejo de Estrés Laboral - 21 Días',
+              ),
+            ),
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          shadowColor: Colors.transparent,
+          padding: EdgeInsets.symmetric(
+            horizontal: size.width < 400 ? 24 : 32,
+            vertical: buttonPadding,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(40),
+          ),
+        ),
+        icon: const Icon(Icons.workspace_premium, size: 22),
+        label: Text(
+          'Ver Mi Certificado',
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontSize: fontSize,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre'
+    ];
+    return months[month - 1];
   }
 }

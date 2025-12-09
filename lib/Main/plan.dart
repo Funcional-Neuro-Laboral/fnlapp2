@@ -59,9 +59,9 @@ class Programa {
     required this.dia,
     required this.userId,
     required this.id,
-    required this.sessionId, 
+    required this.sessionId,
     this.guia,
-    this.unlocked = false, 
+    this.unlocked = false,
   });
 
   factory Programa.fromMap(Map<String, dynamic> map) {
@@ -75,23 +75,23 @@ class Programa {
       dia: int.tryParse(map['dia'].toString()) ?? 0,
       userId: int.tryParse(map['user_id'].toString()) ?? 0,
       id: int.tryParse(map['id'].toString()) ?? 0,
-      sessionId: int.tryParse(map['session_id'].toString()) ?? 0, // Parsear sessionId
+      sessionId:
+          int.tryParse(map['session_id'].toString()) ?? 0, // Parsear sessionId
       guia: map['guia'],
-      unlocked: map['unlocked'] ?? false, 
+      unlocked: map['unlocked'] ?? false,
     );
   }
 
   bool get isUnlocked {
- 
     if (!unlocked) return false;
-    
+
     // Luego verificar la fecha
     if (startDate != null) {
       DateTime temp = DateTime.parse(startDate!).toLocal();
       DateTime date = DateTime(temp.year, temp.month, temp.day);
       DateTime now = DateTime.now();
       DateTime today = DateTime(now.year, now.month, now.day);
-      
+
       return today.isAtSameMomentAs(date) || today.isAfter(date);
     }
     return false;
@@ -113,7 +113,8 @@ class Programa {
 
   String get formattedStartDate {
     if (startDate == null) return '';
-    return DateFormat('dd/MM/yyyy').format(DateTime.parse(startDate!).toLocal());
+    return DateFormat('dd/MM/yyyy')
+        .format(DateTime.parse(startDate!).toLocal());
   }
 }
 
@@ -158,7 +159,8 @@ class _PlanScreenState extends State<PlanScreen> {
 
     // Verificar si ya se mostró el modal anteriormente
     final prefs = await SharedPreferences.getInstance();
-    final hasShownExitTestModal = prefs.getBool('hasShownExitTestModal') ?? false;
+    final hasShownExitTestModal =
+        prefs.getBool('hasShownExitTestModal') ?? false;
 
     if (!hasShownExitTestModal && !_hasShownModal) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -183,7 +185,7 @@ class _PlanScreenState extends State<PlanScreen> {
 
         // Configuración responsive
         final modalWidth = isTablet
-            ? screenSize.width * 0.5  // 50% en tablets
+            ? screenSize.width * 0.5 // 50% en tablets
             : screenSize.width * 0.85; // 85% en móviles
 
         final maxWidth = isTablet ? 500.0 : 350.0;
@@ -220,11 +222,6 @@ class _PlanScreenState extends State<PlanScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.star_rate_rounded,
-                            color: const Color(0xFFF1D93E),
-                            size: iconSize,
-                          ),
                           const SizedBox(width: 8),
                           Flexible(
                             child: Text(
@@ -326,7 +323,8 @@ class _PlanScreenState extends State<PlanScreen> {
 
   List<Programa> get _parsedProgramas {
     return widget.programas
-        .where((p) => p['nombre_tecnica'] != null && p['nombre_tecnica'].isNotEmpty)
+        .where((p) =>
+            p['nombre_tecnica'] != null && p['nombre_tecnica'].isNotEmpty)
         .map((p) => Programa.fromMap(p))
         .toList();
   }
@@ -334,12 +332,13 @@ class _PlanScreenState extends State<PlanScreen> {
   double get _progressPercentage {
     if (widget.programas.isEmpty) return 0;
 
-    final completedCount = widget.programas
-        .where((x) => x['completed_date'] != null)
-        .length;
+    final completedCount =
+        widget.programas.where((x) => x['completed_date'] != null).length;
 
-    return ((completedCount / AppConstants.totalPrograms *
-        AppConstants.percentageMultiplier).round() /
+    return ((completedCount /
+                AppConstants.totalPrograms *
+                AppConstants.percentageMultiplier)
+            .round() /
         AppConstants.percentageDivider);
   }
 
@@ -355,9 +354,7 @@ class _PlanScreenState extends State<PlanScreen> {
               child: Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 20.0,
-                      vertical: 20.0
-                  ),
+                      horizontal: 20.0, vertical: 20.0),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -508,9 +505,9 @@ class _PlanScreenState extends State<PlanScreen> {
     return Column(
       children: parsedProgramas
           .map((programa) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4.0),
-        child: _buildProgramCard(programa, context),
-      ))
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: _buildProgramCard(programa, context),
+              ))
           .toList(),
     );
   }
@@ -527,7 +524,8 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
-  Widget _buildUnlockedCard(Programa programa, BuildContext context, double cardWidth) {
+  Widget _buildUnlockedCard(
+      Programa programa, BuildContext context, double cardWidth) {
     return GestureDetector(
       onTap: () => _navigateToStepScreen(programa, context),
       child: Container(
@@ -549,7 +547,8 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
-  Widget _buildLockedCard(Programa programa, BuildContext context, double cardWidth) {
+  Widget _buildLockedCard(
+      Programa programa, BuildContext context, double cardWidth) {
     return Container(
       width: cardWidth,
       margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 3.0),
@@ -578,7 +577,8 @@ class _PlanScreenState extends State<PlanScreen> {
   }
 
   Widget _buildCardImage(Programa programa, bool isUnlocked) {
-    const String lockedImageUrl = 'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/imagen_bloqueada.png';
+    const String lockedImageUrl =
+        'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/imagen_bloqueada.png';
 
     // Función para generar URL de imagen por día
     String getImageUrl() {
@@ -634,7 +634,8 @@ class _PlanScreenState extends State<PlanScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: isUnlocked ? AppColors.cardBackground : AppColors.lockedBackground,
+        color:
+            isUnlocked ? AppColors.cardBackground : AppColors.lockedBackground,
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(AppConstants.cardBorderRadius),
           bottomRight: Radius.circular(AppConstants.cardBorderRadius),
