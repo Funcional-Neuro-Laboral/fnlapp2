@@ -11,6 +11,7 @@ class ProfileData {
   String? nombreEmpresa;
   final String? gender;
   final String? estresLevel;
+  final String? fullName;
 
   ProfileData({
     required this.email,
@@ -23,25 +24,28 @@ class ProfileData {
     required this.nombreEmpresa,
     required this.gender,
     this.estresLevel,
+    this.fullName,
   });
 
   factory ProfileData.fromJson(Map<String, dynamic> json) {
-    const String defaultImageUrl = 'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/user_img.jpg';
-  
-  // Verifica si el perfil tiene una imagen válida
-  String? profileImagePath = json['profileImage'];
-  String finalImageUrl = defaultImageUrl; // Usar imagen por defecto inicialmente
-  
-  if (profileImagePath != null && 
-      profileImagePath.isNotEmpty && 
-      profileImagePath.startsWith('https://')) {
-    finalImageUrl = profileImagePath;
-  }
+    const String defaultImageUrl =
+        'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/user_img.jpg';
+
+    // Verifica si el perfil tiene una imagen válida
+    String? profileImagePath = json['profileImage'];
+    String finalImageUrl =
+        defaultImageUrl; // Usar imagen por defecto inicialmente
+
+    if (profileImagePath != null &&
+        profileImagePath.isNotEmpty &&
+        profileImagePath.startsWith('https://')) {
+      finalImageUrl = profileImagePath;
+    }
 
     return ProfileData(
       email: json['email'] ?? 'Correo no disponible',
-      nombres: json['nombres'] ?? 'Usuario',
-      apellidos: json['apellidos'] ?? '',
+      nombres: json['names'] ?? json['nombres'] ?? 'Usuario',
+      apellidos: json['lastnames'] ?? json['apellidos'] ?? '',
       nombreEmpresa: json['companyName'] ?? 'Empresa no definida',
       username: json['username'],
       hierarchicalLevel: json['hierarchicalLevel']?.toString() ?? 'No definido',
@@ -49,6 +53,7 @@ class ProfileData {
       idEmpresa: json['id_empresa'] as int?,
       gender: json['gender']?.toString() ?? 'No especificado',
       estresLevel: json['estresLevel'] as String?,
+      fullName: json['fullName'],
     );
   }
 

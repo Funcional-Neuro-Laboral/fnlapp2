@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../Util/token_service.dart';
-import './models/profile_data.dart';
+import 'package:fnlapp/Main/models/profile_data.dart';
 import '../config.dart';
 import '../Main/widgets/custom_navigation_bar.dart';
 import 'plan.dart';
@@ -53,7 +53,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Si no tenemos los datos básicos, no podemos continuar.
     if (userId == null || token == null) {
-      print('Error crítico: userId o token no encontrados al iniciar HomeScreen.');
+      print(
+          'Error crítico: userId o token no encontrados al iniciar HomeScreen.');
       // Opcional: podrías redirigir al login aquí si esto ocurre.
       // _handleLogout();
       return;
@@ -75,18 +76,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _checkExitTest() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool isDay21Completed = prefs.getBool('isDay21Completed') ?? false;
 
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        bool isDay21Completed = prefs.getBool('isDay21Completed') ?? false;
-        
-        print('isDay21Completed: $isDay21Completed');
-        setState(() {
-          showExitTest = isDay21Completed;
-          isExitTestEnabled = isDay21Completed;
-        });
-        
+    print('isDay21Completed: $isDay21Completed');
+    setState(() {
+      showExitTest = isDay21Completed;
+      isExitTestEnabled = isDay21Completed;
+    });
   }
-
 
   Future<void> loadProfile() async {
     profileData = await fetchProfile();
@@ -118,7 +116,8 @@ class _HomeScreenState extends State<HomeScreen> {
           setState(() {
             nivelEstres = _mapNivelEstresFromString(estresLevelString);
           });
-          print('Nivel de estrés obtenido del perfil: $nivelEstres (String: $estresLevelString)');
+          print(
+              'Nivel de estrés obtenido del perfil: $nivelEstres (String: $estresLevelString)');
         }
 
         return profile;
@@ -144,28 +143,30 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // --- FUNCIÓN PARA ACTUALIZAR LA IMAGEN DE PERFIL ---
   void _updateProfileImage(String newImageUrl) async {
-    print('Callback recibido en HomeScreen: actualizando imagen a $newImageUrl');
+    print(
+        'Callback recibido en HomeScreen: actualizando imagen a $newImageUrl');
 
     imageCache.clear();
     imageCache.clearLiveImages();
-  
+
     await loadProfile();
 
     if (mounted) {
-      setState(() {
-      });
+      setState(() {});
       print('ProfileData actualizado en HomeScreen después del callback');
     }
   }
 
   Widget _getSelectedWidget() {
-    final String? nameSource = profileData?.nombres;
+    final String? nameSource = profileData?.fullName ?? profileData?.nombres;
     final String userName = nameSource?.split(' ').first ?? 'Usuario';
 
     final List<dynamic> modifiedProgramas = programas.map((programa) {
       final newPrograma = Map<String, dynamic>.from(programa);
-      if (newPrograma['descripcion'] != null && newPrograma['descripcion'] is String) {
-        newPrograma['descripcion'] = newPrograma['descripcion'].replaceAll('USER', userName);
+      if (newPrograma['descripcion'] != null &&
+          newPrograma['descripcion'] is String) {
+        newPrograma['descripcion'] =
+            newPrograma['descripcion'].replaceAll('USER', userName);
       }
       return newPrograma;
     }).toList();
@@ -217,26 +218,26 @@ class _HomeScreenState extends State<HomeScreen> {
       body: isLoading
           ? const Center(
               child: CircularProgressIndicator(
-              color: Colors.white,
-            ),
-          )
-          : Stack(
-        children: [
-          Positioned.fill(child: _getSelectedWidget()),
-          if (!showWidgets)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: CustomNavigationBar(
-                selectedIndex: _selectedIndex,
-                onItemTapped: _onItemTapped,
-                showExitTest: showExitTest,
-                isExitTestEnabled: isExitTestEnabled,
+                color: Colors.white,
               ),
+            )
+          : Stack(
+              children: [
+                Positioned.fill(child: _getSelectedWidget()),
+                if (!showWidgets)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: CustomNavigationBar(
+                      selectedIndex: _selectedIndex,
+                      onItemTapped: _onItemTapped,
+                      showExitTest: showExitTest,
+                      isExitTestEnabled: isExitTestEnabled,
+                    ),
+                  ),
+              ],
             ),
-        ],
-      ),
     );
   }
 
@@ -248,7 +249,7 @@ class _HomeScreenState extends State<HomeScreen> {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => LoginScreen()),
-            (Route<dynamic> route) => false,
+        (Route<dynamic> route) => false,
       );
     }
   }
@@ -297,16 +298,19 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-
   // NUEVA FUNCIÓN para mapear strings a NivelEstres
   NivelEstres _mapNivelEstresFromString(String nivelString) {
     switch (nivelString.toUpperCase()) {
-      case 'LEVE': return NivelEstres.leve;
-      case 'MODERADO': return NivelEstres.moderado;
-      case 'ALTO': return NivelEstres.severo;
-      case 'SEVERO': return NivelEstres.severo;
-      default: return NivelEstres.desconocido;
+      case 'LEVE':
+        return NivelEstres.leve;
+      case 'MODERADO':
+        return NivelEstres.moderado;
+      case 'ALTO':
+        return NivelEstres.severo;
+      case 'SEVERO':
+        return NivelEstres.severo;
+      default:
+        return NivelEstres.desconocido;
     }
   }
 }
-

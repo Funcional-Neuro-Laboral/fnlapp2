@@ -126,7 +126,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text('Cancelar suscripción'),
-          content: Text('¿Estás seguro de que deseas cancelar tu suscripción Funcy PRO?'),
+          content: Text(
+              '¿Estás seguro de que deseas cancelar tu suscripción Funcy PRO?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -241,7 +242,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       } else {
         final errorResponse = json.decode(responseBody);
-        throw Exception('Error del servidor: ${response.statusCode} - ${errorResponse['error']['message']}');
+        throw Exception(
+            'Error del servidor: ${response.statusCode} - ${errorResponse['error']['message']}');
       }
     } catch (e) {
       if (mounted) {
@@ -306,7 +308,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (image != null) {
         String fileName = image.name.toLowerCase();
-        if (!fileName.endsWith('.jpg') && !fileName.endsWith('.jpeg') && !fileName.endsWith('.png')) {
+        if (!fileName.endsWith('.jpg') &&
+            !fileName.endsWith('.jpeg') &&
+            !fileName.endsWith('.png')) {
           return;
         }
 
@@ -413,7 +417,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width >= 600 && size.width < 1200;
     final isDesktop = size.width >= 1200;
-    final horizontalPadding = isDesktop ? 200.0 : isTablet ? 80.0 : 16.0;
+    final horizontalPadding = isDesktop
+        ? 200.0
+        : isTablet
+            ? 80.0
+            : 16.0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F4F4),
@@ -430,7 +438,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'Perfil',
                   style: GoogleFonts.inter(
                     color: const Color(0xFF212121),
-                    fontSize: size.width < 400 ? 28.0 : size.width < 600 ? 32.0 : 36.0,
+                    fontSize: size.width < 400
+                        ? 28.0
+                        : size.width < 600
+                            ? 32.0
+                            : 36.0,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -469,7 +481,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // ========== WIDGETS DE UI ==========
 
   Widget _buildProfileImage(Size size) {
-    final imageSize = size.width < 400 ? 125.0 : size.width < 600 ? 140.0 : 160.0;
+    final imageSize = size.width < 400
+        ? 125.0
+        : size.width < 600
+            ? 140.0
+            : 160.0;
 
     return GestureDetector(
       onTap: _pickImage,
@@ -503,10 +519,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             backgroundImage: _getImageProvider(),
             child: _getImageProvider() == null
                 ? Icon(
-              Icons.person,
-              size: size.width < 400 ? 40 : size.width < 600 ? 50 : 60,
-              color: const Color(0xFF4320AD),
-            )
+                    Icons.person,
+                    size: size.width < 400
+                        ? 40
+                        : size.width < 600
+                            ? 50
+                            : 60,
+                    color: const Color(0xFF4320AD),
+                  )
                 : null,
           ),
         ),
@@ -516,11 +536,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildUserName(Size size) {
     return Text(
-      "${widget.profileData?.nombres ?? 'Usuario'} ${widget.profileData?.apellidos ?? ''}",
+      widget.profileData?.fullName ??
+          "${widget.profileData?.nombres ?? 'Usuario'} ${widget.profileData?.apellidos ?? ''}",
       textAlign: TextAlign.center,
       style: GoogleFonts.inter(
         color: const Color(0xFF212121),
-        fontSize: size.width < 400 ? 20.0 : size.width < 600 ? 24.0 : 28.0,
+        fontSize: size.width < 400
+            ? 20.0
+            : size.width < 600
+                ? 24.0
+                : 28.0,
         fontWeight: FontWeight.w600,
       ),
     );
@@ -529,7 +554,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildSubscriptionBadge(Size size) {
     // Verificar si el usuario es de company_id 8
     int? companyId = widget.profileData?.idEmpresa;
-    
+
     // Si NO es company_id 8, no mostrar el badge
     if (companyId != 8) {
       return SizedBox.shrink();
@@ -553,21 +578,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         gradient: isPro
             ? LinearGradient(
-          colors: [Color(0xFF52178F), Color(0xFFA88BC7)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        )
+                colors: [Color(0xFF52178F), Color(0xFFA88BC7)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
             : null,
         color: isPro ? null : Colors.grey.shade300,
         borderRadius: BorderRadius.circular(20),
         boxShadow: isPro
             ? [
-          BoxShadow(
-            color: Color(0xFF8A67C8).withOpacity(0.3),
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ]
+                BoxShadow(
+                  color: Color(0xFF8A67C8).withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: Offset(0, 4),
+                ),
+              ]
             : null,
       ),
       child: Row(
@@ -593,7 +618,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildInfoGrid(Size size, bool isTablet, bool isDesktop) {
-    final cardPadding = size.width < 400 ? 16.0 : size.width < 600 ? 20.0 : 24.0;
+    final cardPadding = size.width < 400
+        ? 16.0
+        : size.width < 600
+            ? 20.0
+            : 24.0;
     final cardSpacing = size.width < 400 ? 12.0 : 16.0;
 
     return Container(
@@ -707,10 +736,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String value,
     required Size size,
   }) {
-    final cardPadding = size.width < 400 ? 12.0 : size.width < 600 ? 16.0 : 20.0;
-    final iconSize = size.width < 400 ? 18.0 : size.width < 600 ? 20.0 : 22.0;
-    final titleFontSize = size.width < 400 ? 12.0 : size.width < 600 ? 14.0 : 16.0;
-    final valueFontSize = size.width < 400 ? 12.0 : size.width < 600 ? 14.0 : 16.0;
+    final cardPadding = size.width < 400
+        ? 12.0
+        : size.width < 600
+            ? 16.0
+            : 20.0;
+    final iconSize = size.width < 400
+        ? 18.0
+        : size.width < 600
+            ? 20.0
+            : 22.0;
+    final titleFontSize = size.width < 400
+        ? 12.0
+        : size.width < 600
+            ? 14.0
+            : 16.0;
+    final valueFontSize = size.width < 400
+        ? 12.0
+        : size.width < 600
+            ? 14.0
+            : 16.0;
 
     return Container(
       padding: EdgeInsets.all(cardPadding),
@@ -719,12 +764,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.circular(size.width < 600 ? 10 : 12),
         boxShadow: size.width >= 600
             ? [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ]
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
             : null,
       ),
       child: Row(
@@ -778,7 +823,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildSubscriptionButton(Size size, bool isDesktop) {
     // Verificar si el usuario es de company_id 8
     int? companyId = widget.profileData?.idEmpresa;
-    
+
     // Si NO es company_id 8, no mostrar el botón
     if (companyId != 8) {
       return SizedBox.shrink();
@@ -792,8 +837,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     final isPro = _subscriptionData?.isPro ?? false;
-    final buttonPadding = size.width < 400 ? 14.0 : size.width < 600 ? 16.0 : 18.0;
-    final fontSize = size.width < 400 ? 16.0 : size.width < 600 ? 16.0 : 18.0;
+    final buttonPadding = size.width < 400
+        ? 14.0
+        : size.width < 600
+            ? 16.0
+            : 18.0;
+    final fontSize = size.width < 400
+        ? 16.0
+        : size.width < 600
+            ? 16.0
+            : 18.0;
 
     return Container(
       width: double.infinity,
@@ -804,14 +857,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         onPressed: isPro
             ? _cancelSubscription
             : () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => SubscriptionScreen()),
-          );
-          if (result == true) {
-            await _loadSubscriptionData();
-          }
-        },
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => SubscriptionScreen()),
+                );
+                if (result == true) {
+                  await _loadSubscriptionData();
+                }
+              },
         icon: Icon(
           isPro ? Icons.cancel : Icons.workspace_premium,
           size: size.width < 400 ? 18 : 20,
@@ -840,8 +893,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildLogoutButton(Size size, bool isDesktop) {
-    final buttonPadding = size.width < 400 ? 14.0 : size.width < 600 ? 16.0 : 18.0;
-    final fontSize = size.width < 400 ? 16.0 : size.width < 600 ? 16.0 : 18.0;
+    final buttonPadding = size.width < 400
+        ? 14.0
+        : size.width < 600
+            ? 16.0
+            : 18.0;
+    final fontSize = size.width < 400
+        ? 16.0
+        : size.width < 600
+            ? 16.0
+            : 18.0;
 
     return Container(
       width: double.infinity,
