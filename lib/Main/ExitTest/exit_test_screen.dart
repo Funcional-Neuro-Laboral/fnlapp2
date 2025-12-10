@@ -822,12 +822,13 @@ class _ExitTestScreenState extends State<ExitTestScreen> {
 
       print('Nivel de estrés actualizado correctamente.');
 
-      // Actualizar el flag de día 21 completado en SharedPreferences
+      // Actualizar los flags: desactivar exit test y activar certificado
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isDay21Completed', true);
-      final verificacion = prefs.getBool('isDay21Completed');
-      print('✅ Flag isDay21Completed actualizado a true');
-      print('✅ Verificación inmediata: $verificacion');
+      await prefs.setBool('isDay21Completed', false);
+      await prefs.setBool('hasCompletedExitTest', true);
+      print(
+          '✅ Flag isDay21Completed actualizado a false (exit test completado)');
+      print('✅ Flag hasCompletedExitTest actualizado a true');
 
       // Navegar a la pantalla de certificado después de completar el test de salida
       // Usar push normal en lugar de pushReplacement para poder regresar al HomeScreen

@@ -409,7 +409,9 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
 
         print('Nivel de estrés actualizado correctamente.');
         final SharedPreferences prefs = await SharedPreferences.getInstance();
+        // Ocultar el botón del exit test y activar el botón del certificado
         await prefs.setBool('isDay21Completed', false);
+        await prefs.setBool('hasCompletedExitTest', true);
 
         print("Test de salida completado, navegando a CertificateScreen.");
 

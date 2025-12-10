@@ -78,8 +78,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _checkExitTest() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     bool isDay21Completed = prefs.getBool('isDay21Completed') ?? false;
+    bool hasCompletedExitTest = prefs.getBool('hasCompletedExitTest') ?? false;
 
     print('isDay21Completed: $isDay21Completed');
+    print('hasCompletedExitTest: $hasCompletedExitTest');
     setState(() {
       showExitTest = isDay21Completed;
       isExitTestEnabled = isDay21Completed;
@@ -188,11 +190,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       case 2:
         return MiTestScreen(nivelEstres: nivelEstres);
       case 3:
-        return ProfileScreen(
-          profileData: profileData,
-          onLogout: _handleLogout,
-          onProfileImageUpdated: _updateProfileImage,
-          isDay21Completed: showExitTest,
+        return FutureBuilder<bool>(
+          future: SharedPreferences.getInstance().then(
+            (prefs) => prefs.getBool('hasCompletedExitTest') ?? false,
+          ),
+          builder: (context, snapshot) {
+            return ProfileScreen(
+              profileData: profileData,
+              onLogout: _handleLogout,
+              onProfileImageUpdated: _updateProfileImage,
+              isDay21Completed: snapshot.data ?? false,
+            );
+          },
         );
       case 4:
         if (showExitTest) {

@@ -238,7 +238,7 @@ class _PlanScreenState extends State<PlanScreen> {
                       ),
                       SizedBox(height: isTablet ? 20 : 16),
                       Text(
-                        'Completaste tus 21 días con éxito, ahora puedes realizar tu test de salida para terminar tu fase.',
+                        'Completaste el programa con éxito, ahora puedes realizar tu test de salida para terminar tu fase.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: const Color(0xFF212121),

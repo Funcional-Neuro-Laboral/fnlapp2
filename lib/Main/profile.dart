@@ -436,7 +436,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(height: size.height * 0.05),
+                SizedBox(height: size.height * 0.03),
                 Text(
                   'Perfil',
                   style: GoogleFonts.inter(
@@ -449,7 +449,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                SizedBox(height: size.height * 0.02),
+                SizedBox(height: size.height * 0.015),
                 Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
@@ -458,20 +458,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Column(
                       children: [
                         _buildProfileImage(size),
-                        SizedBox(height: size.height * 0.03),
+                        SizedBox(height: size.height * 0.02),
                         _buildUserName(size),
-                        SizedBox(height: size.height * 0.02),
+                        SizedBox(height: size.height * 0.015),
                         _buildSubscriptionBadge(size),
-                        SizedBox(height: size.height * 0.03),
+                        SizedBox(height: size.height * 0.02),
                         _buildInfoGrid(size, isTablet, isDesktop),
-                        SizedBox(height: size.height * 0.04),
+                        SizedBox(height: size.height * 0.02),
                         _buildSubscriptionButton(size, isDesktop),
-                        SizedBox(height: size.height * 0.02),
+                        SizedBox(height: size.height * 0.015),
                         _buildLogoutButton(size, isDesktop),
-                        SizedBox(height: size.height * 0.02),
+                        SizedBox(height: size.height * 0.015),
                         // Botón de certificado (visible solo si completó el programa)
                         _buildCertificateButton(size, isDesktop),
-                        SizedBox(height: size.height * 0.03),
+                        SizedBox(height: size.height * 0.02),
                       ],
                     ),
                   ),
@@ -965,7 +965,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ? 15.0
             : 16.0;
 
-    // Si no ha completado el programa, no mostrar el botón
+    // Si no ha completado el exit test, no mostrar el botón del certificado
     if (!widget.isDay21Completed) {
       return SizedBox.shrink();
     }
