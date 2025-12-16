@@ -179,7 +179,7 @@ class _FinalStepScreenState extends State<FinalStepScreen>
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => HomeScreen()),
-              (Route<dynamic> route) => false,
+          (Route<dynamic> route) => false,
         );
       }
     });
@@ -197,6 +197,7 @@ class _FinalStepScreenState extends State<FinalStepScreen>
     final deviceType = _getDeviceType(MediaQuery.of(context).size.width);
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       backgroundColor: Colors.transparent,
       body: _buildBody(dimensions, deviceType),
     );
@@ -207,8 +208,7 @@ class _FinalStepScreenState extends State<FinalStepScreen>
       decoration: const BoxDecoration(
         image: DecorationImage(
           image: NetworkImage(
-              'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/fondo_rese%C3%B1a.png'
-          ),
+              'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/fondo_rese%C3%B1a.png'),
           fit: BoxFit.cover,
         ),
       ),
@@ -315,7 +315,8 @@ class _FinalStepScreenState extends State<FinalStepScreen>
           allowHalfRating: false,
           itemCount: 5,
           itemSize: dimensions.starSize,
-          itemPadding: EdgeInsets.symmetric(horizontal: dimensions.starSize * 0.05),
+          itemPadding:
+              EdgeInsets.symmetric(horizontal: dimensions.starSize * 0.05),
           glowColor: _starColor.withOpacity(0.3),
           unratedColor: const Color(0xFFB7B7B7),
           itemBuilder: (context, index) => Icon(
@@ -398,7 +399,8 @@ class _FinalStepScreenState extends State<FinalStepScreen>
     );
   }
 
-  Widget _buildMoodButton(MoodLevel mood, bool isSelected, ResponsiveDimensions dimensions) {
+  Widget _buildMoodButton(
+      MoodLevel mood, bool isSelected, ResponsiveDimensions dimensions) {
     final buttonSize = dimensions.moodIconSize + 16;
 
     return GestureDetector(
@@ -412,9 +414,7 @@ class _FinalStepScreenState extends State<FinalStepScreen>
         width: buttonSize,
         height: buttonSize,
         decoration: BoxDecoration(
-          color: isSelected
-              ? mood.color.withOpacity(0.2)
-              : Colors.transparent,
+          color: isSelected ? mood.color.withOpacity(0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(buttonSize / 2),
           border: Border.all(
             color: isSelected ? mood.color : Colors.transparent,
@@ -474,22 +474,22 @@ class _FinalStepScreenState extends State<FinalStepScreen>
           ),
           child: _isLoading
               ? SizedBox(
-            height: dimensions.buttonHeight * 0.4,
-            width: dimensions.buttonHeight * 0.4,
-            child: const CircularProgressIndicator(
-              color: Colors.white,
-              strokeWidth: 2.5,
-            ),
-          )
+                  height: dimensions.buttonHeight * 0.4,
+                  width: dimensions.buttonHeight * 0.4,
+                  child: const CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2.5,
+                  ),
+                )
               : Text(
-            'Enviar',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: dimensions.headerFontSize + 2,
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+                  'Enviar',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: dimensions.headerFontSize + 2,
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
         ),
       ),
     );

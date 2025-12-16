@@ -52,7 +52,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return {
       'id': 'welcome_message',
-      'text': '¡Hola ${widget.username}! 👋🐱 \nSoy Funcy y me gustaría saber en qué podría ayudarte el día de hoy.',
+      'text':
+          '¡Hola ${widget.username}! 👋🐱 \nSoy Funcy y me gustaría saber en qué podría ayudarte el día de hoy.',
       'time': timeFormat,
       'user_id': 1,
       'created_at': now.toString(),
@@ -107,15 +108,18 @@ class _ChatScreenState extends State<ChatScreen> {
     int currentWordIndex = 0;
 
     _typingTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
-      if (!mounted) { // Verificar mounted en cada iteración
+      if (!mounted) {
+        // Verificar mounted en cada iteración
         timer.cancel();
         return;
       }
 
       if (currentWordIndex < words.length) {
         setState(() {
-          _currentBotMessage += (currentWordIndex == 0 ? '' : ' ') + words[currentWordIndex];
-          final messageIndex = messages.indexWhere((msg) => msg['id'] == botMessageId);
+          _currentBotMessage +=
+              (currentWordIndex == 0 ? '' : ' ') + words[currentWordIndex];
+          final messageIndex =
+              messages.indexWhere((msg) => msg['id'] == botMessageId);
           if (messageIndex != -1) {
             messages[messageIndex]['text'] = _currentBotMessage;
           }
@@ -123,9 +127,11 @@ class _ChatScreenState extends State<ChatScreen> {
         currentWordIndex++;
       } else {
         timer.cancel();
-        if (mounted) { // Verificar mounted antes del setState final
+        if (mounted) {
+          // Verificar mounted antes del setState final
           setState(() {
-            final messageIndex = messages.indexWhere((msg) => msg['id'] == botMessageId);
+            final messageIndex =
+                messages.indexWhere((msg) => msg['id'] == botMessageId);
             if (messageIndex != -1) {
               messages[messageIndex]['isTyping'] = false;
             }
@@ -146,16 +152,14 @@ class _ChatScreenState extends State<ChatScreen> {
           _botIsTyping = true;
         });
       }
-    }
-    else if (data['type'] == 'bot_message') {
+    } else if (data['type'] == 'bot_message') {
       setState(() {
         _botIsTyping = false;
       });
 
       final botResponse = data['data']['response'] ?? '';
       _showTypingEffect(botResponse);
-    }
-    else if (data['type'] == 'error') {
+    } else if (data['type'] == 'error') {
       setState(() {
         _botIsTyping = false;
       });
@@ -174,7 +178,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _onScroll() {
     _scrollOffset = _scrollController.offset;
     if (_scrollController.position.pixels ==
-        _scrollController.position.maxScrollExtent &&
+            _scrollController.position.maxScrollExtent &&
         !_loadingMore) {
       _loadMoreMessages();
     }
@@ -187,7 +191,8 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     }
 
-    final url = Uri.parse('${Config.apiUrl2}/chat/messages?userId=${widget.userId}&limit=$_limit&offset=$_offset');
+    final url = Uri.parse(
+        '${Config.apiUrl2}/chat/messages?userId=${widget.userId}&limit=$_limit&offset=$_offset');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
@@ -281,6 +286,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: Column(
         children: [
           CustomAppBar(
@@ -291,9 +297,8 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 Positioned.fill(
                     child: Container(
-                      color: Color(0xFFF6F6F6),
-                    )
-                ),
+                  color: Color(0xFFF6F6F6),
+                )),
                 Column(
                   children: [
                     Expanded(
@@ -311,11 +316,10 @@ class _ChatScreenState extends State<ChatScreen> {
                           final messageIndex = _botIsTyping ? index - 1 : index;
                           final text = messages[messageIndex]['text'] ?? '';
                           final time = messages[messageIndex]['time'] ?? '';
-                          final user_id = messages[messageIndex]['user_id'] ??
-                              '';
-                          final userType = user_id == widget.userId
-                              ? user_id
-                              : 1;
+                          final user_id =
+                              messages[messageIndex]['user_id'] ?? '';
+                          final userType =
+                              user_id == widget.userId ? user_id : 1;
 
                           return ChatMessage(
                             key: ValueKey(messages[messageIndex]['id']),
@@ -371,7 +375,8 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Funcy está pensando...',
+                Text(
+                  'Funcy está pensando...',
                   style: TextStyle(
                     color: Color(0xFF222222),
                     fontSize: 14,
@@ -384,7 +389,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF351A8B)),
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Color(0xFF351A8B)),
                   ),
                 ),
               ],
@@ -394,5 +400,4 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
-
 }

@@ -20,8 +20,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final ValueNotifier<bool> passwordVisible = ValueNotifier(false);
   final _formKey = GlobalKey<FormState>();
   final FlutterSecureStorage secureStorage = FlutterSecureStorage();
-  bool isLoading = false;  // Variable para controlar el estado de carga
-  final ValueNotifier<bool> rememberMe = ValueNotifier(false);  // Variable para el checkbox de recordar
+  bool isLoading = false; // Variable para controlar el estado de carga
+  final ValueNotifier<bool> rememberMe =
+      ValueNotifier(false); // Variable para el checkbox de recordar
 
   @override
   void initState() {
@@ -34,7 +35,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login(BuildContext context) async {
-    if (_formKey.currentState == null || !_formKey.currentState!.validate()) return;
+    if (_formKey.currentState == null || !_formKey.currentState!.validate())
+      return;
 
     final username = usernameController.text.trim();
     final password = passwordController.text.trim();
@@ -73,11 +75,13 @@ class _LoginScreenState extends State<LoginScreen> {
         isLoading = false;
       });
       print(e);
-      _showSnackBar(context, 'Error: Intentar nuevamente o Contactar al soporte');
+      _showSnackBar(
+          context, 'Error: Intentar nuevamente o Contactar al soporte');
     }
   }
 
-  Future<void> _handleLoginResponse(BuildContext context, http.Response response) async {
+  Future<void> _handleLoginResponse(
+      BuildContext context, http.Response response) async {
     final responseBody = jsonDecode(response.body);
 
     if (responseBody['success'] == true && responseBody['data'] != null) {
@@ -97,9 +101,14 @@ class _LoginScreenState extends State<LoginScreen> {
       final testresresponsebool = data['testresresponsebool'] ?? false;
       final permisopoliticas = data['permisopoliticas'] ?? false;
 
-      if (token != null && username != null && userId != null && email != null) {
-        await _saveUserData(token, username, userId, email, refreshToken, isDay21Completed);
-        await _savePermissions(responsebool, testresresponsebool, permisopoliticas);
+      if (token != null &&
+          username != null &&
+          userId != null &&
+          email != null) {
+        await _saveUserData(
+            token, username, userId, email, refreshToken, isDay21Completed);
+        await _savePermissions(
+            responsebool, testresresponsebool, permisopoliticas);
 
         // Guardar company_id si está disponible
         if (companyId != null) {
@@ -124,7 +133,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _savePermissions(bool responsebool, bool testresresponsebool, bool permisopoliticas) async {
+  Future<void> _savePermissions(bool responsebool, bool testresresponsebool,
+      bool permisopoliticas) async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
 
@@ -142,7 +152,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _saveUserData(String token, String username, int userId, String email, String? refreshToken, bool? isDay21Completed) async {
+  Future<void> _saveUserData(String token, String username, int userId,
+      String email, String? refreshToken, bool? isDay21Completed) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
 
     await prefs.setString('token', token);
@@ -172,12 +183,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
           // Fondo de pantalla completo
@@ -193,247 +206,250 @@ class _LoginScreenState extends State<LoginScreen> {
 
           // Contenido sobrepuesto
           SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // Usar SizedBox en lugar de SingleChildScrollView para web
-                return SizedBox(
-                  height: constraints.maxHeight,
-                  width: constraints.maxWidth,
-                  child: Column(
-                    children: [
-                      // Espacio superior para el logo (flexible)
-                      Flexible(
-                        flex: 2,
-                        child: Center(
-                          child: Image.network(
-                            'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/logo.png',
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
+            child: SingleChildScrollView(
+              physics: ClampingScrollPhysics(),
+              child: Column(
+                children: [
+                  // Logo con padding fijo
+                  Padding(
+                    padding: EdgeInsets.only(top: 20, bottom: 20),
+                    child: Image.network(
+                      'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/logo.png',
+                      height: 100,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
 
-                      // Contenedor blanco sobrepuesto
-                      Flexible(
-                        flex: 5, // Más espacio para el contenido
-                        child: Center(
-                          child: Container(
-                            width: MediaQuery.of(context).size.width > 600
-                                ? 900
-                                : double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.only(
-                                topLeft: Radius.circular(30),
-                                topRight: Radius.circular(30),
+                  // Contenedor blanco sobrepuesto
+                  Container(
+                    width: MediaQuery.of(context).size.width > 600
+                        ? 900
+                        : double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(30),
+                        topRight: Radius.circular(30),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: Offset(0, -2),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 24.0, vertical: 16.0),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            // Texto bienvenida
+                            Center(
+                              child: Column(
+                                children: [
+                                  Text(
+                                    'Bienvenido!',
+                                    style: TextStyle(
+                                      color: const Color(0xFF020107),
+                                      fontSize: 32,
+                                      fontFamily: 'Inter',
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'Ingresa tu usuario y contraseña',
+                                    style: TextStyle(
+                                      color: const Color(0xFF020107),
+                                      fontSize: 18,
+                                      fontFamily: 'Roboto',
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 10,
-                                  offset: Offset(0, -2),
+                            ),
+
+                            // Campos de formulario
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Campo de Usuario
+                                Text(
+                                  'Usuario',
+                                  style: TextStyle(
+                                    color: const Color(0xFF212121),
+                                    fontSize: 16,
+                                    fontFamily: 'Roboto',
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                _buildTextField(
+                                    'Nombre de Usuario', usernameController),
+                                SizedBox(height: 16),
+
+                                // Campo de Contraseña
+                                Text(
+                                  'Contraseña',
+                                  style: TextStyle(
+                                    color: const Color(0xFF212121),
+                                    fontSize: 16,
+                                    fontFamily: 'Roboto',
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                _buildTextField(
+                                    'Escriba su contraseña', passwordController,
+                                    obscureText: true),
+                              ],
+                            ),
+
+                            // Recuérdame y olvidé mi contraseña
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                ValueListenableBuilder<bool>(
+                                  valueListenable: rememberMe,
+                                  builder: (context, value, child) {
+                                    return Row(
+                                      children: [
+                                        GestureDetector(
+                                          onTap: () =>
+                                              rememberMe.value = !value,
+                                          child: Container(
+                                            width: 14,
+                                            height: 14,
+                                            decoration: BoxDecoration(
+                                              border: Border.all(
+                                                color: const Color(0xFF52178F),
+                                                width: 1.27,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(2.55),
+                                              color: value
+                                                  ? const Color(0xFF52178F)
+                                                  : Colors.transparent,
+                                            ),
+                                            child: value
+                                                ? Icon(Icons.check,
+                                                    size: 10,
+                                                    color: Colors.white)
+                                                : null,
+                                          ),
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Recuérdame',
+                                          style: TextStyle(
+                                            color: const Color(0xFF333333),
+                                            fontSize: 14,
+                                            fontFamily: 'Inter',
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            ForgotPasswordScreen(),
+                                      ),
+                                    );
+                                  },
+                                  child: Text(
+                                    'Olvidé mi contraseña',
+                                    style: TextStyle(
+                                      color: const Color(0xFF290B47),
+                                      fontSize: 14,
+                                      fontFamily: 'Inter',
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-                              child: Form(
-                                key: _formKey,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Distribuir espacio uniformemente
-                                  children: [
-                                    // Texto bienvenida
-                                    Center(
-                                      child: Column(
-                                        children: [
-                                          Text(
-                                            'Bienvenido!',
-                                            style: TextStyle(
-                                              color: const Color(0xFF020107),
-                                              fontSize: 32,
-                                              fontFamily: 'Inter',
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                          SizedBox(height: 4),
-                                          Text(
-                                            'Ingresa tu usuario y contraseña',
-                                            style: TextStyle(
-                                              color: const Color(0xFF020107),
-                                              fontSize: 18,
-                                              fontFamily: 'Roboto',
-                                              fontWeight: FontWeight.w400,
-                                            ),
-                                          ),
-                                        ],
+
+                            // Botón de Login
+                            isLoading
+                                ? Center(child: CircularProgressIndicator())
+                                : Container(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: () => _login(context),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFF6D4BD8),
+                                        padding:
+                                            EdgeInsets.symmetric(vertical: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(40),
+                                        ),
+                                        elevation: 6,
+                                        shadowColor: Color(0x26000000),
                                       ),
-                                    ),
-
-                                    // Campos de formulario
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        // Campo de Usuario
-                                        Text(
-                                          'Usuario',
-                                          style: TextStyle(
-                                            color: const Color(0xFF212121),
-                                            fontSize: 16,
-                                            fontFamily: 'Roboto',
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        SizedBox(height: 4),
-                                        _buildTextField('Nombre de Usuario', usernameController),
-                                        SizedBox(height: 16),
-
-                                        // Campo de Contraseña
-                                        Text(
-                                          'Contraseña',
-                                          style: TextStyle(
-                                            color: const Color(0xFF212121),
-                                            fontSize: 16,
-                                            fontFamily: 'Roboto',
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        SizedBox(height: 4),
-                                        _buildTextField('Escriba su contraseña', passwordController, obscureText: true),
-                                      ],
-                                    ),
-
-                                    // Recuérdame y olvidé mi contraseña
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        ValueListenableBuilder<bool>(
-                                          valueListenable: rememberMe,
-                                          builder: (context, value, child) {
-                                            return Row(
-                                              children: [
-                                                GestureDetector(
-                                                  onTap: () => rememberMe.value = !value,
-                                                  child: Container(
-                                                    width: 14,
-                                                    height: 14,
-                                                    decoration: BoxDecoration(
-                                                      border: Border.all(
-                                                        color: const Color(0xFF52178F),
-                                                        width: 1.27,
-                                                      ),
-                                                      borderRadius: BorderRadius.circular(2.55),
-                                                      color: value ? const Color(0xFF52178F) : Colors.transparent,
-                                                    ),
-                                                    child: value
-                                                        ? Icon(Icons.check, size: 10, color: Colors.white)
-                                                        : null,
-                                                  ),
-                                                ),
-                                                SizedBox(width: 8),
-                                                Text(
-                                                  'Recuérdame',
-                                                  style: TextStyle(
-                                                    color: const Color(0xFF333333),
-                                                    fontSize: 14,
-                                                    fontFamily: 'Inter',
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                              ],
-                                            );
-                                          },
-                                        ),
-                                        GestureDetector(
-                                          onTap: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) => ForgotPasswordScreen(),
-                                              ),
-                                            );
-                                          },
-                                          child: Text(
-                                            'Olvidé mi contraseña',
-                                            style: TextStyle(
-                                              color: const Color(0xFF290B47),
-                                              fontSize: 14,
-                                              fontFamily: 'Inter',
-                                              fontWeight: FontWeight.w600,
-                                              decoration: TextDecoration.underline,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-
-                                    // Botón de Login
-                                    isLoading
-                                        ? Center(child: CircularProgressIndicator())
-                                        : Container(
-                                            width: double.infinity,
-                                            child: ElevatedButton(
-                                              onPressed: () => _login(context),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor:const Color(0xFF6D4BD8),
-                                                padding: EdgeInsets.symmetric(vertical: 12),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(40),
-                                                ),
-                                                elevation: 6,
-                                                shadowColor: Color(0x26000000),
-                                              ),
-                                              child: Text(
-                                                'Iniciar Sesión',
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 24,
-                                                  fontFamily: 'Inter',
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                    SizedBox(height: 16),
-
-                                    // Enlace para ir a registro
-                                    Center(
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          Navigator.pushReplacementNamed(context, '/register');
-                                        },
-                                        child: RichText(
-                                          text: TextSpan(
-                                            style: TextStyle(
-                                              color: const Color(0xFF333333),
-                                              fontSize: 14,
-                                              fontFamily: 'Inter',
-                                            ),
-                                            children: [
-                                              TextSpan(text: '¿No tienes cuenta? '),
-                                              TextSpan(
-                                                text: 'Regístrate',
-                                                style: TextStyle(
-                                                  color: const Color(0xFF290B47),
-                                                  fontWeight: FontWeight.w600,
-                                                  decoration: TextDecoration.underline,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                                      child: Text(
+                                        'Iniciar Sesión',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 24,
+                                          fontFamily: 'Inter',
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                     ),
-                                  ],
+                                  ),
+                            SizedBox(height: 16),
+
+                            // Enlace para ir a registro
+                            Center(
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.pushReplacementNamed(
+                                      context, '/register');
+                                },
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: TextStyle(
+                                      color: const Color(0xFF333333),
+                                      fontSize: 14,
+                                      fontFamily: 'Inter',
+                                    ),
+                                    children: [
+                                      TextSpan(text: '¿No tienes cuenta? '),
+                                      TextSpan(
+                                        text: 'Regístrate',
+                                        style: TextStyle(
+                                          color: const Color(0xFF290B47),
+                                          fontWeight: FontWeight.w600,
+                                          decoration: TextDecoration.underline,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                );
-              },
+                    ),
+                  ), // Cierre del Container
+                ],
+              ),
             ),
           ),
         ],
@@ -441,7 +457,8 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildTextField(String hintText, TextEditingController controller, {bool obscureText = false}) {
+  Widget _buildTextField(String hintText, TextEditingController controller,
+      {bool obscureText = false}) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.0),
       margin: EdgeInsets.symmetric(vertical: 8.0),
