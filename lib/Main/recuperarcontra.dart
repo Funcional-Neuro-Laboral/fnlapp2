@@ -13,8 +13,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController codeController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController =
-      TextEditingController();
+  final TextEditingController confirmPasswordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool isLoading = false;
   int currentStep = 1; // 1: Email, 2: Code, 3: Password, 4: Finish
@@ -179,8 +178,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       if (response.statusCode == 200) {
         _nextStep(); // Avanzar al paso final
       } else {
-        _showSnackBar(
-            'Error al restablecer la contraseña. Verifica los datos.');
+        _showSnackBar('Error al restablecer la contraseña. Verifica los datos.');
       }
     } catch (e) {
       setState(() {
@@ -199,7 +197,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
           // Fondo de pantalla completo
@@ -214,49 +211,54 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
           // Contenido principal
           SafeArea(
-            child: SingleChildScrollView(
-              physics: ClampingScrollPhysics(),
-              child: Column(
-                children: [
-                  // Logo con padding fijo
-                  Padding(
-                    padding: EdgeInsets.only(top: 20, bottom: 20),
-                    child: Image.network(
-                      'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/logo.png',
-                      height: 80,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  // Contenedor blanco sobrepuesto
-                  Container(
-                    width: MediaQuery.of(context).size.width > 600
-                        ? 900
-                        : double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(30),
-                        topRight: Radius.circular(30),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: Offset(0, -2),
-                        ),
-                      ],
-                    ),
+            child: Column(
+              children: [
+                // Espacio superior para el logo (flexible)
+                Flexible(
+                  flex: 2,
+                  child: Center(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 24.0, vertical: 32.0),
-                      child: Form(
-                        key: _formKey,
-                        child: _getCurrentStepContent(),
+                      padding: EdgeInsets.all(24.0),
+                      child: Image.network(
+                        'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/logo.png',
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+                // Contenedor blanco sobrepuesto
+                Flexible(
+                  flex: 5,
+                  child: Center(
+                    child: Container(
+                      width: MediaQuery.of(context).size.width > 600
+                          ? 900
+                          : double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(30),
+                          topRight: Radius.circular(30),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: Offset(0, -2),
+                          ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+                        child: Form(
+                          key: _formKey,
+                          child: _getCurrentStepContent(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -318,15 +320,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     color: const Color(0xFF7F7F7F),
                   ),
                 ),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Este campo es requerido';
                 }
-                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                    .hasMatch(value)) {
+                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
                   return 'Ingresa un correo válido';
                 }
                 return null;
@@ -351,20 +351,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             child: isLoading
                 ? CircularProgressIndicator(color: Colors.white)
                 : Text(
-                    'Continuar',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontFamily: 'Inter',
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+              'Continuar',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
         SizedBox(height: 24),
       ],
     );
   }
+
 
   Widget _buildCodeStep() {
     return Column(
@@ -421,8 +422,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     color: const Color(0xFF7F7F7F),
                   ),
                 ),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
@@ -466,14 +466,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             child: isLoading
                 ? CircularProgressIndicator(color: Colors.white)
                 : Text(
-                    'Verificar código',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontFamily: 'Inter',
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+              'Verificar código',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
         SizedBox(height: 24),
@@ -535,15 +535,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     color: Colors.white,
                   ),
                 ),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 suffixIcon: Padding(
                   padding: EdgeInsets.only(right: 8.0),
                   child: IconButton(
                     icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
                       color: Colors.grey[600],
                     ),
                     onPressed: () {
@@ -589,15 +586,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     color: Colors.white,
                   ),
                 ),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 suffixIcon: Padding(
                   padding: EdgeInsets.only(right: 8.0),
                   child: IconButton(
                     icon: Icon(
-                      _obscureConfirmPassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+                      _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
                       color: Colors.grey[600],
                     ),
                     onPressed: () {
@@ -637,14 +631,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             child: isLoading
                 ? CircularProgressIndicator(color: Colors.white)
                 : Text(
-                    'Cambiar contraseña',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontFamily: 'Inter',
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+              'Cambiar contraseña',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
         SizedBox(height: 24),
