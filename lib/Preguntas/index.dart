@@ -65,11 +65,13 @@ class _IndexScreenState extends State<IndexScreen> {
   Future<void> _precacheImages() async {
     await Future.wait([
       precacheImage(
-        NetworkImage('https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_seguridad.png'),
+        NetworkImage(
+            'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_seguridad.png'),
         context,
       ),
       precacheImage(
-        NetworkImage('https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_espejo.png'),
+        NetworkImage(
+            'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_espejo.png'),
         context,
       ),
     ]);
@@ -196,16 +198,16 @@ class _IndexScreenState extends State<IndexScreen> {
         final List<dynamic> data = json.decode(response.body);
 
         if (data.isNotEmpty) {
-          final hierarchicalLevels = data
-              .map((item) => Map<String, dynamic>.from(item))
-              .toList();
+          final hierarchicalLevels =
+              data.map((item) => Map<String, dynamic>.from(item)).toList();
 
           if (!mounted) return;
           setState(() {
             questionCategories['level'] = hierarchicalLevels;
           });
 
-          print('Niveles jerárquicos cargados correctamente (${hierarchicalLevels.length}).');
+          print(
+              'Niveles jerárquicos cargados correctamente (${hierarchicalLevels.length}).');
         } else {
           print('No se encontraron niveles jerárquicos para el área $areaId.');
         }
@@ -254,8 +256,10 @@ class _IndexScreenState extends State<IndexScreen> {
         'iduser': userId.toString(),
       };
 
-      var uriArea = Uri.parse('general/area/by-user').replace(queryParameters: queryParams);
-      var areasResponse = await widget.apiServiceWithToken.get(uriArea.toString());
+      var uriArea = Uri.parse('general/area/by-user')
+          .replace(queryParameters: queryParams);
+      var areasResponse =
+          await widget.apiServiceWithToken.get(uriArea.toString());
 
       var areasData = json.decode(areasResponse.body);
       var areas = areasData as List;
@@ -263,9 +267,8 @@ class _IndexScreenState extends State<IndexScreen> {
       if (areas.isNotEmpty) {
         if (!mounted) return;
         setState(() {
-          questionCategories['area'] = areas
-              .map((item) => Map<String, dynamic>.from(item))
-              .toList();
+          questionCategories['area'] =
+              areas.map((item) => Map<String, dynamic>.from(item)).toList();
         });
 
         print('Áreas cargadas correctamente.');
@@ -285,7 +288,8 @@ class _IndexScreenState extends State<IndexScreen> {
         var data = json.decode(responses[i].body);
 
         if (data != null && data is List) {
-          var category = data.map((item) => Map<String, dynamic>.from(item)).toList();
+          var category =
+              data.map((item) => Map<String, dynamic>.from(item)).toList();
 
           if (i == 0) {
             questionCategories['age_range'] = category;
@@ -441,12 +445,40 @@ class _IndexScreenState extends State<IndexScreen> {
         final isSmallHeight = screenHeight < 700;
 
         // Adaptación responsiva de tamaños
-        final titleFontSize = isLargeTablet ? 32.0 : isTablet ? 28.0 : isSmallHeight ? 20.0 : 24.0;
-        final textFontSize = isLargeTablet ? 20.0 : isTablet ? 18.0 : isSmallHeight ? 16.0 : 18.0;
-        final buttonWidth = isLargeTablet ? 250.0 : isTablet ? 220.0 : isSmallHeight ? 280.0 : 310.0;
-        final imageSize = isLargeTablet ? 220.0 : isTablet ? 200.0 : isSmallHeight ? 120.0 : 150.0;
+        final titleFontSize = isLargeTablet
+            ? 32.0
+            : isTablet
+                ? 28.0
+                : isSmallHeight
+                    ? 20.0
+                    : 24.0;
+        final textFontSize = isLargeTablet
+            ? 20.0
+            : isTablet
+                ? 18.0
+                : isSmallHeight
+                    ? 16.0
+                    : 18.0;
+        final buttonWidth = isLargeTablet
+            ? 250.0
+            : isTablet
+                ? 220.0
+                : isSmallHeight
+                    ? 280.0
+                    : 310.0;
+        final imageSize = isLargeTablet
+            ? 220.0
+            : isTablet
+                ? 200.0
+                : isSmallHeight
+                    ? 120.0
+                    : 150.0;
         final contentPadding = isTablet ? 40.0 : 20.0;
-        final maxContentWidth = isLargeTablet ? 900.0 : isTablet ? 700.0 : double.infinity;
+        final maxContentWidth = isLargeTablet
+            ? 900.0
+            : isTablet
+                ? 700.0
+                : double.infinity;
 
         return Center(
           child: ConstrainedBox(
@@ -456,7 +488,8 @@ class _IndexScreenState extends State<IndexScreen> {
             ),
             child: SingleChildScrollView(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(contentPadding, contentPadding, contentPadding, 12.0),
+                padding: EdgeInsets.fromLTRB(
+                    contentPadding, contentPadding, contentPadding, 12.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -470,7 +503,12 @@ class _IndexScreenState extends State<IndexScreen> {
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    SizedBox(height: isSmallHeight ? 15.0 : isTablet ? 30.0 : 20.0),
+                    SizedBox(
+                        height: isSmallHeight
+                            ? 15.0
+                            : isTablet
+                                ? 30.0
+                                : 20.0),
 
                     // Checkboxes
                     _buildCheckboxRow(
@@ -478,7 +516,8 @@ class _IndexScreenState extends State<IndexScreen> {
                       textSpans: [
                         TextSpan(
                           text: 'Acepto la ',
-                          style: TextStyle(fontSize: textFontSize, color: Colors.black),
+                          style: TextStyle(
+                              fontSize: textFontSize, color: Colors.black),
                         ),
                         TextSpan(
                           text: 'Política de privacidad',
@@ -491,14 +530,15 @@ class _IndexScreenState extends State<IndexScreen> {
                             ..onTap = () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => PoliticaPrivacidadScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => PoliticaPrivacidadScreen()),
                               );
                             },
                         ),
                         TextSpan(
                             text: ' y las ',
-                            style: TextStyle(fontSize: textFontSize, color: Colors.black)
-                        ),
+                            style: TextStyle(
+                                fontSize: textFontSize, color: Colors.black)),
                         TextSpan(
                           text: 'Condiciones de uso',
                           style: TextStyle(
@@ -510,7 +550,8 @@ class _IndexScreenState extends State<IndexScreen> {
                             ..onTap = () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => CondicionesUsoScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => CondicionesUsoScreen()),
                               );
                             },
                         ),
@@ -529,8 +570,10 @@ class _IndexScreenState extends State<IndexScreen> {
                       isChecked: acceptedProcessing1,
                       textSpans: [
                         TextSpan(
-                          text: 'Acepto el procesamiento de mis datos personales de salud con el fin de facilitar las funciones de la aplicación. Ver más en la ',
-                          style: TextStyle(fontSize: textFontSize, color: Colors.black),
+                          text:
+                              'Acepto el procesamiento de mis datos personales de salud con el fin de facilitar las funciones de la aplicación. Ver más en la ',
+                          style: TextStyle(
+                              fontSize: textFontSize, color: Colors.black),
                         ),
                         TextSpan(
                           text: 'Política de privacidad',
@@ -543,7 +586,8 @@ class _IndexScreenState extends State<IndexScreen> {
                             ..onTap = () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => PoliticaPrivacidadScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => PoliticaPrivacidadScreen()),
                               );
                             },
                         ),
@@ -562,8 +606,10 @@ class _IndexScreenState extends State<IndexScreen> {
                       isChecked: acceptedTracking,
                       textSpans: [
                         TextSpan(
-                          text: 'Autorizo a la empresa a recopilar y utilizar información sobre mi actividad en aplicaciones y sitios web relacionados, así como datos necesarios para evaluar mi nivel de estrés y bienestar laboral, conforme a lo establecido en la ',
-                          style: TextStyle(fontSize: textFontSize, color: Colors.black),
+                          text:
+                              'Autorizo a la empresa a recopilar y utilizar información sobre mi actividad en aplicaciones y sitios web relacionados, así como datos necesarios para evaluar mi nivel de estrés y bienestar laboral, conforme a lo establecido en la ',
+                          style: TextStyle(
+                              fontSize: textFontSize, color: Colors.black),
                         ),
                         TextSpan(
                           text: 'Política de privacidad',
@@ -576,7 +622,8 @@ class _IndexScreenState extends State<IndexScreen> {
                             ..onTap = () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => PoliticaPrivacidadScreen()),
+                                MaterialPageRoute(
+                                    builder: (_) => PoliticaPrivacidadScreen()),
                               );
                             },
                         ),
@@ -590,7 +637,12 @@ class _IndexScreenState extends State<IndexScreen> {
                       fontSize: textFontSize,
                     ),
 
-                    SizedBox(height: isSmallHeight ? 15.0 : isTablet ? 30.0 : 20.0),
+                    SizedBox(
+                        height: isSmallHeight
+                            ? 15.0
+                            : isTablet
+                                ? 30.0
+                                : 20.0),
 
                     // Imagen
                     Image.network(
@@ -599,7 +651,12 @@ class _IndexScreenState extends State<IndexScreen> {
                       height: imageSize + 30,
                       fit: BoxFit.contain,
                     ),
-                    SizedBox(height: isSmallHeight ? 15.0 : isTablet ? 30.0 : 20.0),
+                    SizedBox(
+                        height: isSmallHeight
+                            ? 15.0
+                            : isTablet
+                                ? 30.0
+                                : 20.0),
 
                     // Botón Aceptar todo
                     GestureDetector(
@@ -659,7 +716,9 @@ class _IndexScreenState extends State<IndexScreen> {
                             vertical: isTablet ? 16 : 12),
                         clipBehavior: Clip.antiAlias,
                         decoration: ShapeDecoration(
-                          color: agreedToAll ? const Color(0xFF5027D0) : const Color(0xFFD7D7D7),
+                          color: agreedToAll
+                              ? const Color(0xFF5027D0)
+                              : const Color(0xFFD7D7D7),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(40),
                           ),
@@ -668,7 +727,9 @@ class _IndexScreenState extends State<IndexScreen> {
                           child: Text(
                             'Continuar',
                             style: TextStyle(
-                              color: agreedToAll ? Colors.white : const Color(0xFF868686),
+                              color: agreedToAll
+                                  ? Colors.white
+                                  : const Color(0xFF868686),
                               fontSize: isTablet ? 24 : 22,
                               fontFamily: 'Inter',
                               fontWeight: FontWeight.w600,
@@ -748,14 +809,40 @@ class _IndexScreenState extends State<IndexScreen> {
         final isSmallDevice = screenHeight < 650 || screenWidth < 350;
 
         // Adaptación responsiva
-        final contentWidth = isLargeTablet ? 900.0 : isTablet ? 700.0 : screenWidth;
+        final contentWidth = isLargeTablet
+            ? 900.0
+            : isTablet
+                ? 700.0
+                : screenWidth;
         final horizontalPadding = isTablet ? 40.0 : 20.0;
-        final topPadding = isTablet ? 60.0 : 40.0;
-        final titleFontSize = isLargeTablet ? 32.0 : isTablet ? 28.0 : 24.0;
-        final questionCounterFontSize = isLargeTablet ? 20.0 : isTablet ? 18.0 : 18.0;
-        final buttonFontSize = isLargeTablet ? 26.0 : isTablet ? 24.0 : 22.0;
-        final optionFontSize = isLargeTablet ? 26.0 : isTablet ? 24.0 : isSmallDevice ? 20.0 : 22.0;
-        final verticalPadding = isSmallDevice ? 12.0 : isTablet ? 24.0 : 20.0;
+        final topPadding = isTablet ? 20.0 : 16.0;
+        final titleFontSize = isLargeTablet
+            ? 32.0
+            : isTablet
+                ? 28.0
+                : 24.0;
+        final questionCounterFontSize = isLargeTablet
+            ? 20.0
+            : isTablet
+                ? 18.0
+                : 18.0;
+        final buttonFontSize = isLargeTablet
+            ? 26.0
+            : isTablet
+                ? 24.0
+                : 22.0;
+        final optionFontSize = isLargeTablet
+            ? 26.0
+            : isTablet
+                ? 24.0
+                : isSmallDevice
+                    ? 20.0
+                    : 22.0;
+        final verticalPadding = isSmallDevice
+            ? 12.0
+            : isTablet
+                ? 24.0
+                : 20.0;
 
         String currentCategoryKey;
         switch (currentQuestionIndex) {
@@ -783,7 +870,8 @@ class _IndexScreenState extends State<IndexScreen> {
 
         var currentCategoryQuestions = questionCategories[currentCategoryKey];
 
-        if (currentCategoryQuestions == null || currentCategoryQuestions.isEmpty) {
+        if (currentCategoryQuestions == null ||
+            currentCategoryQuestions.isEmpty) {
           return Center(
             child: Text("No se encontraron preguntas para esta categoría."),
           );
@@ -804,201 +892,213 @@ class _IndexScreenState extends State<IndexScreen> {
             preguntaTexto = '¿Cuál es tu posición en la organización?';
             break;
           case 4:
-            preguntaTexto = '¿Cuál es tu nivel de responsabilidad en tu organización?';
+            preguntaTexto =
+                '¿Cuál es tu nivel de responsabilidad en tu organización?';
             break;
           case 5:
             preguntaTexto = '¿A que sede perteneces?';
             break;
         }
 
-        return Align(
-          alignment: Alignment.topCenter,
-          child: SizedBox(
-            width: contentWidth,
-            child: Column(
-              children: [
-                // Header fijo (barra de progreso + pregunta)
-                Padding(
-                  padding: EdgeInsets.only(
-                    top: topPadding,
-                    left: horizontalPadding,
-                    right: horizontalPadding,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Barra de progreso con icono de retroceder
-                      Row(
-                        children: [
-                          // Icono de retroceder (solo visible si no es la primera pregunta)
-                          if (currentQuestionIndex > 0)
-                            GestureDetector(
-                              onTap: goToPreviousQuestion,
-                              child: Container(
-                                padding: EdgeInsets.all(isTablet ? 8.0 : 6.0),
-                                margin: EdgeInsets.only(right: isTablet ? 16.0 : 12.0),
-                                child: Icon(
-                                  Icons.arrow_back_ios,
-                                  color: Colors.black,
-                                  size: isTablet ? 24.0 : 20.0,
-                                ),
-                              ),
-                            )
-                          else
-                            SizedBox(width: isTablet ? 48.0 : 38.0),
-
-                          // Barra de progreso expandida
-                          Expanded(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: List.generate(6, (index) {
-                                return Expanded(
-                                  child: Container(
-                                    margin: EdgeInsets.symmetric(horizontal: isTablet ? 6.0 : 4.0),
-                                    height: isTablet ? 8.0 : 6.0,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(isTablet ? 4.0 : 3.0),
-                                      color: index <= currentQuestionIndex
-                                          ? const Color(0xFF6D4BD8)
-                                          : const Color(0xFFE0E0E0),
-                                    ),
-                                  ),
-                                );
-                              }),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      SizedBox(height: isTablet ? 40.0 : 30.0),
-
-                      // Contador de preguntas
-                      Text(
-                        'Pregunta ${currentQuestionIndex + 1} de 6',
-                        style: TextStyle(
-                          color: Color(0xFF212121),
-                          fontSize: questionCounterFontSize,
-                          fontFamily: 'Inter',
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-
-                      SizedBox(height: isTablet ? 12.0 : 8.0),
-
-                      // Pregunta
-                      Text(
-                        preguntaTexto,
-                        style: TextStyle(
-                          color: Color(0xFF5027D0),
-                          fontSize: titleFontSize,
-                          fontFamily: 'Inter',
-                          fontWeight: FontWeight.w600,
-                        ),
-                        textAlign: TextAlign.start,
-                      ),
-                    ],
-                  ),
-                ),
-
-                SizedBox(height: isTablet ? 24.0 : 16.0),
-
-                // Opciones scrolleables (expandido para ocupar el espacio disponible)
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                    child: _buildQuestionField(
-                      currentCategoryQuestions,
-                      optionFontSize,
-                      verticalPadding,
-                      isTablet,
+        return SafeArea(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              width: contentWidth,
+              child: Column(
+                children: [
+                  // Header fijo (barra de progreso + pregunta)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      top: topPadding,
+                      left: horizontalPadding,
+                      right: horizontalPadding,
                     ),
-                  ),
-                ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Barra de progreso con icono de retroceder
+                        Row(
+                          children: [
+                            // Icono de retroceder (solo visible si no es la primera pregunta)
+                            if (currentQuestionIndex > 0)
+                              GestureDetector(
+                                onTap: goToPreviousQuestion,
+                                child: Container(
+                                  padding: EdgeInsets.all(isTablet ? 8.0 : 6.0),
+                                  margin: EdgeInsets.only(
+                                      right: isTablet ? 16.0 : 12.0),
+                                  child: Icon(
+                                    Icons.arrow_back_ios,
+                                    color: Colors.black,
+                                    size: isTablet ? 24.0 : 20.0,
+                                  ),
+                                ),
+                              )
+                            else
+                              SizedBox(width: isTablet ? 48.0 : 38.0),
 
-                // Botón Siguiente/Finalizar fijo en la parte inferior
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    horizontalPadding,
-                    isTablet ? 20 : 12,
-                    horizontalPadding,
-                    isTablet ? 40 : 30,
-                  ),
-                  child: Builder(
-                    builder: (context) {
-                      final bool isNextEnabled = selectedOption != null ||
-                          selectedAnswers.containsKey(currentQuestionIndex);
-                      final String nextLabel =
-                          currentQuestionIndex < 5 ? 'Siguiente' : 'Continuar';
-
-                      return GestureDetector(
-                        onTap: isNextEnabled
-                            ? () {
-                                if (currentQuestionIndex < 5) {
-                                  goToNextQuestion();
-                                } else {
-                                  // Navegar a la pantalla de resumen
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => IndexSummaryScreen(
-                                        onFinalize: saveResponses,
-                                        onBack: () {
-                                          Navigator.pop(context); // Retroceder a la pantalla de preguntas
-                                        },
+                            // Barra de progreso expandida
+                            Expanded(
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: List.generate(6, (index) {
+                                  return Expanded(
+                                    child: Container(
+                                      margin: EdgeInsets.symmetric(
+                                          horizontal: isTablet ? 6.0 : 4.0),
+                                      height: isTablet ? 8.0 : 6.0,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(
+                                            isTablet ? 4.0 : 3.0),
+                                        color: index <= currentQuestionIndex
+                                            ? const Color(0xFF6D4BD8)
+                                            : const Color(0xFFE0E0E0),
                                       ),
                                     ),
                                   );
-                                }
-                              }
-                            : null,
-                        child: Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.symmetric(
-                            vertical: verticalPadding,
-                          ),
-                          decoration: ShapeDecoration(
-                            color: isNextEnabled
-                                ? const Color(0xFF6D4BD8)
-                                : const Color(0xFFD7D7D7),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(isTablet ? 40.0 : 40.0),
+                                }),
+                              ),
                             ),
-                            shadows: isNextEnabled
-                                ? const [
-                                    BoxShadow(
-                                      color: Color(0x26000000),
-                                      blurRadius: 6,
-                                      offset: Offset(0, 2),
-                                      spreadRadius: 2,
-                                    ),
-                                    BoxShadow(
-                                      color: Color(0x4C000000),
-                                      blurRadius: 2,
-                                      offset: Offset(0, 1),
-                                      spreadRadius: 0,
-                                    ),
-                                  ]
-                                : const [],
+                          ],
+                        ),
+
+                        SizedBox(height: isTablet ? 16.0 : 12.0),
+
+                        // Contador de preguntas
+                        Text(
+                          'Pregunta ${currentQuestionIndex + 1} de 6',
+                          style: TextStyle(
+                            color: Color(0xFF212121),
+                            fontSize: questionCounterFontSize,
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w600,
                           ),
-                          child: Center(
-                            child: Text(
-                              nextLabel,
-                              style: TextStyle(
-                                color: isNextEnabled
-                                    ? Colors.white
-                                    : const Color(0xFF868686),
-                                fontSize: buttonFontSize,
-                                fontFamily: 'Inter',
-                                fontWeight: FontWeight.w600,
+                        ),
+
+                        SizedBox(height: isTablet ? 8.0 : 4.0),
+
+                        // Pregunta
+                        Text(
+                          preguntaTexto,
+                          style: TextStyle(
+                            color: Color(0xFF5027D0),
+                            fontSize: titleFontSize,
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.start,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: isTablet ? 16.0 : 12.0),
+
+                  // Opciones scrolleables (expandido para ocupar el espacio disponible)
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: horizontalPadding),
+                      child: _buildQuestionField(
+                        currentCategoryQuestions,
+                        optionFontSize,
+                        verticalPadding,
+                        isTablet,
+                      ),
+                    ),
+                  ),
+
+                  // Botón Siguiente/Finalizar fijo en la parte inferior
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      horizontalPadding,
+                      isTablet ? 20 : 12,
+                      horizontalPadding,
+                      isTablet ? 40 : 30,
+                    ),
+                    child: Builder(
+                      builder: (context) {
+                        final bool isNextEnabled = selectedOption != null ||
+                            selectedAnswers.containsKey(currentQuestionIndex);
+                        final String nextLabel = currentQuestionIndex < 5
+                            ? 'Siguiente'
+                            : 'Continuar';
+
+                        return GestureDetector(
+                          onTap: isNextEnabled
+                              ? () {
+                                  if (currentQuestionIndex < 5) {
+                                    goToNextQuestion();
+                                  } else {
+                                    // Navegar a la pantalla de resumen
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            IndexSummaryScreen(
+                                          onFinalize: saveResponses,
+                                          onBack: () {
+                                            Navigator.pop(
+                                                context); // Retroceder a la pantalla de preguntas
+                                          },
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                              : null,
+                          child: Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.symmetric(
+                              vertical: verticalPadding,
+                            ),
+                            decoration: ShapeDecoration(
+                              color: isNextEnabled
+                                  ? const Color(0xFF6D4BD8)
+                                  : const Color(0xFFD7D7D7),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                    isTablet ? 40.0 : 40.0),
+                              ),
+                              shadows: isNextEnabled
+                                  ? const [
+                                      BoxShadow(
+                                        color: Color(0x26000000),
+                                        blurRadius: 6,
+                                        offset: Offset(0, 2),
+                                        spreadRadius: 2,
+                                      ),
+                                      BoxShadow(
+                                        color: Color(0x4C000000),
+                                        blurRadius: 2,
+                                        offset: Offset(0, 1),
+                                        spreadRadius: 0,
+                                      ),
+                                    ]
+                                  : const [],
+                            ),
+                            child: Center(
+                              child: Text(
+                                nextLabel,
+                                style: TextStyle(
+                                  color: isNextEnabled
+                                      ? Colors.white
+                                      : const Color(0xFF868686),
+                                  fontSize: buttonFontSize,
+                                  fontFamily: 'Inter',
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -1023,7 +1123,8 @@ class _IndexScreenState extends State<IndexScreen> {
           return Padding(
             padding: EdgeInsets.symmetric(vertical: isTablet ? 12.0 : 8.0),
             child: SizedBox(
-              width: MediaQuery.of(context).size.width * (isTablet ? 0.9 : 0.85),
+              width:
+                  MediaQuery.of(context).size.width * (isTablet ? 0.9 : 0.85),
               child: OutlinedButton(
                 style: OutlinedButton.styleFrom(
                   backgroundColor: selectedOption == question['id'].toString()
@@ -1071,7 +1172,8 @@ class _IndexScreenState extends State<IndexScreen> {
 
   void _updateAgreedToAll() {
     setState(() {
-      agreedToAll = acceptedProcessing && acceptedTracking && acceptedProcessing1;
+      agreedToAll =
+          acceptedProcessing && acceptedTracking && acceptedProcessing1;
     });
   }
 }
