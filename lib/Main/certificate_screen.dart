@@ -182,41 +182,63 @@ class _CertificateScreenState extends State<CertificateScreen>
               }
             }
           } else {
-            // En móvil: Guardar el PDF en Descargas
+            // En móvil: Guardar el PDF
             try {
-              Directory? directory;
+              // Primero guardamos temporalmente para tener una ruta
+              final tempDir = await getTemporaryDirectory();
+              final tempFile = File('${tempDir.path}/$fileName');
+              await tempFile.writeAsBytes(pdfBytes);
 
-              if (Platform.isAndroid) {
-                // En Android, guardar en Downloads
-                directory = Directory('/storage/emulated/0/Download');
-                if (!await directory.exists()) {
-                  directory = await getExternalStorageDirectory();
-                }
-              } else if (Platform.isIOS) {
-                // En iOS, guardar en Documents (accesible desde Archivos)
-                directory = await getApplicationDocumentsDirectory();
-              }
+              // Guardar la ruta para compartir después
+              setState(() {
+                _savedPdfPath = tempFile.path;
+              });
 
-              if (directory != null) {
-                final file = File('${directory.path}/$fileName');
-                await file.writeAsBytes(pdfBytes);
-
-                // Guardar la ruta para compartir después
-                setState(() {
-                  _savedPdfPath = file.path;
-                });
-
-                print('📄 PDF guardado en: ${file.path}');
+              if (Platform.isIOS) {
+                // En iOS: Usar Share para que el usuario elija dónde guardar
+                // El sistema mostrará opciones como "Guardar en Archivos"
+                await Share.shareXFiles(
+                  [XFile(tempFile.path)],
+                  subject: 'Certificado $userName',
+                );
 
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
+                    const SnackBar(
                       content: Text(
-                          'Certificado guardado en ${Platform.isAndroid ? "Descargas" : "Documentos"}'),
+                          'Selecciona "Guardar en Archivos" para guardar tu certificado'),
                       backgroundColor: Colors.green,
                       duration: Duration(seconds: 3),
                     ),
                   );
+                }
+              } else if (Platform.isAndroid) {
+                // En Android, guardar directamente en Downloads
+                Directory? directory =
+                    Directory('/storage/emulated/0/Download');
+                if (!await directory.exists()) {
+                  directory = await getExternalStorageDirectory();
+                }
+
+                if (directory != null) {
+                  final file = File('${directory.path}/$fileName');
+                  await file.writeAsBytes(pdfBytes);
+
+                  setState(() {
+                    _savedPdfPath = file.path;
+                  });
+
+                  print('📄 PDF guardado en: ${file.path}');
+
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Certificado guardado en Descargas'),
+                        backgroundColor: Colors.green,
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                  }
                 }
               }
             } catch (e) {
@@ -334,34 +356,19 @@ class _CertificateScreenState extends State<CertificateScreen>
           final fileName =
               'Certificado_Funcional_${DateTime.now().millisecondsSinceEpoch}.pdf';
 
-          Directory? directory;
+          // Guardar en directorio temporal para todas las plataformas móviles
+          // El compartir se encargará de dar opciones al usuario
+          final tempDir = await getTemporaryDirectory();
+          final file = File('${tempDir.path}/$fileName');
+          await file.writeAsBytes(pdfBytes);
 
-          if (Platform.isAndroid) {
-            // En Android, guardar en Downloads
-            directory = Directory('/storage/emulated/0/Download');
-            if (!await directory.exists()) {
-              directory = await getExternalStorageDirectory();
-            }
-          } else if (Platform.isIOS) {
-            // En iOS, guardar en Documents
-            directory = await getApplicationDocumentsDirectory();
-          } else {
-            // Fallback para otras plataformas
-            directory = await getTemporaryDirectory();
-          }
+          print('📄 PDF guardado temporalmente en: ${file.path}');
 
-          if (directory != null) {
-            final file = File('${directory.path}/$fileName');
-            await file.writeAsBytes(pdfBytes);
+          setState(() {
+            _savedPdfPath = file.path;
+          });
 
-            print('📄 PDF guardado en: ${file.path}');
-
-            setState(() {
-              _savedPdfPath = file.path;
-            });
-
-            return file.path;
-          }
+          return file.path;
         }
       }
 
