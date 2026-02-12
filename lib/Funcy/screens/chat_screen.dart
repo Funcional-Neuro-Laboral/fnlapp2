@@ -12,6 +12,7 @@ import '../widgets/chat_box_footer.dart';
 import '../widgets/custom_app_bar.dart';
 import '../../config.dart';
 import 'dart:async';
+import '../../Util/api_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final int userId;
@@ -62,14 +63,28 @@ class _ChatScreenState extends State<ChatScreen> {
 
   late WebSocketChannel _channel;
 
-  void _connectWebSocket() {
+  void _connectWebSocket() async {
     try {
-      _channel = WebSocketChannel.connect(Uri.parse(Config.wsUrl));
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      if (token == null) {
+        print(" No hay token disponible");
+        return;
+      }
+
+      print(" Token: ${token.substring(0, 30)}...");
+
+      final wsUrlWithToken = '${Config.wsUrl}?token=$token';
+
+      print(" Conectando a: $wsUrlWithToken");
+
+      _channel = WebSocketChannel.connect(Uri.parse(wsUrlWithToken));
 
       if (mounted) {
         setState(() => _isConnected = true);
       }
-      print("✅ Conectado al WebSocket");
+      print(" WebSocket conectado");
 
       _channel.stream.listen((message) {
         final data = jsonDecode(message);
@@ -80,10 +95,10 @@ class _ChatScreenState extends State<ChatScreen> {
           setState(() => _isConnected = false);
         }
       }, onError: (error) {
-        print("❌ Error WebSocket: $error");
+        print("Error WebSocket: $error");
       });
     } catch (e) {
-      print("No se pudo conectar: $e");
+      print("Error: $e");
     }
   }
 
@@ -187,9 +202,13 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     }
 
-    final url = Uri.parse('${Config.apiUrl2}/chat/messages?userId=${widget.userId}&limit=$_limit&offset=$_offset');
+    final apiService = ApiService();
+
     try {
-      final response = await http.get(url);
+      final response = await apiService.get(
+          'chat/messages?userId=${widget.userId}&limit=$_limit&offset=$_offset'
+      );
+
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
 
@@ -211,14 +230,12 @@ class _ChatScreenState extends State<ChatScreen> {
             _loadingMore = false;
           } else {
             messages = newMessages;
-            // Siempre agregar el mensaje de bienvenida al final (será el primero en aparecer)
             messages.add(_createWelcomeMessage());
           }
           _offset += _limit;
         });
       } else {
         print('Error al obtener mensajes: ${response.statusCode}');
-        // Si hay error, al menos mostrar el mensaje de bienvenida
         if (!isLoadMore) {
           setState(() {
             messages = [_createWelcomeMessage()];
@@ -227,7 +244,6 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (error) {
       print('Error en la solicitud HTTP: $error');
-      // Si hay error, al menos mostrar el mensaje de bienvenida
       if (!isLoadMore) {
         setState(() {
           messages = [_createWelcomeMessage()];
