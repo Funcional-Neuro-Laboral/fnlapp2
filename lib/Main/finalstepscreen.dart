@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:fnlapp/Main/home.dart';
 import 'dart:convert';
 import '../config.dart';
+import '../Util/api_service.dart';
 
 class FinalStepScreen extends StatefulWidget {
   final int userId;
@@ -149,19 +150,16 @@ class _FinalStepScreenState extends State<FinalStepScreen>
   }
 
   Future<void> _sendFeedbackToServer() async {
-    final String apiUrl =
-        "${Config.apiUrl2}/programs/sessions/${widget.sessionId}/complete/${widget.userId}";
-
     final Map<String, dynamic> requestData = {
       "comentario": _commentController.text.trim(),
       "estrellas": _rating.toInt(),
       "caritas": _selectedMood.value,
     };
 
-    final response = await http.put(
-      Uri.parse(apiUrl),
-      headers: {"Content-Type": "application/json"},
-      body: json.encode(requestData),
+    final apiService = ApiService();
+    final response = await apiService.put(
+      'programs/sessions/${widget.sessionId}/complete/${widget.userId}',
+      requestData,
     );
 
     if (response.statusCode != 200) {

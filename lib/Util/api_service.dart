@@ -88,4 +88,15 @@ class ApiService {
       throw Exception('Error: ${response.statusCode} - ${response.reasonPhrase}');
     }
   }
+
+  Future<http.Response> put(String endpoint, Map<String, dynamic> data) async {
+    final currentToken = await _getCurrentToken();
+    final response = await http.put(
+      Uri.parse('${Config.apiUrl}/$endpoint'),
+      headers: await _headers(currentToken),
+      body: jsonEncode(data),
+    );
+    await _handleResponse(response);
+    return response;
+  }
 }
