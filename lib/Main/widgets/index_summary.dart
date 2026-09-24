@@ -109,7 +109,7 @@ class IndexSummaryScreen extends StatelessWidget {
                             // Imagen centrada horizontalmente
                             Center(
                               child: Image.network(
-                                'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_espejo.png',
+                                'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/happy.png',
                                 width: imageSize.clamp(150.0, 400.0),
                                 height: imageSize.clamp(150.0, 400.0),
                                 fit: BoxFit.contain,

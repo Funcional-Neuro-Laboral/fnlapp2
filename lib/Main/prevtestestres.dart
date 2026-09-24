@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:fnlapp/Main/testestres_form.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 class TestEstresScreen extends StatelessWidget {
   const TestEstresScreen({Key? key}) : super(key: key);
@@ -55,23 +54,44 @@ class TestEstresScreen extends StatelessWidget {
                   flex: 3,
                   child: Container(
                     constraints: BoxConstraints(
-                      maxWidth: esEscritorio ? 400 : (esTablet ? 350 : anchosPantalla * 0.8),
-                      maxHeight: esEscritorio ? 300 : (esTablet ? 280 : altoPantalla * 0.25),
+                      maxWidth: esEscritorio
+                          ? 400
+                          : (esTablet ? 350 : anchosPantalla * 0.8),
+                      maxHeight: esEscritorio
+                          ? 300
+                          : (esTablet ? 280 : altoPantalla * 0.25),
                     ),
                     child: AspectRatio(
                       aspectRatio: 1.2,
-                      child: SvgPicture.network(
-                        'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/caras_funcy_prev_test.svg',
+                      child: Image.network(
+                        'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/Respiraci%C3%B3n/RELAJACION.png',
                         fit: BoxFit.contain,
-                        placeholderBuilder: (context) => Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Center(
-                            child: CircularProgressIndicator(),
-                          ),
-                        ),
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) {
+                            return child;
+                          }
+
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.broken_image),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),

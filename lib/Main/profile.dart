@@ -8,11 +8,12 @@ import 'models/profile_data.dart';
 import 'models/subscription_data.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../config.dart';
+import '../config.dart' as app_config;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fnlapp/Main/certificate_screen.dart';
+import 'package:fnlapp/SplashScreen/welcome_screen.dart' show FuncyColors;
 
 class ProfileScreen extends StatefulWidget {
   final ProfileData? profileData;
@@ -40,6 +41,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   SubscriptionData? _subscriptionData;
   bool _loadingSubscription = true;
 
+  // Ancho máximo del contenido (mismo criterio que en PlanScreen): evita
+  // que la tarjeta y el header se estiren de borde a borde en tablet/web.
+  static const double _maxContentWidth = 560.0;
+
   @override
   void initState() {
     super.initState();
@@ -58,7 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
 
       final response = await http.get(
-        Uri.parse('${Config.apiUrl2}/subscriptions/current'),
+        Uri.parse('${app_config.Config.apiUrl2}/subscriptions/current'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -91,7 +96,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final token = prefs.getString('token');
 
       final response = await http.post(
-        Uri.parse('${Config.apiUrl2}/subscriptions/cancel'),
+        Uri.parse('${app_config.Config.apiUrl2}/subscriptions/cancel'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -163,7 +168,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         throw Exception('No se pudo obtener el ID del usuario');
       }
 
-      final uri = Uri.parse('${Config.apiUrl2}/users/upload-photo/$userId');
+      final uri = Uri.parse('${app_config.Config.apiUrl2}/users/upload-photo/$userId');
       final request = http.MultipartRequest('PUT', uri);
 
       if (token != null) {
@@ -271,7 +276,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         throw Exception('No se pudieron obtener los datos del usuario');
       }
 
-      String url = '${Config.apiUrl2}/users/getprofile/$userId';
+      String url = '${app_config.Config.apiUrl2}/users/getprofile/$userId';
       final response = await http.get(
         Uri.parse(url),
         headers: {
@@ -418,69 +423,166 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final isTablet = size.width >= 600 && size.width < 1200;
-    final isDesktop = size.width >= 1200;
-    final horizontalPadding = isDesktop
-        ? 200.0
-        : isTablet
-            ? 80.0
-            : 16.0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F4F4),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.only(bottom: 110),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(height: size.height * 0.03),
-                Text(
-                  'Perfil',
-                  style: GoogleFonts.inter(
-                    color: const Color(0xFF212121),
-                    fontSize: size.width < 400
-                        ? 28.0
-                        : size.width < 600
-                            ? 32.0
-                            : 36.0,
-                    fontWeight: FontWeight.w700,
+      body: Stack(
+        children: [
+          // Mismo lenguaje visual del login, bienvenida y "Mi Plan Diario":
+          // degradado de marca con formas suaves de profundidad.
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  FuncyColors.primaryDark,
+                  FuncyColors.primary,
+                  FuncyColors.primaryLight,
+                ],
+                stops: [0.0, 0.4, 1.0],
+              ),
+            ),
+          ),
+          Positioned(
+            top: -90,
+            right: -70,
+            child: _decorativeCircle(220, Colors.white.withOpacity(0.06)),
+          ),
+          Positioned(
+            top: 220,
+            left: -80,
+            child: _decorativeCircle(170, Colors.white.withOpacity(0.05)),
+          ),
+
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 110),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: _maxContentWidth,
                   ),
-                ),
-                SizedBox(height: size.height * 0.015),
-                Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: isDesktop ? 800 : double.infinity,
-                    ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20.0, vertical: 20.0),
                     child: Column(
                       children: [
-                        _buildProfileImage(size),
-                        SizedBox(height: size.height * 0.02),
-                        _buildUserName(size),
-                        SizedBox(height: size.height * 0.015),
-                        _buildSubscriptionBadge(size),
-                        SizedBox(height: size.height * 0.02),
-                        _buildInfoGrid(size, isTablet, isDesktop),
-                        SizedBox(height: size.height * 0.02),
-                        _buildSubscriptionButton(size, isDesktop),
-                        SizedBox(height: size.height * 0.015),
-                        _buildLogoutButton(size, isDesktop),
-                        SizedBox(height: size.height * 0.015),
-                        // Botón de certificado (visible solo si completó el programa)
-                        _buildCertificateButton(size, isDesktop),
-                        SizedBox(height: size.height * 0.02),
+                        _buildHeader(size),
+                        const SizedBox(height: 8),
+                        _buildProfileCard(size),
                       ],
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
+    );
+  }
+
+  Widget _decorativeCircle(double diameter, Color color) {
+    return Container(
+      width: diameter,
+      height: diameter,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+    );
+  }
+
+  // Header con el mismo estilo "kicker + título" de PlanScreen, más la
+  // mascota Funcy dando la bienvenida al usuario en su perfil.
+  Widget _buildHeader(Size size) {
+    final mascotSize = size.width < 400 ? 64.0 : 80.0;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'FUNCY · TU PERFIL',
+                style: GoogleFonts.inter(
+                  color: Colors.white.withOpacity(0.72),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Mi Perfil',
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontSize: size.width < 400 ? 26.0 : 30.0,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Image.asset(
+          'assets/images/happy_mascot.png',
+          height: mascotSize,
+          width: mascotSize,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) =>
+              const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
+  // Tarjeta blanca flotante (mismo criterio que la tarjeta de progreso en
+  // PlanScreen), con el avatar superpuesto sobre el borde superior.
+  Widget _buildProfileCard(Size size) {
+    final avatarSize = size.width < 400
+        ? 125.0
+        : size.width < 600
+            ? 140.0
+            : 160.0;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.topCenter,
+      children: [
+        Container(
+          width: double.infinity,
+          margin: EdgeInsets.only(top: avatarSize / 2),
+          padding: EdgeInsets.fromLTRB(20, avatarSize / 2 + 16, 20, 24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: FuncyColors.primaryDark.withOpacity(0.22),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              _buildUserName(size),
+              SizedBox(height: size.height * 0.015),
+              _buildSubscriptionBadge(size),
+              SizedBox(height: size.height * 0.02),
+              _buildInfoSection(),
+              SizedBox(height: size.height * 0.02),
+              _buildSubscriptionButton(size),
+              SizedBox(height: size.height * 0.015),
+              _buildLogoutButton(size),
+              SizedBox(height: size.height * 0.015),
+              // Botón de certificado (visible solo si completó el programa)
+              _buildCertificateButton(size),
+            ],
+          ),
+        ),
+        _buildProfileImage(size),
+      ],
     );
   }
 
@@ -623,197 +725,143 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildInfoGrid(Size size, bool isTablet, bool isDesktop) {
-    final cardPadding = size.width < 400
-        ? 16.0
-        : size.width < 600
-            ? 20.0
-            : 24.0;
-    final cardSpacing = size.width < 400 ? 12.0 : 16.0;
+  // Sección de información: chips de color individuales en vez de una
+  // grilla rígida de columnas. El número de columnas se decide con
+  // LayoutBuilder, a partir del ANCHO DISPONIBLE real en ese punto del
+  // árbol (nunca del ancho de pantalla), así que no importa cuánto se
+  // estire la ventana: cada chip siempre tiene espacio suficiente y el
+  // texto nunca queda comprimido letra por letra.
+  Widget _buildInfoSection() {
+    final items = <_InfoItem>[
+      _InfoItem(
+        icon: Icons.email_outlined,
+        title: 'ID',
+        value: widget.profileData?.username ?? 'No disponible',
+        color: const Color(0xFF6D4BD8), // morado de marca
+      ),
+      _InfoItem(
+        icon: Icons.female,
+        title: 'Género',
+        value: widget.profileData?.gender ?? 'No disponible',
+        color: const Color(0xFF2FB8A6), // teal
+      ),
+      _InfoItem(
+        icon: Icons.person_outline,
+        title: 'Puesto',
+        value: widget.profileData?.hierarchicalLevel ?? 'No disponible',
+        color: const Color(0xFFEF7D57), // coral
+      ),
+      _InfoItem(
+        icon: Icons.business_outlined,
+        title: 'Centro',
+        value: widget.profileData?.nombreEmpresa ?? 'No disponible',
+        color: const Color(0xFFF2B134), // ámbar
+      ),
+    ];
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(cardPadding),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFDCD4F6),
-        borderRadius: BorderRadius.circular(size.width < 600 ? 16 : 20),
+        color: const Color(0xFFF6F3FC),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: FuncyColors.primary.withOpacity(0.10)),
       ),
-      child: isDesktop && size.width > 1200
-          ? _buildDesktopLayout(cardSpacing, size)
-          : _buildTabletMobileLayout(cardSpacing, size),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.badge_outlined, color: FuncyColors.primary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Información',
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF212121),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const spacing = 12.0;
+              // 1 columna si el espacio real es angosto, 2 si alcanza.
+              // Umbral bajo (380) a propósito: dos chips de ~180px cada
+              // uno leen bien, y por debajo de eso una sola columna evita
+              // cualquier compresión de texto.
+              final columns = constraints.maxWidth < 380 ? 1 : 2;
+              final itemWidth = columns == 1
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth - spacing) / 2;
+
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: items
+                    .map((item) => SizedBox(
+                          width: itemWidth,
+                          child: _buildInfoChip(item),
+                        ))
+                    .toList(),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildDesktopLayout(double cardSpacing, Size size) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildInfoCard(
-            icon: Icons.email_outlined,
-            title: 'ID',
-            value: widget.profileData?.username ?? 'No disponible',
-            size: size,
-          ),
-        ),
-        SizedBox(width: cardSpacing),
-        Expanded(
-          child: _buildInfoCard(
-            icon: Icons.female,
-            title: 'Género',
-            value: widget.profileData?.gender ?? 'No disponible',
-            size: size,
-          ),
-        ),
-        SizedBox(width: cardSpacing),
-        Expanded(
-          child: _buildInfoCard(
-            icon: Icons.person,
-            title: 'Puesto',
-            value: widget.profileData?.hierarchicalLevel ?? 'No disponible',
-            size: size,
-          ),
-        ),
-        SizedBox(width: cardSpacing),
-        Expanded(
-          child: _buildInfoCard(
-            icon: Icons.business_outlined,
-            title: 'Centro',
-            value: widget.profileData?.nombreEmpresa ?? 'No disponible',
-            size: size,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTabletMobileLayout(double cardSpacing, Size size) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildInfoCard(
-                icon: Icons.email_outlined,
-                title: 'ID',
-                value: widget.profileData?.username ?? 'No disponible',
-                size: size,
-              ),
-            ),
-            SizedBox(width: cardSpacing),
-            Expanded(
-              child: _buildInfoCard(
-                icon: Icons.female,
-                title: 'Género',
-                value: widget.profileData?.gender ?? 'No disponible',
-                size: size,
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: cardSpacing),
-        Row(
-          children: [
-            Expanded(
-              child: _buildInfoCard(
-                icon: Icons.person,
-                title: 'Puesto',
-                value: widget.profileData?.hierarchicalLevel ?? 'No disponible',
-                size: size,
-              ),
-            ),
-            SizedBox(width: cardSpacing),
-            Expanded(
-              child: _buildInfoCard(
-                icon: Icons.business_outlined,
-                title: 'Centro',
-                value: widget.profileData?.nombreEmpresa ?? 'No disponible',
-                size: size,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoCard({
-    required IconData icon,
-    required String title,
-    required String value,
-    required Size size,
-  }) {
-    final cardPadding = size.width < 400
-        ? 12.0
-        : size.width < 600
-            ? 16.0
-            : 20.0;
-    final iconSize = size.width < 400
-        ? 18.0
-        : size.width < 600
-            ? 20.0
-            : 22.0;
-    final titleFontSize = size.width < 400
-        ? 12.0
-        : size.width < 600
-            ? 14.0
-            : 16.0;
-    final valueFontSize = size.width < 400
-        ? 12.0
-        : size.width < 600
-            ? 14.0
-            : 16.0;
-
+  Widget _buildInfoChip(_InfoItem item) {
     return Container(
-      padding: EdgeInsets.all(cardPadding),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(size.width < 600 ? 10 : 12),
-        boxShadow: size.width >= 600
-            ? [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: item.color.withOpacity(0.18)),
+        boxShadow: [
+          BoxShadow(
+            color: item.color.withOpacity(0.12),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: EdgeInsets.all(size.width < 400 ? 6 : 8),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF0EEFF),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: item.color.withOpacity(0.14),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              icon,
-              color: const Color(0xFF4320AD),
-              size: iconSize,
-            ),
+            child: Icon(item.icon, color: item.color, size: 18),
           ),
-          SizedBox(width: size.width < 400 ? 8 : 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  title,
+                  item.title.toUpperCase(),
                   style: GoogleFonts.inter(
-                    color: const Color(0xFF3D3D3D),
-                    fontSize: titleFontSize,
-                    fontWeight: FontWeight.w600,
+                    color: item.color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
-                  value,
+                  item.value,
                   style: GoogleFonts.inter(
-                    color: Colors.black,
-                    fontSize: valueFontSize,
-                    fontWeight: FontWeight.w400,
+                    color: const Color(0xFF212121),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -826,7 +874,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSubscriptionButton(Size size, bool isDesktop) {
+  Widget _buildSubscriptionButton(Size size) {
     // Verificar si el usuario es de company_id 8
     int? companyId = widget.profileData?.idEmpresa;
 
@@ -856,9 +904,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Container(
       width: double.infinity,
-      constraints: BoxConstraints(
-        maxWidth: isDesktop ? 400 : size.width * 0.8,
-      ),
+      // Ancho fijo (ya no depende de size.width): al vivir dentro de la
+      // tarjeta blanca, que ya está acotada por _maxContentWidth, un
+      // límite fijo evita que el botón se vea desproporcionado.
+      constraints: const BoxConstraints(maxWidth: 400),
       child: ElevatedButton.icon(
         onPressed: isPro
             ? _cancelSubscription
@@ -898,7 +947,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildLogoutButton(Size size, bool isDesktop) {
+  Widget _buildLogoutButton(Size size) {
     final buttonPadding = size.width < 400
         ? 14.0
         : size.width < 600
@@ -910,12 +959,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ? 16.0
             : 18.0;
 
+    // Acento rojo/coral (distinto de la familia morada usada en el resto
+    // de la pantalla): así "Cerrar sesión" se lee de inmediato como una
+    // acción distinta —de salida— y no compite visualmente con los CTAs
+    // principales (suscripción, certificado).
+    const logoutColor = Color(0xFFE0564C);
+
     return Container(
       width: double.infinity,
-      constraints: BoxConstraints(
-        maxWidth: isDesktop ? 400 : size.width * 0.8,
-      ),
-      child: ElevatedButton(
+      constraints: const BoxConstraints(maxWidth: 400),
+      child: OutlinedButton.icon(
         onPressed: () async {
           final result = await _showLogoutDialog();
           if (result != null) {
@@ -923,29 +976,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
             widget.onLogout();
           }
         },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF6D4BD8),
+        icon: Icon(
+          Icons.logout_rounded,
+          color: logoutColor,
+          size: size.width < 400 ? 18 : 20,
+        ),
+        label: Text(
+          'Cerrar sesión',
+          style: GoogleFonts.inter(
+            color: logoutColor,
+            fontSize: fontSize,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: logoutColor.withOpacity(0.06),
           padding: EdgeInsets.symmetric(
             horizontal: size.width < 400 ? 24 : 32,
             vertical: buttonPadding,
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(40),
-            side: const BorderSide(
-              color: Color(0xFF6D4BD8),
-              width: 1.5,
-            ),
           ),
-          elevation: size.width >= 600 ? 2 : 0,
-          shadowColor: size.width >= 600 ? Colors.black.withOpacity(0.1) : null,
-        ),
-        child: Text(
-          'Cerrar sesión',
-          style: GoogleFonts.inter(
-            color: const Color(0xFF6D4BD8),
-            fontSize: fontSize,
-            fontWeight: FontWeight.w500,
+          side: BorderSide(
+            color: logoutColor.withOpacity(0.35),
+            width: 1.5,
           ),
         ),
       ),
@@ -953,7 +1008,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   /// Botón para ver el certificado (disponible después de completar el programa)
-  Widget _buildCertificateButton(Size size, bool isDesktop) {
+  Widget _buildCertificateButton(Size size) {
     final buttonPadding = size.width < 400
         ? 14.0
         : size.width < 600
@@ -972,9 +1027,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Container(
       width: double.infinity,
-      constraints: BoxConstraints(
-        maxWidth: isDesktop ? 400 : size.width * 0.8,
-      ),
+      constraints: const BoxConstraints(maxWidth: 400),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFF6D4BD8), Color(0xFF5027D0)],
@@ -1046,4 +1099,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ];
     return months[month - 1];
   }
+}
+
+// Pequeño contenedor de datos para cada chip de información del perfil.
+class _InfoItem {
+  final IconData icon;
+  final String title;
+  final String value;
+  final Color color;
+
+  _InfoItem({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.color,
+  });
 }

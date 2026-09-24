@@ -461,12 +461,16 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         // Verificar si el usuario pertenece a la empresa 8 (General)
         bool isCompany8 = await _isCompany8User();
 
-        print('DEBUG: isCompany8 = $isCompany8');
+        print('========== SUBSCRIPTION DEBUG ==========');
+        print('isCompany8 = $isCompany8');
 
+        final hasAccess = await SubscriptionService.hasAccessToPrograms();
+
+        print('hasAccessToPrograms = $hasAccess');
+        print('========================================');
+        
         // Verificar acceso a programas SOLO si es de company_id 8
         if (isCompany8) {
-          final hasAccess = await SubscriptionService.hasAccessToPrograms();
-
           if (!hasAccess) {
             // Usuario no tiene acceso, mostrar diálogo de suscripción
             final shouldNavigate = await _showSubscriptionDialog();
@@ -531,6 +535,11 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
             );
           }
         } else {
+            print('========================================');
+            print('POSIBLE BYPASS DE SUSCRIPCIÓN');
+            print('_isCompany8User() devolvió FALSE');
+            print('Se generará el programa SIN verificar suscripción');
+            print('========================================');          
           // Usuario NO es de company_id 8 (empresas con suscripción corporativa)
           // Generar programa directamente sin verificar suscripción individual
           await _generateProgram(userProfile, totalScore);

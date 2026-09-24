@@ -74,7 +74,7 @@ class _SplashScreenState extends State<SplashScreen> {
         decoration: const BoxDecoration(
           image: DecorationImage(
             image: NetworkImage(
-                'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/inicio_splash.png'),
+                'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/fnl/FNL+LOGO.jpeg'),
             fit: BoxFit.cover,
           ),
         ),

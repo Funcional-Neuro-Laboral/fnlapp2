@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../Util/token_service.dart';
+import 'login.dart' show FnlColors;
 
 class RegisterScreen extends StatefulWidget {
   @override
@@ -30,6 +30,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     });
   }
+
+  // ---------------------------------------------------------------------
+  // Lógica de negocio (sin cambios funcionales respecto a la versión original)
+  // ---------------------------------------------------------------------
 
   Future<void> _register(BuildContext context) async {
     if (_formKey.currentState == null || !_formKey.currentState!.validate())
@@ -237,273 +241,298 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
+      backgroundColor: FnlColors.background,
       body: LayoutBuilder(
         builder: (context, constraints) {
-          // Determinar el tipo de dispositivo
           final screenWidth = constraints.maxWidth;
           final isWeb = screenWidth > 900;
           final isTablet = screenWidth > 600 && screenWidth <= 900;
-          final isMobile = screenWidth <= 600;
+          final isWide = screenWidth > 600;
 
-          // Tamaños adaptativos
-          final titleSize = isWeb ? 36.0 : (isTablet ? 32.0 : 28.0);
-          final subtitleSize = isWeb ? 18.0 : (isTablet ? 16.0 : 14.0);
-          final labelSize = isWeb ? 16.0 : (isTablet ? 15.0 : 14.0);
-          final buttonTextSize = isWeb ? 24.0 : (isTablet ? 22.0 : 20.0);
-          final logoHeight = isWeb ? 120.0 : (isTablet ? 100.0 : 80.0);
-
-          // Espaciados adaptativos
-          final verticalSpacing = isWeb ? 20.0 : (isTablet ? 16.0 : 12.0);
-          final horizontalPadding = isWeb ? 48.0 : (isTablet ? 32.0 : 20.0);
-          final fieldSpacing = isWeb ? 16.0 : (isTablet ? 14.0 : 12.0);
-
-          // Ancho del contenedor
-          final containerWidth =
-              isWeb ? 900.0 : (isTablet ? screenWidth * 0.85 : double.infinity);
+          final fieldSpacing = isWeb ? 18.0 : 16.0;
+          final contentMaxWidth = isWeb ? 640.0 : (isTablet ? 560.0 : 420.0);
 
           return Stack(
             children: [
-              // Fondo de pantalla completo
-              Positioned.fill(
-                child: Container(
-                  color: Color(0xFF5027D0),
-                  child: SvgPicture.network(
-                    'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/wallpaper+log-in.svg',
-                    fit: BoxFit.cover,
-                  ),
-                ),
+              // Mismo fondo del login: claro, con formas suaves en las
+              // esquinas, en vez del wallpaper morado a pantalla completa.
+              Positioned(
+                top: -60,
+                right: -60,
+                child: _decorativeBlob(220, FnlColors.primary.withOpacity(0.10)),
+              ),
+              Positioned(
+                bottom: -80,
+                left: -80,
+                child: _decorativeBlob(260, FnlColors.primary.withOpacity(0.08)),
               ),
 
-              // Logo en la parte superior
               SafeArea(
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: Padding(
-                    padding: EdgeInsets.only(top: verticalSpacing * 2),
-                    child: Container(
-                      height: logoHeight,
-                      child: Image.network(
-                        'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/logo.png',
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // Contenedor blanco anclado en la parte inferior
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: SafeArea(
-                  top: false,
-                  child: Container(
-                    width: containerWidth,
-                    constraints: BoxConstraints(
-                      maxHeight: constraints.maxHeight * 0.75,
-                    ),
-                    margin: EdgeInsets.symmetric(horizontal: isMobile ? 0 : 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(30),
-                        topRight: Radius.circular(30),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: Offset(0, -2),
-                        ),
-                      ],
-                    ),
-                    child: SingleChildScrollView(
-                      physics: BouncingScrollPhysics(),
+                child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: contentMaxWidth),
                       child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: horizontalPadding,
-                          vertical: verticalSpacing * 1.5,
-                        ),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Título de registro
-                              Center(
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      'Registrarse',
-                                      style: TextStyle(
-                                        color: const Color(0xFF020107),
-                                        fontSize: titleSize,
-                                        fontFamily: 'Inter',
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      'Es rápido y fácil',
-                                      style: TextStyle(
-                                        color: const Color(0xFF020107),
-                                        fontSize: subtitleSize,
-                                        fontFamily: 'Roboto',
-                                        fontWeight: FontWeight.w400,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 28, vertical: 32),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Logo de marca, mismo activo ya usado en la app.
+                            Image.network(
+                              'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/fnl/f24c3b81-229f-4fd8-9e07-99074e44cc88.png',
+                              height: 88,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Icon(
+                                  Icons.psychology_alt_rounded,
+                                  size: 64,
+                                  color: FnlColors.primary,
+                                );
+                              },
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            const Text(
+                              'Registrarse',
+                              style: TextStyle(
+                                color: FnlColors.textDark,
+                                fontSize: 30,
+                                fontFamily: 'Inter',
+                                fontWeight: FontWeight.w800,
                               ),
-                              SizedBox(height: verticalSpacing * 1.5),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Es rápido y fácil',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 15.5,
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
 
-                              // Campos de formulario con layout adaptativo
-                              if (isWeb || isTablet) ...[
-                                // Layout en dos columnas para web/tablet
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: _buildFieldColumn([
-                                        _buildLabeledField(
-                                            'Usuario',
-                                            'Nombre de usuario',
-                                            usernameController,
-                                            labelSize,
-                                            fieldSpacing),
-                                        _buildLabeledField(
-                                            'Nombre',
-                                            'Nombre completo',
-                                            namesController,
-                                            labelSize,
-                                            fieldSpacing),
-                                        _buildLabeledField(
-                                            'Correo',
-                                            'Tu correo',
-                                            emailController,
-                                            labelSize,
-                                            fieldSpacing,
-                                            keyboardType:
-                                                TextInputType.emailAddress),
-                                      ]),
+                            const SizedBox(height: 28),
+
+                            Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (isWide) ...[
+                                    // Layout en dos columnas para tablet/web.
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: _buildFieldColumn([
+                                            _buildLabeledField(
+                                              'Usuario',
+                                              'Nombre de usuario',
+                                              usernameController,
+                                              icon: Icons.person_outline_rounded,
+                                              spacing: fieldSpacing,
+                                            ),
+                                            _buildLabeledField(
+                                              'Nombre',
+                                              'Nombre completo',
+                                              namesController,
+                                              icon: Icons.badge_outlined,
+                                              spacing: fieldSpacing,
+                                            ),
+                                            _buildLabeledField(
+                                              'Correo',
+                                              'Tu correo',
+                                              emailController,
+                                              icon: Icons.email_outlined,
+                                              spacing: fieldSpacing,
+                                              keyboardType:
+                                                  TextInputType.emailAddress,
+                                            ),
+                                          ]),
+                                        ),
+                                        SizedBox(width: fieldSpacing * 1.5),
+                                        Expanded(
+                                          child: _buildFieldColumn([
+                                            _buildLabeledField(
+                                              'Apellidos',
+                                              'Apellidos',
+                                              lastnamesController,
+                                              icon: Icons.badge_outlined,
+                                              spacing: fieldSpacing,
+                                            ),
+                                            _buildLabeledField(
+                                              'Contraseña',
+                                              'Nueva contraseña',
+                                              passwordController,
+                                              icon: Icons.lock_outline_rounded,
+                                              spacing: fieldSpacing,
+                                              obscureText: true,
+                                            ),
+                                          ]),
+                                        ),
+                                      ],
                                     ),
-                                    SizedBox(width: fieldSpacing * 2),
-                                    Expanded(
-                                      child: _buildFieldColumn([
-                                        _buildLabeledField(
-                                            'Apellidos',
-                                            'Apellidos',
-                                            lastnamesController,
-                                            labelSize,
-                                            fieldSpacing),
-                                        _buildLabeledField(
-                                            'Contraseña',
-                                            'Nueva contraseña',
-                                            passwordController,
-                                            labelSize,
-                                            fieldSpacing,
-                                            obscureText: true),
-                                      ]),
+                                  ] else ...[
+                                    // Layout vertical para móvil.
+                                    _buildLabeledField(
+                                      'Usuario',
+                                      'Nombre de usuario',
+                                      usernameController,
+                                      icon: Icons.person_outline_rounded,
+                                      spacing: fieldSpacing,
+                                    ),
+                                    _buildLabeledField(
+                                      'Nombre',
+                                      'Nombre completo',
+                                      namesController,
+                                      icon: Icons.badge_outlined,
+                                      spacing: fieldSpacing,
+                                    ),
+                                    _buildLabeledField(
+                                      'Apellidos',
+                                      'Apellidos',
+                                      lastnamesController,
+                                      icon: Icons.badge_outlined,
+                                      spacing: fieldSpacing,
+                                    ),
+                                    _buildLabeledField(
+                                      'Correo',
+                                      'Tu correo',
+                                      emailController,
+                                      icon: Icons.email_outlined,
+                                      spacing: fieldSpacing,
+                                      keyboardType: TextInputType.emailAddress,
+                                    ),
+                                    _buildLabeledField(
+                                      'Contraseña',
+                                      'Nueva contraseña',
+                                      passwordController,
+                                      icon: Icons.lock_outline_rounded,
+                                      spacing: fieldSpacing,
+                                      obscureText: true,
                                     ),
                                   ],
-                                ),
-                              ] else ...[
-                                // Layout vertical para móvil
-                                _buildLabeledField(
-                                    'Usuario',
-                                    'Nombre de usuario',
-                                    usernameController,
-                                    labelSize,
-                                    fieldSpacing),
-                                _buildLabeledField('Nombre', 'Nombre completo',
-                                    namesController, labelSize, fieldSpacing),
-                                _buildLabeledField(
-                                    'Apellidos',
-                                    'Apellidos',
-                                    lastnamesController,
-                                    labelSize,
-                                    fieldSpacing),
-                                _buildLabeledField('Correo', 'Tu correo',
-                                    emailController, labelSize, fieldSpacing,
-                                    keyboardType: TextInputType.emailAddress),
-                                _buildLabeledField(
-                                    'Contraseña',
-                                    'Nueva contraseña',
-                                    passwordController,
-                                    labelSize,
-                                    fieldSpacing,
-                                    obscureText: true),
-                              ],
 
-                              SizedBox(height: verticalSpacing * 1.5),
+                                  const SizedBox(height: 10),
 
-                              // Botón de Registro
-                              isLoading
-                                  ? Center(child: CircularProgressIndicator())
-                                  : SizedBox(
-                                      width: double.infinity,
+                                  // Botón "Crear cuenta": mismo relleno
+                                  // degradado y flecha que "Iniciar sesión"
+                                  // en el login.
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(40),
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            FnlColors.primary,
+                                            FnlColors.primaryDark,
+                                          ],
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: FnlColors.primary
+                                                .withOpacity(0.35),
+                                            blurRadius: 16,
+                                            offset: const Offset(0, 8),
+                                          ),
+                                        ],
+                                      ),
                                       child: ElevatedButton(
-                                        onPressed: () => _register(context),
+                                        onPressed:
+                                            isLoading ? null : () => _register(context),
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                              const Color(0xFF6D4BD8),
-                                          padding: EdgeInsets.symmetric(
-                                              vertical: isWeb ? 16 : 12),
+                                          backgroundColor: Colors.transparent,
+                                          shadowColor: Colors.transparent,
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 16),
                                           shape: RoundedRectangleBorder(
                                             borderRadius:
                                                 BorderRadius.circular(40),
                                           ),
-                                          elevation: 6,
-                                          shadowColor: Color(0x26000000),
                                         ),
-                                        child: Text(
-                                          'Crear cuenta',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: buttonTextSize,
-                                            fontFamily: 'Inter',
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
+                                        child: isLoading
+                                            ? const SizedBox(
+                                                height: 22,
+                                                width: 22,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2.4,
+                                                  color: Colors.white,
+                                                ),
+                                              )
+                                            : const Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Text(
+                                                    'Crear cuenta',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 18,
+                                                      fontFamily: 'Inter',
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                  SizedBox(width: 8),
+                                                  Icon(
+                                                      Icons
+                                                          .arrow_forward_rounded,
+                                                      color: Colors.white,
+                                                      size: 20),
+                                                ],
+                                              ),
                                       ),
-                                    ),
-                              SizedBox(height: verticalSpacing),
-
-                              // Enlace para ir a login
-                              Center(
-                                child: GestureDetector(
-                                  onTap: () {
-                                    Navigator.pushReplacementNamed(
-                                        context, '/login');
-                                  },
-                                  child: RichText(
-                                    text: TextSpan(
-                                      style: TextStyle(
-                                        color: const Color(0xFF333333),
-                                        fontSize: labelSize,
-                                        fontFamily: 'Inter',
-                                      ),
-                                      children: [
-                                        TextSpan(text: '¿Ya tienes cuenta? '),
-                                        TextSpan(
-                                          text: 'Inicia sesión',
-                                          style: TextStyle(
-                                            color: const Color(0xFF290B47),
-                                            fontWeight: FontWeight.w600,
-                                            decoration:
-                                                TextDecoration.underline,
-                                          ),
-                                        ),
-                                      ],
                                     ),
                                   ),
-                                ),
+
+                                  const SizedBox(height: 20),
+
+                                  // Enlace para ir a login.
+                                  Center(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        Navigator.pushReplacementNamed(
+                                            context, '/login');
+                                      },
+                                      child: RichText(
+                                        text: TextSpan(
+                                          style: TextStyle(
+                                            color: Colors.grey[700],
+                                            fontSize: 14,
+                                            fontFamily: 'Inter',
+                                          ),
+                                          children: const [
+                                            TextSpan(text: '¿Ya tienes cuenta? '),
+                                            TextSpan(
+                                              text: 'Inicia sesión',
+                                              style: TextStyle(
+                                                color: FnlColors.primary,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -517,6 +546,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  Widget _decorativeBlob(double diameter, Color color) {
+    return Container(
+      width: diameter,
+      height: diameter,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+    );
+  }
+
   Widget _buildFieldColumn(List<Widget> fields) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -527,44 +564,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget _buildLabeledField(
     String label,
     String hint,
-    TextEditingController controller,
-    double labelSize,
-    double spacing, {
+    TextEditingController controller, {
+    required IconData icon,
+    required double spacing,
     bool obscureText = false,
     TextInputType keyboardType = TextInputType.text,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: const Color(0xFF212121),
-            fontSize: labelSize,
-            fontFamily: 'Roboto',
-            fontWeight: FontWeight.w500,
+    return Padding(
+      padding: EdgeInsets.only(bottom: spacing),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF212121),
+              fontSize: 14.5,
+              fontFamily: 'Roboto',
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-        SizedBox(height: 4),
-        _buildTextField(hint, controller,
-            obscureText: obscureText, keyboardType: keyboardType),
-        SizedBox(height: spacing),
-      ],
+          const SizedBox(height: 6),
+          _buildTextField(
+            hint,
+            controller,
+            icon: icon,
+            obscureText: obscureText,
+            keyboardType: keyboardType,
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildTextField(String hintText, TextEditingController controller,
-      {bool obscureText = false,
-      TextInputType keyboardType = TextInputType.text}) {
+  Widget _buildTextField(
+    String hintText,
+    TextEditingController controller, {
+    required IconData icon,
+    bool obscureText = false,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.85),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Color(0xFF7F7F7F),
-          width: 1.0,
-        ),
+        color: const Color(0xFFF7F6FB),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE4E1F2), width: 1.2),
       ),
       child: ValueListenableBuilder<bool>(
         valueListenable: passwordVisible,
@@ -572,26 +616,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
           return TextFormField(
             controller: controller,
             keyboardType: keyboardType,
-            style: TextStyle(fontSize: 14),
+            style: const TextStyle(fontSize: 15.5),
             decoration: InputDecoration(
               border: InputBorder.none,
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+              prefixIcon: Icon(icon, color: Colors.grey[500], size: 21),
               hintText: hintText,
-              hintStyle: TextStyle(fontSize: 14),
-              contentPadding: EdgeInsets.symmetric(vertical: 8),
-              isDense: true,
+              hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14.5),
               suffixIcon: obscureText
                   ? ValueListenableBuilder<bool>(
                       valueListenable: passwordVisible,
                       builder: (context, value, child) {
                         return IconButton(
                           icon: Icon(
-                            value ? Icons.visibility : Icons.visibility_off,
+                            value
+                                ? Icons.visibility_rounded
+                                : Icons.visibility_off_rounded,
                             color: Colors.grey[600],
                             size: 20,
                           ),
                           onPressed: () => passwordVisible.value = !value,
-                          padding: EdgeInsets.zero,
-                          constraints: BoxConstraints(),
                         );
                       },
                     )

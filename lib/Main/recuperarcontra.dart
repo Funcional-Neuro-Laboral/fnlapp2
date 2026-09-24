@@ -220,7 +220,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     child: Padding(
                       padding: EdgeInsets.all(24.0),
                       child: Image.network(
-                        'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/logo.png',
+                        'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/fnl/fnl+logo2.png',
                         fit: BoxFit.contain,
                       ),
                     ),

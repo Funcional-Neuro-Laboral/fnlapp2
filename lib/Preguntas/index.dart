@@ -66,12 +66,12 @@ class _IndexScreenState extends State<IndexScreen> {
     await Future.wait([
       precacheImage(
         NetworkImage(
-            'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_seguridad.png'),
+            'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/thinking.png'),
         context,
       ),
       precacheImage(
         NetworkImage(
-            'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_espejo.png'),
+            'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/happy.png'),
         context,
       ),
     ]);
@@ -646,7 +646,7 @@ class _IndexScreenState extends State<IndexScreen> {
 
                     // Imagen
                     Image.network(
-                      'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_seguridad.png',
+                      'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/thinking.png',
                       width: imageSize,
                       height: imageSize + 30,
                       fit: BoxFit.contain,

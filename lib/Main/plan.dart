@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:fnlapp/Main/testestres_form.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../Util/translations.dart';
+import 'package:fnlapp/SplashScreen/welcome_screen.dart' show FuncyColors;
 
 // Constantes
 class AppConstants {
@@ -14,24 +15,24 @@ class AppConstants {
   static const int percentageMultiplier = 1000;
   static const int percentageDivider = 10;
   static const double cardImageHeight = 150.0;
-  static const double cardBorderRadius = 12.0;
+  static const double cardBorderRadius = 20.0;
   static const double progressBarHeight = 12.0;
+  static const double maxContentWidth = 480.0;
 }
 
 // Colores del tema
 class AppColors {
-  static const Color primary = Color(0xFF6F3EA2);
-  static const Color secondary = Color(0xFF8A6FE0);
-  static const Color background = Color(0xFFF6F6F6);
+  static const Color primary = FuncyColors.primary;
+  static const Color secondary = FuncyColors.primaryLight;
   static const Color textPrimary = Color(0xFF212121);
   static const Color textSecondary = Color(0xFF4A4A4A);
   static const Color cardBackground = Colors.white;
-  static const Color lockedBackground = Color(0xFFFFFFFF);
+  static const Color lockedBackground = Color(0xFFFAF9FD);
   static const Color badgeBackground = Color(0xFFDCD4F6);
   static const Color badgeText = Color(0xFF10082A);
-  static const Color progressBackground = Color(0xFFEFEFEF);
-  static const Color progressGradientStart = Color(0xFFDCD4F6);
-  static const Color progressGradientEnd = Color(0xFF8A6FE0);
+  static const Color progressBackground = Color(0xFFEFEAF8);
+  static const Color progressGradientStart = FuncyColors.primaryLight;
+  static const Color progressGradientEnd = FuncyColors.primary;
 }
 
 // Modelo de datos
@@ -47,6 +48,7 @@ class Programa {
   final int id;
   final int sessionId;
   final dynamic guia;
+  final dynamic ttsUrls; // URLs de audio TTS (relación por índice con guia)
   final bool unlocked;
 
   Programa({
@@ -61,6 +63,7 @@ class Programa {
     required this.id,
     required this.sessionId,
     this.guia,
+    this.ttsUrls,
     this.unlocked = false,
   });
 
@@ -78,6 +81,7 @@ class Programa {
       sessionId:
           int.tryParse(map['session_id'].toString()) ?? 0, // Parsear sessionId
       guia: map['guia'],
+      ttsUrls: map['tts_urls'] ?? map['ttsUrls'],
       unlocked: map['unlocked'] ?? false,
     );
   }
@@ -85,7 +89,6 @@ class Programa {
   bool get isUnlocked {
     if (!unlocked) return false;
 
-    // Luego verificar la fecha
     if (startDate != null) {
       DateTime temp = DateTime.parse(startDate!).toLocal();
       DateTime date = DateTime(temp.year, temp.month, temp.day);
@@ -107,6 +110,23 @@ class Programa {
       return [];
     } catch (e) {
       debugPrint('Error parsing steps: $e');
+      return [];
+    }
+  }
+
+  List<String> get parsedTtsUrls {
+    try {
+      dynamic raw = ttsUrls;
+      if (raw is String) {
+        if (raw.trim().isEmpty) return [];
+        raw = json.decode(raw);
+      }
+      if (raw is List) {
+        return raw.map((e) => e == null ? '' : e.toString().trim()).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error parsing tts_urls: $e');
       return [];
     }
   }
@@ -185,8 +205,8 @@ class _PlanScreenState extends State<PlanScreen> {
 
         // Configuración responsive
         final modalWidth = isTablet
-            ? screenSize.width * 0.5 // 50% en tablets
-            : screenSize.width * 0.85; // 85% en móviles
+            ? screenSize.width * 0.5 // 50% en tablet
+            : screenSize.width * 0.85; // 85% en móvil
 
         final maxWidth = isTablet ? 500.0 : 350.0;
         final padding = isTablet ? 32.0 : 24.0;
@@ -206,7 +226,7 @@ class _PlanScreenState extends State<PlanScreen> {
             width: modalWidth,
             constraints: BoxConstraints(
               maxWidth: maxWidth,
-              maxHeight: screenSize.height * 0.7, // Máximo 70% de la altura
+              maxHeight: screenSize.height * 0.7,
             ),
             padding: EdgeInsets.all(padding),
             decoration: BoxDecoration(
@@ -251,8 +271,7 @@ class _PlanScreenState extends State<PlanScreen> {
                       SizedBox(height: isTablet ? 32 : 24),
                       GestureDetector(
                         onTap: () {
-                          Navigator.of(context).pop(); // Cerrar modal
-                          // Navegar al test de salida
+                          Navigator.of(context).pop(); 
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -268,16 +287,20 @@ class _PlanScreenState extends State<PlanScreen> {
                           padding: buttonPadding,
                           clipBehavior: Clip.antiAlias,
                           decoration: ShapeDecoration(
-                            color: const Color(0xFF6D4BD8),
+                            gradient: const LinearGradient(
+                              colors: [
+                                FuncyColors.primary,
+                                FuncyColors.primaryDark,
+                              ],
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(40),
                             ),
-                            shadows: const [
+                            shadows: [
                               BoxShadow(
-                                color: Color(0x26000000),
-                                blurRadius: 6,
-                                offset: Offset(0, 2),
-                                spreadRadius: 2,
+                                color: FuncyColors.primary.withOpacity(0.35),
+                                blurRadius: 14,
+                                offset: const Offset(0, 6),
                               ),
                             ],
                           ),
@@ -288,7 +311,7 @@ class _PlanScreenState extends State<PlanScreen> {
                                 color: Colors.white,
                                 fontSize: buttonFontSize,
                                 fontFamily: 'Inter',
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -297,7 +320,7 @@ class _PlanScreenState extends State<PlanScreen> {
                     ],
                   ),
                 ),
-                // Botón de cerrar responsive
+                // Botón de cerrar 
                 Positioned(
                   top: isTablet ? -16 : -12,
                   right: isTablet ? -16 : -12,
@@ -345,48 +368,105 @@ class _PlanScreenState extends State<PlanScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 130.0),
-              child: SingleChildScrollView(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20.0, vertical: 20.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildHeader(),
-                        const SizedBox(height: 15),
-                        _buildProgressSection(context),
-                        const SizedBox(height: 20),
-                        _buildContent(context),
-                      ],
+      body: Stack(
+        children: [
+          // Mismo lenguaje visual del login
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  FuncyColors.primaryDark,
+                  FuncyColors.primary,
+                  FuncyColors.primaryLight,
+                ],
+                stops: [0.0, 0.4, 1.0],
+              ),
+            ),
+          ),
+          Positioned(
+            top: -90,
+            right: -70,
+            child: _decorativeCircle(220, Colors.white.withOpacity(0.06)),
+          ),
+          Positioned(
+            top: 220,
+            left: -80,
+            child: _decorativeCircle(170, Colors.white.withOpacity(0.05)),
+          ),
+
+          SafeArea(
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 130.0),
+                  child: SingleChildScrollView(
+                    child: Center(
+                      // limita el ancho de todo el contenido
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: AppConstants.maxContentWidth,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20.0, vertical: 20.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildHeader(),
+                              const SizedBox(height: 18),
+                              _buildProgressSection(context),
+                              const SizedBox(height: 22),
+                              _buildContent(context),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
+  Widget _decorativeCircle(double diameter, Color color) {
+    return Container(
+      width: diameter,
+      height: diameter,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+    );
+  }
+
   Widget _buildHeader() {
-    return const Align(
+    return Align(
       alignment: Alignment.centerLeft,
-      child: Text(
-        'Mi Plan Diario',
-        style: TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 32,
-          fontFamily: 'Inter',
-          fontWeight: FontWeight.w700,
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'FUNCY · TU RUTA DE 21 DÍAS',
+            style: GoogleFonts.inter(
+              color: Colors.white.withOpacity(0.72),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Mi Plan Diario',
+            style: GoogleFonts.inter(
+              color: Colors.white,
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -396,38 +476,80 @@ class _PlanScreenState extends State<PlanScreen> {
       return const SizedBox.shrink();
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildProgressHeader(),
-        const SizedBox(height: 16),
-        _buildProgressBar(context),
-      ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: FuncyColors.primaryDark.withOpacity(0.22),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildProgressHeader(),
+          const SizedBox(height: 14),
+          _buildProgressBar(context),
+        ],
+      ),
     );
   }
 
   Widget _buildProgressHeader() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            "Tu progreso",
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 18,
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w600,
-            ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          "Tu progreso",
+          style: GoogleFonts.inter(
+            color: AppColors.textPrimary,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
           ),
-          Text(
-            "${_progressPercentage}%",
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontSize: 16,
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w600,
+        ),
+        Text(
+          "${_progressPercentage}%",
+          style: GoogleFonts.inter(
+            color: AppColors.primary,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressBar(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: AppConstants.progressBarHeight,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: AppColors.progressBackground,
+      ),
+      child: Stack(
+        children: [
+          FractionallySizedBox(
+            widthFactor: (_progressPercentage / 100).clamp(0.0, 1.0),
+            child: Container(
+              height: AppConstants.progressBarHeight,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: const LinearGradient(
+                  colors: [
+                    AppColors.progressGradientStart,
+                    AppColors.progressGradientEnd,
+                  ],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+              ),
             ),
           ),
         ],
@@ -435,53 +557,13 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
-  Widget _buildProgressBar(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Container(
-        width: double.infinity,
-        height: AppConstants.progressBarHeight,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: AppColors.progressBackground,
-        ),
-        child: Stack(
-          children: [
-            Container(
-              width: double.infinity,
-              height: AppConstants.progressBarHeight,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                color: AppColors.progressBackground,
-              ),
-            ),
-            FractionallySizedBox(
-              widthFactor: _progressPercentage / 100,
-              child: Container(
-                height: AppConstants.progressBarHeight,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  gradient: const LinearGradient(
-                    colors: [
-                      AppColors.progressGradientStart,
-                      AppColors.progressGradientEnd,
-                    ],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildContent(BuildContext context) {
     if (widget.isLoading) {
-      return const CircularProgressIndicator(
-        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24.0),
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+        ),
       );
     }
 
@@ -490,9 +572,10 @@ class _PlanScreenState extends State<PlanScreen> {
         padding: const EdgeInsets.symmetric(vertical: 20.0),
         child: Text(
           'No hay programas disponibles',
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.inter(
             fontSize: 16.0,
-            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w500,
+            color: Colors.white.withOpacity(0.85),
           ),
         ),
       );
@@ -515,24 +598,21 @@ class _PlanScreenState extends State<PlanScreen> {
   }
 
   Widget _buildProgramCard(Programa programa, BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final cardWidth = screenWidth * 0.9;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: programa.isUnlocked
-          ? _buildUnlockedCard(programa, context, cardWidth)
-          : _buildLockedCard(programa, context, cardWidth),
+          ? _buildUnlockedCard(programa, context)
+          : _buildLockedCard(programa, context),
     );
   }
 
-  Widget _buildUnlockedCard(
-      Programa programa, BuildContext context, double cardWidth) {
+  Widget _buildUnlockedCard(Programa programa, BuildContext context) {
     return GestureDetector(
       onTap: () => _navigateToStepScreen(programa, context),
       child: Container(
-        width: cardWidth,
-        margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 3.0),
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(vertical: 3.0),
         decoration: _buildCardDecoration(),
         child: Stack(
           children: [
@@ -549,11 +629,10 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
-  Widget _buildLockedCard(
-      Programa programa, BuildContext context, double cardWidth) {
+  Widget _buildLockedCard(Programa programa, BuildContext context) {
     return Container(
-      width: cardWidth,
-      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 3.0),
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 3.0),
       decoration: _buildCardDecoration(),
       child: Column(
         children: [
@@ -566,13 +645,13 @@ class _PlanScreenState extends State<PlanScreen> {
 
   BoxDecoration _buildCardDecoration() {
     return BoxDecoration(
+      color: Colors.white,
       borderRadius: BorderRadius.circular(AppConstants.cardBorderRadius),
       boxShadow: [
         BoxShadow(
-          color: Colors.grey.withOpacity(0.3),
-          spreadRadius: 2,
-          blurRadius: 6,
-          offset: const Offset(0, 3),
+          color: FuncyColors.primaryDark.withOpacity(0.18),
+          blurRadius: 18,
+          offset: const Offset(0, 8),
         ),
       ],
     );
@@ -593,7 +672,7 @@ class _PlanScreenState extends State<PlanScreen> {
 
       // Mapeo temporal para los 21 días
       if (programa.dia >= 1 && programa.dia <= 21) {
-        return 'https://funkyrecursos.s3.us-east-2.amazonaws.com/recursos_nuevos2/DIA${programa.dia}.png';
+        return 'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/recursos_nuevos2/DIA${programa.dia}.png';
       }
 
       return '';
@@ -779,6 +858,7 @@ class _PlanScreenState extends State<PlanScreen> {
       MaterialPageRoute(
         builder: (context) => StepScreen(
           steps: programa.parsedSteps,
+          ttsUrls: programa.parsedTtsUrls,
           tecnicaNombre: programa.nombreTecnica,
           tecnicaTipo: programa.tipoTecnica,
           dia: programa.dia,
