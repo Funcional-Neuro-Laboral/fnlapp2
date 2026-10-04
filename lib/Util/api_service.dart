@@ -4,6 +4,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 import 'token_service.dart';
 
+/// Error de una petición al servidor, con su código HTTP.
+class ApiException implements Exception {
+  ApiException(this.statusCode, this.message);
+
+  final int statusCode;
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class ApiService {
   final String? token;
 
@@ -17,59 +28,59 @@ class ApiService {
     return prefs.getString('token');
   }
 
-  Future<http.Response> get(String endpoint) async {
-    final currentToken = await _getCurrentToken();
-    final response = await http.get(
-        Uri.parse('${Config.apiUrl2}/$endpoint'),
-        headers: await _headers(currentToken)
-    );
-    await _handleResponse(response);
+  /// Envía la petición; si el token expiró, lo renueva y reintenta una vez.
+  Future<http.Response> _send(
+    Future<http.Response> Function(Map<String, String> headers) request,
+  ) async {
+    var response = await request(_headers(await _getCurrentToken()));
+    if (response.statusCode == 401 && token == null) {
+      final refreshed = await TokenService.instance.refreshTokenManually();
+      if (!refreshed) {
+        throw ApiException(401, 'Token expirado y no se pudo renovar');
+      }
+      response = await request(_headers(await _getCurrentToken()));
+    }
+    _handleResponse(response);
     return response;
   }
 
-  Future<http.Response> getList(String endpoint) async {
-    final currentToken = await _getCurrentToken();
-    final response = await http.get(
-        Uri.parse('${Config.apiUrl}/$endpoint'),
-        headers: await _headers(currentToken)
-    );
-    await _handleResponse(response);
-    return response;
+  Future<http.Response> get(String endpoint) {
+    return _send((headers) => http.get(Uri.parse('${Config.apiUrl2}/$endpoint'), headers: headers));
   }
 
-  Future<http.Response> post(String endpoint, Map<String, dynamic> data) async {
-    final currentToken = await _getCurrentToken();
-    final response = await http.post(
-      Uri.parse('${Config.apiUrl}/$endpoint'),
-      headers: await _headers(currentToken),
-      body: jsonEncode(data),
-    );
-    await _handleResponse(response);
-    return response;
+  Future<http.Response> getList(String endpoint) {
+    return _send((headers) => http.get(Uri.parse('${Config.apiUrl}/$endpoint'), headers: headers));
   }
 
-  Future<http.Response> patch(String endpoint, Map<String, dynamic> data) async {
-    final currentToken = await _getCurrentToken();
-    final response = await http.patch(
-      Uri.parse('${Config.apiUrl}/$endpoint'),
-      headers: await _headers(currentToken),
-      body: jsonEncode(data),
-    );
-    await _handleResponse(response);
-    return response;
+  Future<http.Response> post(String endpoint, Map<String, dynamic> data) {
+    return _send((headers) => http.post(
+          Uri.parse('${Config.apiUrl}/$endpoint'),
+          headers: headers,
+          body: jsonEncode(data),
+        ));
   }
 
-  Future<http.Response> delete(String endpoint) async {
-    final currentToken = await _getCurrentToken();
-    final response = await http.delete(
-        Uri.parse('${Config.apiUrl}/$endpoint'),
-        headers: await _headers(currentToken)
-    );
-    await _handleResponse(response);
-    return response;
+  Future<http.Response> patch(String endpoint, Map<String, dynamic> data) {
+    return _send((headers) => http.patch(
+          Uri.parse('${Config.apiUrl}/$endpoint'),
+          headers: headers,
+          body: jsonEncode(data),
+        ));
   }
 
-  Future<Map<String, String>> _headers(String? currentToken) async {
+  Future<http.Response> delete(String endpoint) {
+    return _send((headers) => http.delete(Uri.parse('${Config.apiUrl}/$endpoint'), headers: headers));
+  }
+
+  Future<http.Response> put(String endpoint, Map<String, dynamic> data) {
+    return _send((headers) => http.put(
+          Uri.parse('${Config.apiUrl}/$endpoint'),
+          headers: headers,
+          body: jsonEncode(data),
+        ));
+  }
+
+  Map<String, String> _headers(String? currentToken) {
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
@@ -77,26 +88,11 @@ class ApiService {
     };
   }
 
-  Future<void> _handleResponse(http.Response response) async {
+  void _handleResponse(http.Response response) {
     if (response.statusCode == 401) {
-      // Token expirado, intentar renovar
-      bool refreshed = await TokenService.instance.refreshTokenManually();
-      if (!refreshed) {
-        throw Exception('Token expirado y no se pudo renovar');
-      }
+      throw ApiException(401, 'Token expirado y no se pudo renovar');
     } else if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Error: ${response.statusCode} - ${response.reasonPhrase}');
+      throw ApiException(response.statusCode, 'Error: ${response.statusCode} - ${response.reasonPhrase}');
     }
-  }
-
-  Future<http.Response> put(String endpoint, Map<String, dynamic> data) async {
-    final currentToken = await _getCurrentToken();
-    final response = await http.put(
-      Uri.parse('${Config.apiUrl}/$endpoint'),
-      headers: await _headers(currentToken),
-      body: jsonEncode(data),
-    );
-    await _handleResponse(response);
-    return response;
   }
 }

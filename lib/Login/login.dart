@@ -1,13 +1,15 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+
 import '../Main/recuperarcontra.dart';
-import '../Util/token_service.dart';
-import '../config.dart'; // Importa el archivo de configuración
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import '../Politicas y Terminos/condiciones_uso.dart';
+import '../Politicas y Terminos/politica_privacidad.dart';
+import '../SplashScreen/splashscreen.dart';
+import '../theme/app_colors.dart';
+import '../Util/auth_session.dart';
+import '../widgets/app_buttons.dart';
+import '../widgets/app_text_field.dart';
+import '../widgets/brand_background.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -17,474 +19,271 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final ValueNotifier<bool> passwordVisible = ValueNotifier(false);
   final _formKey = GlobalKey<FormState>();
-  final FlutterSecureStorage secureStorage = FlutterSecureStorage();
-  bool isLoading = false;  // Variable para controlar el estado de carga
-  final ValueNotifier<bool> rememberMe = ValueNotifier(false);  // Variable para el checkbox de recordar
+  final _passwordFocus = FocusNode();
+  bool isLoading = false;
+  bool rememberMe = false;
+  String? _errorMessage;
+
+  late final TapGestureRecognizer _termsTap = TapGestureRecognizer()
+    ..onTap = () => Navigator.push(context, MaterialPageRoute(builder: (_) => CondicionesUsoScreen()));
+  late final TapGestureRecognizer _privacyTap = TapGestureRecognizer()
+    ..onTap = () => Navigator.push(context, MaterialPageRoute(builder: (_) => PoliticaPrivacidadScreen()));
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_formKey.currentState == null) {
-        print("Form is not initialized yet");
-      }
-    });
+  void dispose() {
+    usernameController.dispose();
+    passwordController.dispose();
+    _passwordFocus.dispose();
+    _termsTap.dispose();
+    _privacyTap.dispose();
+    super.dispose();
   }
 
-  Future<void> _login(BuildContext context) async {
-    if (_formKey.currentState == null || !_formKey.currentState!.validate()) return;
-
-    final username = usernameController.text.trim();
-    final password = passwordController.text.trim();
+  Future<void> _login() async {
+    FocusScope.of(context).unfocus();
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() {
       isLoading = true;
+      _errorMessage = null;
     });
 
-    try {
-      final response = await http.post(
-        Uri.parse('${Config.apiUrl2}/users/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'username': username,
-          'password': password,
-          'rememberMe': rememberMe.value
-        }),
-      );
+    final result = await AuthSession.login(
+      username: usernameController.text.trim(),
+      // La contraseña se envía tal cual: los espacios pueden ser parte de ella.
+      password: passwordController.text,
+      rememberMe: rememberMe,
+    );
 
+    if (!mounted) return;
+    if (result.ok) {
+      Navigator.pushReplacementNamed(context, '/');
+    } else {
       setState(() {
         isLoading = false;
+        _errorMessage = result.message;
       });
-
-      print('Response body: ${response.body}');
-      if (response.statusCode == 200) {
-        await _handleLoginResponse(context, response);
-      } else if (response.statusCode == 401) {
-        _showSnackBar(context, 'Credenciales Invalidas');
-      } else if (response.statusCode == 403) {
-        _showSnackBar(context, 'Usuario sin un rol');
-      } else {
-        _showSnackBar(context, 'Error desconocido: ${response.statusCode}');
-      }
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      print(e);
-      _showSnackBar(context, 'Error: Intentar nuevamente o Contactar al soporte');
     }
   }
 
-  Future<void> _handleLoginResponse(BuildContext context, http.Response response) async {
-    final responseBody = jsonDecode(response.body);
-
-    if (responseBody['success'] == true && responseBody['data'] != null) {
-      final data = responseBody['data'];
-      final user = data['user'];
-      final token = data['token'];
-      final refreshToken = data['refreshToken'];
-
-      final userId = user['id'];
-      final email = user['email'];
-      final username = user['username'];
-      final companyId = user['company_id']; // Puede ser string o int
-      final isDay21Completed = data['isDay21Completed'] ?? false;
-
-      // Extraer permisos directamente de la respuesta del login
-      final responsebool = data['responsebool'] ?? false;
-      final testresresponsebool = data['testresresponsebool'] ?? false;
-      final permisopoliticas = data['permisopoliticas'] ?? false;
-
-      if (token != null && username != null && userId != null && email != null) {
-        await _saveUserData(token, username, userId, email, refreshToken, isDay21Completed);
-        await _savePermissions(responsebool, testresresponsebool, permisopoliticas);
-
-        // Guardar company_id si está disponible
-        if (companyId != null) {
-          SharedPreferences prefs = await SharedPreferences.getInstance();
-          int? companyIdInt =
-              companyId is String ? int.tryParse(companyId) : companyId;
-          if (companyIdInt != null) {
-            await prefs.setInt('company_id', companyIdInt);
-            print('company_id guardado en SharedPreferences: $companyIdInt');
-          }
-        }
-
-        // Inicializar el servicio de renovación de tokens
-        await TokenService.instance.initializeTokenRefresh();
-
-        _navigateBasedOnPermission(context);
-      } else {
-        _showSnackBar(context, 'Datos de autenticación no recibidos');
-      }
-    } else {
-      _showSnackBar(context, 'Error en la respuesta del servidor');
-    }
-  }
-
-  Future<void> _savePermissions(bool responsebool, bool testresresponsebool, bool permisopoliticas) async {
-    try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-
-      // Guardar permisos usando los nombres que ya tienes en tu app
-      await prefs.setBool('userresponsebool', responsebool);
-      await prefs.setBool('testestresbool', testresresponsebool);
-      await prefs.setBool('permisopoliticas', permisopoliticas);
-
-      print('Permisos guardados desde login:');
-      print('  - userresponsebool: $responsebool');
-      print('  - testestresbool: $testresresponsebool');
-      print('  - permisopoliticas: $permisopoliticas');
-    } catch (e) {
-      print('Error guardando permisos: $e');
-    }
-  }
-
-  Future<void> _saveUserData(String token, String username, int userId, String email, String? refreshToken, bool? isDay21Completed) async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-
-    await prefs.setString('token', token);
-
-    // Solo guardar refreshToken si no es null
-    if (refreshToken != null) {
-      await prefs.setString('refreshToken', refreshToken);
-    } else {
-      await prefs.remove('refreshToken');
-    }
-
-    if (isDay21Completed != null) {
-      await prefs.setBool('isDay21Completed', isDay21Completed);
-    } else {
-      await prefs.remove('isDay21Completed');
-    }
-
-    await prefs.setString('username', username);
-    await prefs.setInt('userId', userId);
-    await prefs.setString('email', email);
-
-    print("TOKEN GUARDADO en SharedPreferences: $token");
-  }
-
-  void _navigateBasedOnPermission(BuildContext context) {
-    Navigator.pushReplacementNamed(context, '/');
-  }
-
-  void _showSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-  }
+  String? _required(String? value) =>
+      (value == null || value.trim().isEmpty) ? 'Este campo es obligatorio' : null;
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final sessionExpired = ModalRoute.of(context)?.settings.arguments == LoginArgs.sessionExpired;
+
     return Scaffold(
-      body: Stack(
-        children: [
-          // Fondo de pantalla completo
-          Positioned.fill(
-            child: Container(
-              color: Color(0xFF5027D0),
-              child: SvgPicture.network(
-                'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/wallpaper+log-in.svg',
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-
-          // Contenido sobrepuesto
-          SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // Usar SizedBox en lugar de SingleChildScrollView para web
-                return SizedBox(
-                  height: constraints.maxHeight,
-                  width: constraints.maxWidth,
-                  child: Column(
-                    children: [
-                      // Espacio superior para el logo (flexible)
-                      Flexible(
-                        flex: 2,
-                        child: Center(
-                          child: Image.network(
-                            'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/logo.png',
-                            fit: BoxFit.contain,
-                          ),
+      body: BrandBackground(
+        child: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
+                child: AutofillGroup(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Center(child: FnlLogo(width: 176)),
+                        const SizedBox(height: 28),
+                        Text('¡Hola de nuevo!', style: textTheme.headlineSmall, textAlign: TextAlign.center),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Ingresa para continuar con tu plan de bienestar.',
+                          style: textTheme.bodyMedium?.copyWith(color: AppColors.inkSecondary),
+                          textAlign: TextAlign.center,
                         ),
-                      ),
-
-                      // Contenedor blanco sobrepuesto
-                      Flexible(
-                        flex: 5, // Más espacio para el contenido
-                        child: Center(
-                          child: Container(
-                            width: MediaQuery.of(context).size.width > 600
-                                ? 900
-                                : double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.only(
-                                topLeft: Radius.circular(30),
-                                topRight: Radius.circular(30),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 10,
-                                  offset: Offset(0, -2),
-                                ),
-                              ],
-                            ),
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-                              child: Form(
-                                key: _formKey,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Distribuir espacio uniformemente
+                        if (sessionExpired) ...[
+                          const SizedBox(height: 20),
+                          const _InfoBanner(
+                            icon: Icons.lock_clock_outlined,
+                            message: 'Tu sesión expiró. Vuelve a iniciar sesión; tu progreso está guardado.',
+                          ),
+                        ],
+                        const SizedBox(height: 26),
+                        AppTextField(
+                          label: 'Usuario o correo',
+                          hint: 'nombre.apellido',
+                          controller: usernameController,
+                          icon: Icons.person_outline_rounded,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.username, AutofillHints.email],
+                          validator: _required,
+                          onSubmitted: (_) => _passwordFocus.requestFocus(),
+                        ),
+                        const SizedBox(height: 16),
+                        AppTextField(
+                          label: 'Contraseña',
+                          hint: 'Tu contraseña',
+                          controller: passwordController,
+                          focusNode: _passwordFocus,
+                          icon: Icons.lock_outline_rounded,
+                          isPassword: true,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.password],
+                          validator: (value) =>
+                              (value == null || value.isEmpty) ? 'Este campo es obligatorio' : null,
+                          onSubmitted: (_) => _login(),
+                        ),
+                        if (_errorMessage != null) ...[
+                          const SizedBox(height: 14),
+                          _ErrorBanner(message: _errorMessage!),
+                        ],
+                        const SizedBox(height: 8),
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () => setState(() => rememberMe = !rememberMe),
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(minHeight: 44),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    // Texto bienvenida
-                                    Center(
-                                      child: Column(
-                                        children: [
-                                          Text(
-                                            'Bienvenido!',
-                                            style: TextStyle(
-                                              color: const Color(0xFF020107),
-                                              fontSize: 32,
-                                              fontFamily: 'Inter',
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                          SizedBox(height: 4),
-                                          Text(
-                                            'Ingresa tu usuario y contraseña',
-                                            style: TextStyle(
-                                              color: const Color(0xFF020107),
-                                              fontSize: 18,
-                                              fontFamily: 'Roboto',
-                                              fontWeight: FontWeight.w400,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                                    Checkbox(
+                                      value: rememberMe,
+                                      onChanged: (value) => setState(() => rememberMe = value ?? false),
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      visualDensity: VisualDensity.compact,
                                     ),
-
-                                    // Campos de formulario
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        // Campo de Usuario
-                                        Text(
-                                          'Usuario',
-                                          style: TextStyle(
-                                            color: const Color(0xFF212121),
-                                            fontSize: 16,
-                                            fontFamily: 'Roboto',
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        SizedBox(height: 4),
-                                        _buildTextField('Nombre de Usuario', usernameController),
-                                        SizedBox(height: 16),
-
-                                        // Campo de Contraseña
-                                        Text(
-                                          'Contraseña',
-                                          style: TextStyle(
-                                            color: const Color(0xFF212121),
-                                            fontSize: 16,
-                                            fontFamily: 'Roboto',
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        SizedBox(height: 4),
-                                        _buildTextField('Escriba su contraseña', passwordController, obscureText: true),
-                                      ],
-                                    ),
-
-                                    // Recuérdame y olvidé mi contraseña
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        ValueListenableBuilder<bool>(
-                                          valueListenable: rememberMe,
-                                          builder: (context, value, child) {
-                                            return Row(
-                                              children: [
-                                                GestureDetector(
-                                                  onTap: () => rememberMe.value = !value,
-                                                  child: Container(
-                                                    width: 14,
-                                                    height: 14,
-                                                    decoration: BoxDecoration(
-                                                      border: Border.all(
-                                                        color: const Color(0xFF52178F),
-                                                        width: 1.27,
-                                                      ),
-                                                      borderRadius: BorderRadius.circular(2.55),
-                                                      color: value ? const Color(0xFF52178F) : Colors.transparent,
-                                                    ),
-                                                    child: value
-                                                        ? Icon(Icons.check, size: 10, color: Colors.white)
-                                                        : null,
-                                                  ),
-                                                ),
-                                                SizedBox(width: 8),
-                                                Text(
-                                                  'Recuérdame',
-                                                  style: TextStyle(
-                                                    color: const Color(0xFF333333),
-                                                    fontSize: 14,
-                                                    fontFamily: 'Inter',
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                              ],
-                                            );
-                                          },
-                                        ),
-                                        GestureDetector(
-                                          onTap: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) => ForgotPasswordScreen(),
-                                              ),
-                                            );
-                                          },
-                                          child: Text(
-                                            'Olvidé mi contraseña',
-                                            style: TextStyle(
-                                              color: const Color(0xFF290B47),
-                                              fontSize: 14,
-                                              fontFamily: 'Inter',
-                                              fontWeight: FontWeight.w600,
-                                              decoration: TextDecoration.underline,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-
-                                    // Botón de Login
-                                    isLoading
-                                        ? Center(child: CircularProgressIndicator())
-                                        : Container(
-                                            width: double.infinity,
-                                            child: ElevatedButton(
-                                              onPressed: () => _login(context),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor:const Color(0xFF6D4BD8),
-                                                padding: EdgeInsets.symmetric(vertical: 12),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(40),
-                                                ),
-                                                elevation: 6,
-                                                shadowColor: Color(0x26000000),
-                                              ),
-                                              child: Text(
-                                                'Iniciar Sesión',
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 24,
-                                                  fontFamily: 'Inter',
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                    SizedBox(height: 16),
-
-                                    // Enlace para ir a registro
-                                    Center(
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          Navigator.pushReplacementNamed(context, '/register');
-                                        },
-                                        child: RichText(
-                                          text: TextSpan(
-                                            style: TextStyle(
-                                              color: const Color(0xFF333333),
-                                              fontSize: 14,
-                                              fontFamily: 'Inter',
-                                            ),
-                                            children: [
-                                              TextSpan(text: '¿No tienes cuenta? '),
-                                              TextSpan(
-                                                text: 'Regístrate',
-                                                style: TextStyle(
-                                                  color: const Color(0xFF290B47),
-                                                  fontWeight: FontWeight.w600,
-                                                  decoration: TextDecoration.underline,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
+                                    Text('Recordarme', style: textTheme.bodySmall),
+                                    const SizedBox(width: 8),
                                   ],
                                 ),
                               ),
                             ),
-                          ),
+                            TextButton(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => ForgotPasswordScreen()),
+                              ),
+                              child: const Text(
+                                '¿Olvidaste tu contraseña?',
+                                style: TextStyle(decoration: TextDecoration.underline),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        AppPrimaryButton(label: 'Iniciar sesión', loading: isLoading, onPressed: _login),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text('¿No tienes cuenta?',
+                                style: textTheme.bodySmall?.copyWith(color: AppColors.inkSecondary)),
+                            TextButton(
+                              onPressed: () => Navigator.pushReplacementNamed(context, '/register'),
+                              child: const Text(
+                                'Crear cuenta',
+                                style: TextStyle(fontWeight: FontWeight.w700, decoration: TextDecoration.underline),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Text.rich(
+                          TextSpan(
+                            style: const TextStyle(fontSize: 12, height: 18 / 12, color: AppColors.inkSecondary),
+                            children: [
+                              const TextSpan(text: 'Al continuar aceptas los '),
+                              TextSpan(
+                                text: 'Términos de uso',
+                                style: const TextStyle(color: AppColors.primaryDeep, decoration: TextDecoration.underline),
+                                recognizer: _termsTap,
+                              ),
+                              const TextSpan(text: ' y la '),
+                              TextSpan(
+                                text: 'Política de privacidad',
+                                style: const TextStyle(color: AppColors.primaryDeep, decoration: TextDecoration.underline),
+                                recognizer: _privacyTap,
+                              ),
+                              const TextSpan(text: '.'),
+                            ],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
                   ),
-                );
-              },
+                ),
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
+}
 
-  Widget _buildTextField(String hintText, TextEditingController controller, {bool obscureText = false}) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16.0),
-      margin: EdgeInsets.symmetric(vertical: 8.0),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.85),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Color(0xFF7F7F7F),
-          width: 1.0,
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.errorBg,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(color: AppColors.error, fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
         ),
       ),
-      child: ValueListenableBuilder<bool>(
-        valueListenable: passwordVisible,
-        builder: (context, isPasswordVisible, child) {
-          return TextFormField(
-            controller: controller,
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              hintText: hintText,
-              suffixIcon: obscureText
-                  ? ValueListenableBuilder<bool>(
-                      valueListenable: passwordVisible,
-                      builder: (context, value, child) {
-                        return IconButton(
-                          icon: Icon(
-                            value ? Icons.visibility : Icons.visibility_off,
-                            color: Colors.grey[600],
-                          ),
-                          onPressed: () => passwordVisible.value = !value,
-                        );
-                      },
-                    )
-                  : null,
+    );
+  }
+}
+
+class _InfoBanner extends StatelessWidget {
+  const _InfoBanner({required this.icon, required this.message});
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.lavender,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: AppColors.primaryDeep, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: AppColors.primaryDeep, fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600),
             ),
-            obscureText: obscureText && !isPasswordVisible,
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Este campo es requerido';
-              }
-              return null;
-            },
-          );
-        },
+          ),
+        ],
       ),
     );
   }

@@ -29,7 +29,6 @@ class TestNoticeDialog extends StatelessWidget {
               style: TextStyle(
                 color: Color(0xFF5027D0),
                 fontSize: fontSize,
-                fontFamily: 'Inter',
                 fontWeight: FontWeight.w700,
                 height: lineHeight,
               ),
@@ -40,7 +39,6 @@ class TestNoticeDialog extends StatelessWidget {
               style: TextStyle(
                 color: Colors.black,
                 fontSize: fontSize,
-                fontFamily: 'Inter',
                 fontWeight: FontWeight.w700,
                 height: lineHeight,
               ),
@@ -58,7 +56,6 @@ class TestNoticeDialog extends StatelessWidget {
                 style: TextStyle(
                   color: Colors.black,
                   fontSize: fontSize,
-                  fontFamily: 'Inter',
                   fontWeight: FontWeight.w400,
                   height: lineHeight,
                 ),
@@ -68,7 +65,6 @@ class TestNoticeDialog extends StatelessWidget {
                 style: TextStyle(
                   color: Colors.black,
                   fontSize: fontSize,
-                  fontFamily: 'Inter',
                   fontWeight: FontWeight.w700,
                   height: lineHeight,
                 ),
@@ -78,7 +74,6 @@ class TestNoticeDialog extends StatelessWidget {
                 style: TextStyle(
                   color: Color(0xFF5027D0),
                   fontSize: fontSize,
-                  fontFamily: 'Inter',
                   fontWeight: FontWeight.w700,
                   height: lineHeight,
                 ),
@@ -88,7 +83,6 @@ class TestNoticeDialog extends StatelessWidget {
                 style: TextStyle(
                   color: Colors.black,
                   fontSize: fontSize,
-                  fontFamily: 'Inter',
                   fontWeight: FontWeight.w400,
                   height: lineHeight,
                 ),
@@ -98,7 +92,6 @@ class TestNoticeDialog extends StatelessWidget {
                 style: TextStyle(
                   color: Colors.black,
                   fontSize: fontSize,
-                  fontFamily: 'Inter',
                   fontWeight: FontWeight.w700,
                   height: lineHeight,
                 ),
@@ -108,7 +101,6 @@ class TestNoticeDialog extends StatelessWidget {
                 style: TextStyle(
                   color: Colors.black,
                   fontSize: fontSize,
-                  fontFamily: 'Inter',
                   fontWeight: FontWeight.w400,
                   height: lineHeight,
                 ),
@@ -128,7 +120,6 @@ class TestNoticeDialog extends StatelessWidget {
               style: TextStyle(
                 color: Colors.black,
                 fontSize: fontSize,
-                fontFamily: 'Inter',
                 fontWeight: FontWeight.w700,
                 height: lineHeight,
               ),
@@ -143,7 +134,6 @@ class TestNoticeDialog extends StatelessWidget {
                     style: TextStyle(
                       color: Colors.black,
                       fontSize: fontSize,
-                      fontFamily: 'Inter',
                       fontWeight: FontWeight.w400,
                       height: lineHeight,
                     ),
@@ -153,7 +143,6 @@ class TestNoticeDialog extends StatelessWidget {
                     style: TextStyle(
                       color: Color(0xFF5027D0),
                       fontSize: fontSize,
-                      fontFamily: 'Inter',
                       fontWeight: FontWeight.w700,
                       height: lineHeight,
                     ),
@@ -174,7 +163,6 @@ class TestNoticeDialog extends StatelessWidget {
                 style: TextStyle(
                   color: Colors.black,
                   fontSize: fontSize,
-                  fontFamily: 'Inter',
                   fontWeight: FontWeight.w400,
                   height: lineHeight,
                 ),
@@ -184,7 +172,6 @@ class TestNoticeDialog extends StatelessWidget {
                 style: TextStyle(
                   color: Colors.black,
                   fontSize: fontSize,
-                  fontFamily: 'Inter',
                   fontWeight: FontWeight.w700,
                   height: lineHeight,
                 ),
@@ -201,7 +188,6 @@ class TestNoticeDialog extends StatelessWidget {
           style: TextStyle(
             color: Colors.black,
             fontSize: fontSize,
-            fontFamily: 'Inter',
             fontWeight: FontWeight.w700,
             height: lineHeight,
           ),
@@ -287,7 +273,6 @@ class TestNoticeDialog extends StatelessWidget {
                               style: TextStyle(
                                 color: Color(0xFF4320AD),
                                 fontSize: titleFontSize,
-                                fontFamily: 'Inter',
                                 fontWeight: FontWeight.w700,
                                 height: 1.3,
                               ),
@@ -318,7 +303,6 @@ class TestNoticeDialog extends StatelessWidget {
                                     style: TextStyle(
                                       color: Colors.black,
                                       fontSize: screenWidth * 0.060,
-                                      fontFamily: 'Inter',
                                       fontWeight: FontWeight.w400,
                                       height: 1.4,
                                     ),
@@ -328,7 +312,6 @@ class TestNoticeDialog extends StatelessWidget {
                                     style: TextStyle(
                                       color: Color(0xFF5027D0),
                                       fontSize: screenWidth * 0.060,
-                                      fontFamily: 'Inter',
                                       fontWeight: FontWeight.w700,
                                       height: 1.4,
                                     ),
@@ -338,7 +321,6 @@ class TestNoticeDialog extends StatelessWidget {
                                     style: TextStyle(
                                       color: Colors.black,
                                       fontSize: screenWidth * 0.060,
-                                      fontFamily: 'Inter',
                                       fontWeight: FontWeight.w400,
                                       height: 1.4,
                                     ),
@@ -356,7 +338,6 @@ class TestNoticeDialog extends StatelessWidget {
                                   style: TextStyle(
                                     color: Color(0xFF4320AD),
                                     fontSize: titleFontSize,
-                                    fontFamily: 'Inter',
                                     fontWeight: FontWeight.w700,
                                     height: 1.3,
                                   ),
@@ -404,7 +385,6 @@ class TestNoticeDialog extends StatelessWidget {
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: buttonFontSize,
-                        fontFamily: 'Inter',
                         fontWeight: FontWeight.w700,
                       ),
                     ),

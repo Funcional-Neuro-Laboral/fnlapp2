@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
@@ -11,6 +12,13 @@ class TokenService {
   TokenService._();
 
   Timer? _refreshTimer;
+
+  /// Se llama cuando la sesión ya no se puede renovar (el servidor rechazó
+  /// el refresh token). La app lo usa para avisar al usuario.
+  VoidCallback? onSessionExpired;
+
+  /// Preferencias del usuario que se conservan al cerrar sesión.
+  static const _preservedKeys = ['stepTextSize'];
 
   // Inicializar el servicio de renovación de tokens
   Future<void> initializeTokenRefresh() async {
@@ -25,7 +33,7 @@ class TokenService {
     String? refreshToken = prefs.getString('refreshToken');
 
     if (refreshToken == null) {
-      print('No hay refresh token disponible');
+      debugPrint('No hay refresh token disponible');
       return;
     }
 
@@ -35,19 +43,16 @@ class TokenService {
     _refreshTimer = Timer.periodic(refreshInterval, (timer) async {
       await _refreshAccessToken();
     });
-
-    print('Timer de renovación de token programado cada ${refreshInterval.inMinutes} minutos');
   }
 
   // Renovar el access token
-  Future<bool> _refreshAccessToken() async {
+  Future<bool> _refreshAccessToken({bool notify = true}) async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String? refreshToken = prefs.getString('refreshToken');
 
       if (refreshToken == null) {
-        print('No hay refresh token para renovar');
-        await _handleTokenRefreshFailure();
+        await _handleTokenRefreshFailure(notify: notify);
         return false;
       }
 
@@ -61,52 +66,47 @@ class TokenService {
         final responseBody = jsonDecode(response.body);
 
         if (responseBody['success'] == true && responseBody['data'] != null) {
-          final data = responseBody['data'];
-          final newToken = data['token'];
-
+          final newToken = responseBody['data']['token'];
           if (newToken != null) {
-            // Guardar el nuevo token
             await prefs.setString('token', newToken);
-            print('Token renovado exitosamente');
             return true;
           }
         }
+      } else if (response.statusCode == 400 ||
+          response.statusCode == 401 ||
+          response.statusCode == 403) {
+        // El servidor rechazó el refresh token: la sesión expiró.
+        await _handleTokenRefreshFailure(notify: notify);
       } else {
-        print('Error renovando token: ${response.statusCode}');
-        await _handleTokenRefreshFailure();
+        debugPrint('Error renovando token: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error en renovación de token: $e');
-      await _handleTokenRefreshFailure();
+      // Error de red: no se cierra la sesión, se reintentará más tarde.
+      debugPrint('Error de red al renovar token: $e');
     }
 
     return false;
   }
 
   // Manejar fallo en renovación de token
-  Future<void> _handleTokenRefreshFailure() async {
-    print('Fallo en renovación de token - cerrando sesión');
-    await logout();
+  Future<void> _handleTokenRefreshFailure({bool notify = true}) async {
+    await clearLocalSession();
+    if (notify) onSessionExpired?.call();
   }
 
-  // Metodo público para renovar token manualmente
-  Future<bool> refreshTokenManually() async {
-    return await _refreshAccessToken();
+  /// Renueva el token ahora. Con [notify] en falso no se muestra el aviso de
+  /// sesión expirada (útil al abrir la app, que ya va al inicio de sesión).
+  Future<bool> refreshTokenManually({bool notify = true}) async {
+    return await _refreshAccessToken(notify: notify);
   }
 
   Future<bool> logoutFromServer({bool logoutAll = false}) async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String? refreshToken = prefs.getString('refreshToken');
-      String? accessToken = prefs.getString('token'); // Obtener el access token
+      String? accessToken = prefs.getString('token');
 
-      if (refreshToken == null) {
-        print('No hay refresh token para logout');
-        return false;
-      }
-
-      if (accessToken == null) {
-        print('No hay access token para logout');
+      if (refreshToken == null || accessToken == null) {
         return false;
       }
 
@@ -114,7 +114,7 @@ class TokenService {
         Uri.parse('${Config.apiUrl2}/users/logout'),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $accessToken', // Agregar el access token
+          'Authorization': 'Bearer $accessToken',
         },
         body: jsonEncode({
           'refreshToken': refreshToken,
@@ -124,41 +124,42 @@ class TokenService {
 
       if (response.statusCode == 200) {
         final responseBody = jsonDecode(response.body);
-
-        if (responseBody['success'] == true) {
-          print('Logout exitoso: ${responseBody['message']}');
-          return true;
-        }
-      } else {
-        print('Error en logout: ${response.statusCode}');
-        // Imprimir más detalles del error
-        try {
-          final errorBody = jsonDecode(response.body);
-          print('Detalles del error: ${errorBody['message']}');
-        } catch (e) {
-          print('Error parseando respuesta de error');
-        }
+        return responseBody['success'] == true;
       }
+      debugPrint('Error en logout: ${response.statusCode}');
     } catch (e) {
-      print('Error en logout del servidor: $e');
+      debugPrint('Error en logout del servidor: $e');
     }
 
     return false;
+  }
+
+  /// Borra los datos de sesión del dispositivo, conservando las preferencias
+  /// del usuario (por ejemplo, el tamaño de texto).
+  Future<void> clearLocalSession() async {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
+
+    final prefs = await SharedPreferences.getInstance();
+    final preserved = <String, Object?>{
+      for (final key in _preservedKeys) key: prefs.get(key),
+    };
+    await prefs.clear();
+    for (final entry in preserved.entries) {
+      final value = entry.value;
+      if (value is double) await prefs.setDouble(entry.key, value);
+      if (value is int) await prefs.setInt(entry.key, value);
+      if (value is String) await prefs.setString(entry.key, value);
+      if (value is bool) await prefs.setBool(entry.key, value);
+    }
   }
 
   // Limpiar recursos y cerrar sesión
   Future<void> logout({bool logoutAll = false}) async {
     // Primero intentar logout en el servidor
     await logoutFromServer(logoutAll: logoutAll);
-
     // Limpiar datos locales independientemente del resultado
-    _refreshTimer?.cancel();
-    _refreshTimer = null;
-
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-
-    print('Sesión cerrada - tokens eliminados');
+    await clearLocalSession();
   }
 
   // Detener el servicio
