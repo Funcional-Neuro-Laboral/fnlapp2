@@ -7,7 +7,6 @@ import 'package:fnlapp/Util/enums.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:fnlapp/SharedPreferences/sharedpreference.dart';
-import 'package:fnlapp/Main/cargarprograma.dart';
 import 'package:fnlapp/config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../Preguntas/index.dart';
@@ -17,6 +16,10 @@ import '../Util/api_service.dart';
 import '../Util/test_notices_data.dart';
 import '../services/subscription_service.dart';
 import 'package:fnlapp/Main/certificate_screen.dart';
+import 'package:fnlapp/Main/stress_result_screen.dart';
+import '../Util/stress_factors.dart';
+import '../theme/app_colors.dart';
+import '../widgets/app_buttons.dart';
 
 class TestEstresQuestionScreen extends StatefulWidget {
   const TestEstresQuestionScreen({Key? key}) : super(key: key);
@@ -384,7 +387,15 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         return;
       }
 
-      print('Test guardado correctamente con tipo: $testType');
+      // Guardar el resultado en el dispositivo para mostrarlo en "Mi test".
+      final factors = topStressFactors(selectedOptions);
+      await LastStressResult(
+        score: totalScore,
+        nivel: nivelEstres,
+        date: DateTime.now(),
+        factors: factors,
+        testType: testType,
+      ).save();
 
       if (testType == 'exit') {
         // Si es un test de salida (día 21 completado), actualizar el nivel de estrés
@@ -423,14 +434,24 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         // Formatear fecha actual
         String completionDate = _formatDate(DateTime.now());
 
-        // Navegar a la pantalla de certificado después del test de salida
+        // Mostrar el resultado del test de salida y, desde ahí, el certificado.
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => CertificateScreen(
-              username: userName.trim(),
-              completionDate: completionDate,
-              programName: 'Programa de Manejo de Estrés Laboral - 21 Días',
+            builder: (resultContext) => StressResultScreen(
+              nivel: nivelEstres,
+              score: totalScore,
+              factors: factors,
+              primaryLabel: 'Ver mi certificado',
+              onPrimary: () => Navigator.of(resultContext).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => CertificateScreen(
+                    username: userName.trim(),
+                    completionDate: completionDate,
+                    programName: 'Programa de Manejo de Estrés Laboral - 21 Días',
+                  ),
+                ),
+              ),
             ),
           ),
         );
@@ -490,7 +511,7 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (context) =>
-                        CargarProgramaScreen(nivelEstres: nivelEstres),
+                        _entryResult(nivelEstres, totalScore, factors),
                   ),
                 );
               } else {
@@ -526,7 +547,7 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
               context,
               MaterialPageRoute(
                 builder: (context) =>
-                    CargarProgramaScreen(nivelEstres: nivelEstres),
+                    _entryResult(nivelEstres, totalScore, factors),
               ),
             );
           }
@@ -540,7 +561,7 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
             context,
             MaterialPageRoute(
               builder: (context) =>
-                  CargarProgramaScreen(nivelEstres: nivelEstres),
+                  _entryResult(nivelEstres, totalScore, factors),
             ),
           );
         }
@@ -556,6 +577,22 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         isSubmitting = false;
       });
     }
+  }
+
+  /// Resultado del test de entrada; desde ahí se entra al plan.
+  Widget _entryResult(NivelEstres nivel, int score, List<StressFactor> factors) {
+    return Builder(
+      builder: (resultContext) => StressResultScreen(
+        nivel: nivel,
+        score: score,
+        factors: factors,
+        primaryLabel: 'Ver mi plan de 21 días',
+        onPrimary: () => Navigator.of(resultContext).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => HomeScreen()),
+          (route) => false,
+        ),
+      ),
+    );
   }
 
   Future<bool?> _showSubscriptionDialog() {
@@ -729,332 +766,189 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
 
     // Verificación inicial para asegurarse de que 'questions' no esté vacío y que el índice esté en rango
     if (questions.isEmpty || currentQuestionIndex >= questions.length) {
-      return Scaffold(
-        body: Center(
-          child: Text(
-              "No hay preguntas disponibles"), // Mensaje de error si no hay preguntas
-        ),
+      return const Scaffold(
+        body: Center(child: Text('No hay preguntas disponibles')),
       );
     }
 
-    // Asignar la pregunta actual solo si la lista de preguntas tiene contenido y el índice es válido
     final question = questions[currentQuestionIndex];
-
-    // Obtener el ancho de la pantalla
-    double screenWidth = MediaQuery.of(context).size.width;
+    final total = questions.length;
+    final isLast = currentQuestionIndex >= total - 1;
+    final isNextEnabled = selectedOptions[currentQuestionIndex] != 0 && !isSubmitting;
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final screenWidth = constraints.maxWidth;
-          final screenHeight = constraints.maxHeight;
-          final isTablet = screenWidth > 600;
-
-          // Tamaños responsivos
-          final headerPadding = isTablet ? 24.0 : 16.0;
-          final iconSize = isTablet ? 28.0 : 24.0;
-          final titleFontSize = isTablet ? 20.0 : 16.0;
-          final questionFontSize = isTablet ? 22.0 : 16.0;
-          final descriptionFontSize = isTablet ? 19.0 : 16.0;
-          final optionFontSize = isTablet ? 24.0 : 22.0;
-          final buttonFontSize = isTablet ? 24.0 : 22.0;
-          final horizontalPadding = isTablet ? 32.0 : 24.0;
-          final maxContentWidth = isTablet ? 800.0 : double.infinity;
-
-          return Container(
-            color: Color(0xFFF6F6F6),
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
             child: Column(
               children: [
-                // Header con icono de retroceso y título (fijo)
-                Container(
-                  margin: EdgeInsets.only(
-                      top: MediaQuery.of(context).padding.top + 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF6F6F6),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0x14000000),
-                        blurRadius: 8,
-                        offset: Offset(0, 4),
-                        spreadRadius: 0,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 20, 0),
+                  child: Row(
+                    children: [
+                      if (currentQuestionIndex > 0)
+                        IconButton(
+                          tooltip: 'Pregunta anterior',
+                          onPressed: isSubmitting ? null : goToPreviousQuestion,
+                          style: IconButton.styleFrom(backgroundColor: AppColors.muted, minimumSize: const Size(44, 44)),
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppColors.ink),
+                        )
+                      else
+                        const SizedBox(width: 44),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Semantics(
+                              liveRegion: true,
+                              child: Text('Pregunta ${currentQuestionIndex + 1} de $total',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.inkSecondary)),
+                            ),
+                            const SizedBox(height: 6),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(999),
+                              child: LinearProgressIndicator(
+                                value: (currentQuestionIndex + 1) / total,
+                                minHeight: 6,
+                                backgroundColor: const Color(0xFFE6E2F0),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      vertical: 10.0,
-                      horizontal: headerPadding,
-                    ),
-                    child: Row(
-                      children: [
-                        if (currentQuestionIndex > 0)
-                          GestureDetector(
-                            onTap: goToPreviousQuestion,
-                            child: Container(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Icon(
-                                Icons.arrow_back_ios,
-                                color: Color(0xFF4320AD),
-                                size: iconSize,
-                              ),
-                            ),
-                          )
-                        else
-                          SizedBox(width: 40 + (isTablet ? 8 : 0)),
-                        Expanded(
-                          child: Center(
-                            child: Text(
-                              'Pregunta ${currentQuestionIndex + 1} de ${questions.length}',
-                              style: TextStyle(
-                                color: const Color(0xFF4320AD),
-                                fontSize: titleFontSize,
-                                fontFamily: 'Inter',
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 40 + (isTablet ? 8 : 0)),
-                      ],
-                    ),
-                  ),
                 ),
-
-                SizedBox(height: isTablet ? 30 : 20),
-
-                // Pregunta (fija)
-                Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxContentWidth),
-                    child: Column(
-                      children: [
-                        if (question['question'] != null)
-                          Padding(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: horizontalPadding),
-                            child: Text(
-                              question['question']!,
-                              textAlign: TextAlign.start,
-                              style: TextStyle(
-                                color: const Color(0xFF4320AD),
-                                fontSize: questionFontSize,
-                                fontFamily: 'Inter',
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        if (question['description'] != null) ...[
-                          SizedBox(height: isTablet ? 16 : 12),
-                          Padding(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: horizontalPadding),
-                            child: Text(
-                              question['description']!,
-                              textAlign: TextAlign.start,
-                              style: TextStyle(
-                                fontSize: descriptionFontSize,
-                                fontFamily: 'Inter',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-
-                SizedBox(height: isTablet ? 30 : 20),
-
-                // Opciones scrolleables
                 Expanded(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: maxContentWidth),
-                      child: SingleChildScrollView(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: horizontalPadding),
-                        child: Column(
-                          children: List.generate(8, (index) {
-                            final optionKey = 'option${index + 1}';
-                            final detailKey = 'detail${index + 1}';
-                            final optionText = question[optionKey];
-                            final optionDetail = question[detailKey];
-
-                            if (optionText == null || optionDetail == null) {
-                              return SizedBox.shrink();
-                            }
-
-                            bool isSelected =
-                                selectedOptions[currentQuestionIndex] ==
-                                    (index + 1);
-
-                            return Padding(
-                              padding: EdgeInsets.symmetric(
-                                  vertical: isTablet ? 10.0 : 8.0),
-                              child: GestureDetector(
-                                onTap: () => selectOption(index + 1),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 300),
-                                  width: double.infinity,
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: isTablet ? 16 : 12,
-                                    horizontal: isTablet ? 40 : 32,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? Color(0x8E5027D0)
-                                        : Colors.white,
-                                    border: Border.all(
-                                      width: 2,
-                                      color: Color(0xFF6D4BD8),
-                                    ),
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        optionText,
-                                        style: TextStyle(
-                                          color: isSelected
-                                              ? Colors.white
-                                              : Color(0xFF6D4BD8),
-                                          fontSize: optionFontSize,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      if (isSelected)
-                                        Padding(
-                                          padding: EdgeInsets.only(
-                                              top: isTablet ? 12.0 : 8.0),
-                                          child: Text.rich(
-                                            TextSpan(
-                                              children: [
-                                                TextSpan(
-                                                  text: "Detalle: ",
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize:
-                                                        isTablet ? 16 : 14,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                                TextSpan(
-                                                  text: optionDetail,
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize:
-                                                        isTablet ? 16 : 14,
-                                                    fontWeight: FontWeight.w400,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
+                    children: [
+                      if (question['question'] != null)
+                        Semantics(
+                          header: true,
+                          child: Text(question['question']!, style: textTheme.titleMedium?.copyWith(height: 26 / 18)),
                         ),
-                      ),
-                    ),
+                      if (question['description'] != null) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          question['description']!,
+                          style: textTheme.bodyMedium?.copyWith(color: AppColors.inkSecondary),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      for (var index = 0; index < 8; index++)
+                        if (question['option${index + 1}'] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _AnswerOption(
+                              label: question['option${index + 1}']!,
+                              detail: question['detail${index + 1}'],
+                              selected: selectedOptions[currentQuestionIndex] == index + 1,
+                              onTap: () => selectOption(index + 1),
+                            ),
+                          ),
+                    ],
                   ),
                 ),
-
-                // Botón Siguiente/Finalizar (fijo)
                 Container(
-                  padding: EdgeInsets.fromLTRB(
-                    horizontalPadding,
-                    12,
-                    horizontalPadding,
-                    MediaQuery.of(context).padding.bottom +
-                        (isTablet ? 30 : 20),
-                  ),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: maxContentWidth),
-                      child: Builder(
-                        builder: (context) {
-                          final bool isNextEnabled =
-                              selectedOptions[currentQuestionIndex] != 0;
-                          final String nextLabel =
-                              currentQuestionIndex < questions.length - 1
-                                  ? 'Siguiente'
-                                  : 'Continuar';
-
-                          return GestureDetector(
-                            onTap: isNextEnabled && !isSubmitting
-                                ? () {
-                                    if (currentQuestionIndex <
-                                        questions.length - 1) {
-                                      goToNextQuestion();
-                                    } else {
-                                      submitTest();
-                                    }
-                                  }
-                                : null,
-                            child: Container(
-                              width: double.infinity,
-                              padding: EdgeInsets.symmetric(
-                                  vertical: isTablet ? 18 : 16),
-                              decoration: ShapeDecoration(
-                                color: (isNextEnabled && !isSubmitting)
-                                    ? const Color(0xFF6D4BD8)
-                                    : const Color(0xFFD7D7D7),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(40),
-                                ),
-                                shadows: isNextEnabled
-                                    ? const [
-                                        BoxShadow(
-                                          color: Color(0x26000000),
-                                          blurRadius: 6,
-                                          offset: Offset(0, 2),
-                                          spreadRadius: 2,
-                                        ),
-                                      ]
-                                    : const [],
-                              ),
-                              child: Center(
-                                child: isSubmitting
-                                    ? SizedBox(
-                                        width: isTablet ? 24 : 20,
-                                        height: isTablet ? 24 : 20,
-                                        child: CircularProgressIndicator(
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                  Colors.white),
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : Text(
-                                        nextLabel,
-                                        style: TextStyle(
-                                          color:
-                                              (isNextEnabled && !isSubmitting)
-                                                  ? Colors.white
-                                                  : const Color(0xFF868686),
-                                          fontSize: buttonFontSize,
-                                          fontFamily: 'Inter',
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                  decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.divider))),
+                  child: AppPrimaryButton(
+                    label: isLast ? 'Ver mi resultado' : 'Siguiente',
+                    loading: isSubmitting,
+                    onPressed: isNextEnabled
+                        ? () {
+                            if (!isLast) {
+                              goToNextQuestion();
+                            } else {
+                              submitTest();
+                            }
+                          }
+                        : null,
                   ),
                 ),
               ],
             ),
-          );
-        },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AnswerOption extends StatelessWidget {
+  const _AnswerOption({required this.label, required this.selected, required this.onTap, this.detail});
+
+  final String label;
+  final String? detail;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      inMutuallyExclusiveGroup: true,
+      checked: selected,
+      button: true,
+      label: label,
+      hint: selected ? detail : null,
+      excludeSemantics: true,
+      child: Material(
+        color: selected ? AppColors.selected : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: selected ? AppColors.primary : AppColors.border, width: selected ? 2 : 1.5),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(label,
+                            style: TextStyle(fontSize: 16, height: 22 / 16, fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 200),
+                          child: selected && detail != null
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Text(detail!,
+                                      style: const TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.inkSecondary)),
+                                )
+                              : const SizedBox(width: double.infinity),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: selected ? AppColors.primary : Colors.transparent,
+                      border: Border.all(color: selected ? AppColors.primary : const Color(0xFFB9B3CC), width: 2),
+                    ),
+                    child: selected ? const Icon(Icons.check_rounded, size: 14, color: Colors.white) : null,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

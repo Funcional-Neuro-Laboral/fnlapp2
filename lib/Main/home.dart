@@ -1,314 +1,227 @@
-import 'package:flutter/material.dart';
-import 'package:fnlapp/Login/login.dart';
-import 'package:fnlapp/Main/profile.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../Util/token_service.dart';
+
+import 'package:flutter/material.dart';
 import 'package:fnlapp/Main/models/profile_data.dart';
-import '../config.dart';
-import '../Main/widgets/custom_navigation_bar.dart';
-import 'plan.dart';
-import './widgets/chat_widget.dart';
-import 'mitest.dart';
-import './ExitTest/exit_test_screen.dart';
-import 'package:fnlapp/Util/enums.dart';
+import 'package:fnlapp/Main/profile.dart';
 import 'package:fnlapp/Main/testestres_form.dart';
+import 'package:fnlapp/Util/enums.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../Funcy/screens/chat_screen.dart';
+import '../Util/api_service.dart';
+import '../widgets/app_bottom_nav.dart';
+import 'mitest.dart';
+import 'plan.dart';
 
 class HomeScreen extends StatefulWidget {
+  const HomeScreen({Key? key, this.initialIndex = 0}) : super(key: key);
+
+  final int initialIndex;
+
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen> {
   NivelEstres nivelEstres = NivelEstres.desconocido;
   List<dynamic> programas = [];
   bool isLoading = true;
-  int _selectedIndex = 0;
-  bool isChatOpen = false;
-  bool showExitTest = false;
-  bool showWidgets = false;
+  bool loadFailed = false;
+  late int _selectedIndex = widget.initialIndex;
+  late final Set<int> _visitedTabs = {widget.initialIndex};
   int? userId;
   String? username;
-  int? funcyInteract;
   ProfileData? profileData;
-  bool hasFilledEmotion = false;
-  String? token;
   bool isExitTestEnabled = false;
+  bool hasCompletedExitTest = false;
 
   @override
   void initState() {
     super.initState();
-    // Cargamos todos los datos necesarios al iniciar la pantalla
     _loadInitialData();
   }
 
-  // --- NUEVA FUNCIÓN PARA CENTRALIZAR LA CARGA DE DATOS ---
-  Future<void> _loadInitialData() async {
-    // Primero, obtenemos los datos del usuario de SharedPreferences
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+  Future<void> _loadInitialData({bool silent = false}) async {
+    final prefs = await SharedPreferences.getInstance();
     userId = prefs.getInt('userId');
     username = prefs.getString('username');
-    token = prefs.getString('token');
+    final token = prefs.getString('token');
 
-    // Si no tenemos los datos básicos, no podemos continuar.
     if (userId == null || token == null) {
-      print(
-          'Error crítico: userId o token no encontrados al iniciar HomeScreen.');
-      // Opcional: podrías redirigir al login aquí si esto ocurre.
-      // _handleLogout();
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
       return;
     }
 
-    // Ahora que tenemos los datos, ejecutamos las llamadas a la API en paralelo
-    await Future.wait([
-      _checkExitTest(),
-      obtenerNivelEstresYProgramas(),
-      loadProfile(),
-    ]);
-
-    // Actualizamos el estado para reflejar que la carga ha terminado
-    if (mounted) {
+    if (!silent && mounted) {
       setState(() {
-        isLoading = false;
+        isLoading = true;
+        loadFailed = false;
       });
     }
-  }
 
-  Future<void> _checkExitTest() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    bool isDay21Completed = prefs.getBool('isDay21Completed') ?? false;
-    bool hasCompletedExitTest = prefs.getBool('hasCompletedExitTest') ?? false;
+    isExitTestEnabled = prefs.getBool('isDay21Completed') ?? false;
+    hasCompletedExitTest = prefs.getBool('hasCompletedExitTest') ?? false;
 
-    print('isDay21Completed: $isDay21Completed');
-    print('hasCompletedExitTest: $hasCompletedExitTest');
-    setState(() {
-      showExitTest = isDay21Completed;
-      isExitTestEnabled = isDay21Completed;
-    });
-  }
+    await Future.wait([_loadPrograms(), _loadProfile()]);
 
-  Future<void> loadProfile() async {
-    profileData = await fetchProfile();
     if (mounted) {
-      setState(() {});
+      setState(() => isLoading = false);
     }
   }
 
-  // --- FUNCIÓN fetchProfile MODIFICADA PARA OBTENER EL NIVEL DE ESTRÉS ---
-  Future<ProfileData?> fetchProfile() async {
-    if (userId == null || token == null) {
-      print('Error en fetchProfile: Faltan datos de usuario.');
-      return null;
-    }
+  Future<void> refresh() => _loadInitialData(silent: true);
 
+  Future<void> _loadPrograms() async {
     try {
-      String url = '${Config.apiUrl2}/users/getprofile/$userId';
-      final response = await http.get(Uri.parse(url), headers: {
-        'Authorization': 'Bearer $token',
-      });
-
-      if (response.statusCode == 200) {
-        var profileJson = json.decode(response.body);
-        var profile = ProfileData.fromJson(profileJson);
-
-        // NUEVO: Obtener el nivel de estrés del perfil (viene como string)
-        String? estresLevelString = profileJson['estresLevel'];
-        if (estresLevelString != null && mounted) {
-          setState(() {
-            nivelEstres = _mapNivelEstresFromString(estresLevelString);
-          });
-          print(
-              'Nivel de estrés obtenido del perfil: $nivelEstres (String: $estresLevelString)');
-        }
-
-        return profile;
+      final response = await ApiService().get('users/daily-activities?userId=$userId');
+      final responseData = jsonDecode(response.body);
+      programas = responseData['userProgramas'] ?? [];
+      loadFailed = false;
+    } on ApiException catch (e) {
+      // Sin programa todavía: se muestra "Tu plan se está preparando".
+      if (e.statusCode == 404) {
+        programas = [];
+        loadFailed = false;
       } else {
-        print('Error fetching profile: ${response.statusCode}');
-        return null;
+        debugPrint('Error obteniendo programas: $e');
+        loadFailed = true;
       }
     } catch (e) {
-      print('Error fetching profile: $e');
-      return null;
+      debugPrint('Error obteniendo programas: $e');
+      loadFailed = true;
     }
   }
+
+  Future<void> _loadProfile() async {
+    try {
+      final response = await ApiService().get('users/getprofile/$userId');
+      final profileJson = json.decode(response.body);
+      profileData = ProfileData.fromJson(profileJson);
+      final estresLevelString = profileJson['estresLevel'];
+      if (estresLevelString is String) {
+        nivelEstres = _mapNivelEstresFromString(estresLevelString);
+      }
+    } catch (e) {
+      debugPrint('Error fetching profile: $e');
+    }
+  }
+
+  String get _firstName {
+    final source = profileData?.fullName ?? profileData?.nombres;
+    final first = source?.trim().split(' ').first ?? '';
+    return first.isEmpty ? (username ?? '') : first;
+  }
+
+  int get _completedDays => programas.where((p) => p['completed_date'] != null || p['completed'] == true).length;
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
-      isChatOpen = index == 1;
-      if (index == 4 && showExitTest) {
-        showWidgets = true;
-      }
+      _visitedTabs.add(index);
     });
   }
 
-  // --- FUNCIÓN PARA ACTUALIZAR LA IMAGEN DE PERFIL ---
-  void _updateProfileImage(String newImageUrl) async {
-    print(
-        'Callback recibido en HomeScreen: actualizando imagen a $newImageUrl');
+  Future<void> _startExitTest() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const TestEstresQuestionScreen()),
+    );
+    await refresh();
+  }
 
+  Future<void> _updateProfileImage(String newImageUrl) async {
     imageCache.clear();
     imageCache.clearLiveImages();
+    await _loadProfile();
+    if (mounted) setState(() {});
+  }
 
-    await loadProfile();
-
-    if (mounted) {
-      setState(() {});
-      print('ProfileData actualizado en HomeScreen después del callback');
+  Widget _buildTab(int index) {
+    final firstName = _firstName;
+    switch (index) {
+      case 0:
+        final modifiedProgramas = programas.map((programa) {
+          final newPrograma = Map<String, dynamic>.from(programa);
+          if (newPrograma['descripcion'] is String) {
+            newPrograma['descripcion'] =
+                (newPrograma['descripcion'] as String).replaceAll('USER', firstName.isEmpty ? 'tú' : firstName);
+          }
+          return newPrograma;
+        }).toList();
+        return PlanScreen(
+          nivelEstres: nivelEstres,
+          isLoading: isLoading,
+          loadFailed: loadFailed,
+          programas: modifiedProgramas,
+          showExitTestModal: isExitTestEnabled && !hasCompletedExitTest,
+          userName: firstName,
+          avatarUrl: _customAvatarUrl,
+          onRefresh: refresh,
+          onOpenProfile: () => _onItemTapped(3),
+          onStartExitTest: _startExitTest,
+        );
+      case 1:
+        return ChatScreen(
+          userId: userId ?? 0,
+          username: firstName.isEmpty ? 'Usuario' : firstName,
+          embedded: true,
+        );
+      case 2:
+        return MiTestScreen(
+          nivelEstres: nivelEstres,
+          isExitTestEnabled: isExitTestEnabled,
+          hasCompletedExitTest: hasCompletedExitTest,
+          onStartExitTest: _startExitTest,
+        );
+      default:
+        return ProfileScreen(
+          profileData: profileData,
+          onLogout: _handleLogout,
+          onProfileImageUpdated: _updateProfileImage,
+          isDay21Completed: hasCompletedExitTest,
+          completedDays: _completedDays,
+        );
     }
   }
 
-  Widget _getSelectedWidget() {
-    final String? nameSource = profileData?.fullName ?? profileData?.nombres;
-    final String userName = nameSource?.split(' ').first ?? 'Usuario';
-
-    final List<dynamic> modifiedProgramas = programas.map((programa) {
-      final newPrograma = Map<String, dynamic>.from(programa);
-      if (newPrograma['descripcion'] != null &&
-          newPrograma['descripcion'] is String) {
-        newPrograma['descripcion'] =
-            newPrograma['descripcion'].replaceAll('USER', userName);
-      }
-      return newPrograma;
-    }).toList();
-
-    switch (_selectedIndex) {
-      case 0:
-        return PlanScreen(
-          nivelEstres: nivelEstres,
-          isLoading: isLoading,
-          programas: modifiedProgramas,
-          showExitTestModal: isExitTestEnabled,
-        );
-      case 1:
-        return ChatWidget(
-          userId: userId ?? 1,
-          username: username ?? 'Usuario',
-          onChatToggle: (isOpen) => setState(() => isChatOpen = isOpen),
-        );
-      case 2:
-        return MiTestScreen(nivelEstres: nivelEstres);
-      case 3:
-        return FutureBuilder<bool>(
-          future: SharedPreferences.getInstance().then(
-            (prefs) => prefs.getBool('hasCompletedExitTest') ?? false,
-          ),
-          builder: (context, snapshot) {
-            return ProfileScreen(
-              profileData: profileData,
-              onLogout: _handleLogout,
-              onProfileImageUpdated: _updateProfileImage,
-              isDay21Completed: snapshot.data ?? false,
-            );
-          },
-        );
-      case 4:
-        if (showExitTest) {
-          return TestEstresQuestionScreen();
-        }
-        return PlanScreen(
-          nivelEstres: nivelEstres,
-          isLoading: isLoading,
-          programas: programas,
-        );
-      default:
-        return PlanScreen(
-          nivelEstres: nivelEstres,
-          isLoading: isLoading,
-          programas: programas,
-        );
-    }
+  /// Solo se muestra la foto si el usuario subió una (no la imagen genérica).
+  String? get _customAvatarUrl {
+    final url = profileData?.profileImage;
+    if (url == null || url.endsWith('/assets/user_img.jpg')) return null;
+    return url;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Color(0xFF5027D0),
-      body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: Colors.white,
-              ),
-            )
-          : Stack(
-              children: [
-                Positioned.fill(child: _getSelectedWidget()),
-                if (!showWidgets)
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: CustomNavigationBar(
-                      selectedIndex: _selectedIndex,
-                      onItemTapped: _onItemTapped,
-                      showExitTest: showExitTest,
-                      isExitTestEnabled: isExitTestEnabled,
-                    ),
-                  ),
-              ],
-            ),
+    return PopScope(
+      canPop: _selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _selectedIndex != 0) _onItemTapped(0);
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: [
+            for (var i = 0; i < 4; i++)
+              // Cada pestaña se crea la primera vez que se visita y luego conserva su estado.
+              _visitedTabs.contains(i) ? _buildTab(i) : const SizedBox.shrink(),
+          ],
+        ),
+        bottomNavigationBar: AppBottomNav(
+          selectedIndex: _selectedIndex,
+          onSelected: _onItemTapped,
+        ),
+      ),
     );
   }
 
   Future<void> _handleLogout() async {
-    // Usar logout con invalidación de tokens en servidor
-    await TokenService.instance.logout(logoutAll: false);
-
     if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => LoginScreen()),
-        (Route<dynamic> route) => false,
-      );
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
     }
   }
 
-  // --- FUNCIÓN obtenerNivelEstresYProgramas MODIFICADA ---
-  Future<void> obtenerNivelEstresYProgramas() async {
-    // La verificación principal ya se hizo en _loadInitialData.
-    if (userId == null || token == null) {
-      print('Error en obtenerNivelEstresYProgramas: Faltan datos de usuario.');
-      return;
-    }
-
-    try {
-      // MODIFICADO: Usar la nueva API para obtener las actividades diarias
-      final responseProgramas = await http.get(
-        Uri.parse('${Config.apiUrl2}/users/daily-activities?userId=$userId'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token'
-        },
-      );
-
-      if (responseProgramas.statusCode == 200) {
-        final responseData = jsonDecode(responseProgramas.body);
-        if (mounted) {
-          setState(() {
-            programas = responseData['userProgramas'] ?? [];
-          });
-          print('Programas cargados: ${programas.length}');
-        }
-      } else {
-        print('Error al obtener programas: ${responseProgramas.statusCode}');
-        if (mounted) {
-          setState(() {
-            programas = [];
-          });
-        }
-      }
-    } catch (e) {
-      print('Error obteniendo programas: $e');
-      if (mounted) {
-        setState(() {
-          programas = [];
-        });
-      }
-    }
-  }
-
-  // NUEVA FUNCIÓN para mapear strings a NivelEstres
   NivelEstres _mapNivelEstresFromString(String nivelString) {
     switch (nivelString.toUpperCase()) {
       case 'LEVE':
@@ -316,7 +229,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       case 'MODERADO':
         return NivelEstres.moderado;
       case 'ALTO':
-        return NivelEstres.severo;
       case 'SEVERO':
         return NivelEstres.severo;
       default:

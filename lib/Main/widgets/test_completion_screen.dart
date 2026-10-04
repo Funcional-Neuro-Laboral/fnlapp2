@@ -65,7 +65,6 @@ class _TestCompletionScreenState extends State<TestCompletionScreen> {
                                   style: TextStyle(
                                     color: const Color(0xFF5027D0),
                                     fontSize: titleFontSize,
-                                    fontFamily: 'Inter',
                                     fontWeight: FontWeight.w700,
                                     height: 1.3,
                                   ),
@@ -117,7 +116,6 @@ class _TestCompletionScreenState extends State<TestCompletionScreen> {
                                     style: TextStyle(
                                       color: const Color(0xFF4320AD),
                                       fontSize: finalTextFontSize,
-                                      fontFamily: 'Inter',
                                       fontWeight: FontWeight.w600,
                                       height: 1.5,
                                     ),
@@ -193,7 +191,6 @@ class _TestCompletionScreenState extends State<TestCompletionScreen> {
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: buttonFontSize,
-                                        fontFamily: 'Inter',
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -243,7 +240,6 @@ class _TestCompletionScreenState extends State<TestCompletionScreen> {
             style: TextStyle(
               color: const Color(0xFF333333),
               fontSize: fontSize,
-              fontFamily: 'Inter',
               fontWeight: FontWeight.w400,
               height: 1.5,
             ),

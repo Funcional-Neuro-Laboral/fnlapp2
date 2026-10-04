@@ -1,15 +1,21 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:fnlapp/Main/finalstepscreen.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:http/http.dart' as http;
+import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
-import 'dart:io';
-import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import '../Util/translations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../config.dart';
+import '../theme/app_colors.dart';
+import '../theme/funcy.dart';
+import '../Util/api_service.dart';
+import '../Util/translations.dart';
 import 'completed_dia_screen.dart';
-import 'dart:async';
 
 class StepScreen extends StatefulWidget {
   final List<String> steps;
@@ -38,74 +44,53 @@ class StepScreen extends StatefulWidget {
 }
 
 class _StepScreenState extends State<StepScreen> {
+  static const _autoAdvanceSeconds = 10;
+  static const _textSizes = [17.0, 20.0, 24.0];
+  static const _textSizeLabels = ['pequeño', 'mediano', 'grande'];
+
   int currentStep = 0;
   bool isPlaying = false;
   bool isLoading = false;
-  final TextEditingController commentController = TextEditingController();
-  double rating = 0;
-  double textSize = 18.0;
+  double textSize = 20.0;
   bool isMuted = false;
   bool _isPaused = false;
   AudioPlayer? currentPlayer;
+  StreamSubscription<PlayerState>? _playerSubscription;
   Timer? _delayTimer;
   bool _isInDelay = false;
-  int _remainingSeconds = 10;
-  Map<int, AudioSource> _cachedAudioSources = {};
+  int _remainingSeconds = _autoAdvanceSeconds;
+  final Map<int, AudioSource> _cachedAudioSources = {};
   bool _isPreloadingAudio = true;
 
-  // Helper method para obtener el tipo de dispositivo
-  DeviceType _getDeviceType(double width) {
-    if (width < 600) return DeviceType.mobile;
-    if (width < 1024) return DeviceType.tablet;
-    return DeviceType.desktop;
-  }
+  List<String> get _steps => widget.steps.isEmpty ? const ['Respira profundo y tómate un momento para ti.'] : widget.steps;
 
-  // Helper method para obtener dimensiones responsivas
-  ResponsiveDimensions _getResponsiveDimensions(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final deviceType = _getDeviceType(size.width);
-
-    switch (deviceType) {
-      case DeviceType.mobile:
-        return ResponsiveDimensions(
-          padding: 16.0,
-          imageHeight: size.height * 0.35,
-          fontSize: 16.0,
-          titleFontSize: 17.0,
-          iconSize: 24.0,
-          buttonWidth: size.width * 0.25,
-          buttonHeight: 60.0,
-          maxContentWidth: size.width,
-        );
-      case DeviceType.tablet:
-        return ResponsiveDimensions(
-          padding: 24.0,
-          imageHeight: size.height * 0.4,
-          fontSize: 18.0,
-          titleFontSize: 20.0,
-          iconSize: 28.0,
-          buttonWidth: size.width * 0.2,
-          buttonHeight: 70.0,
-          maxContentWidth: size.width * 0.8,
-        );
-      case DeviceType.desktop:
-        return ResponsiveDimensions(
-          padding: 32.0,
-          imageHeight: size.height * 0.45,
-          fontSize: 20.0,
-          titleFontSize: 24.0,
-          iconSize: 32.0,
-          buttonWidth: 140.0,
-          buttonHeight: 80.0,
-          maxContentWidth: 800.0,
-        );
-    }
-  }
+  bool get _isLastStep => currentStep >= _steps.length - 1;
 
   @override
   void initState() {
     super.initState();
+    _loadTextSize();
     _preloadAllAudio();
+  }
+
+  @override
+  void dispose() {
+    _delayTimer?.cancel();
+    _playerSubscription?.cancel();
+    currentPlayer?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadTextSize() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getDouble('stepTextSize');
+    if (saved != null && mounted) setState(() => textSize = saved);
+  }
+
+  Future<void> _setTextSize(double value) async {
+    setState(() => textSize = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('stepTextSize', value);
   }
 
   String _getImageUrlByDay() {
@@ -115,79 +100,62 @@ class _StepScreenState extends State<StepScreen> {
     return widget.url_img;
   }
 
-  @override
-  void dispose() {
-    commentController.dispose();
-    currentPlayer?.dispose();
-    _cancelDelayTimer();
-    super.dispose();
-  }
+  /// URL del audio de un paso, con el texto codificado correctamente.
+  Uri _ttsUri(String text) =>
+      Uri.parse('${Config.apiUrl2}/general/speech/tts/').replace(queryParameters: {'text': text});
+
+  // ========== AUDIO ==========
 
   Future<void> _preloadAllAudio() async {
-    setState(() {
-      _isPreloadingAudio = true;
-    });
-
     try {
-      for (int i = 0; i < widget.steps.length; i++) {
-        final audioSource = await _downloadAudioForStep(widget.steps[i], i);
-        if (audioSource != null) {
-          _cachedAudioSources[i] = audioSource;
-        }
-      }
+      // Las descargas se hacen en paralelo para que el audio esté listo antes.
+      await Future.wait([
+        for (var i = 0; i < _steps.length; i++)
+          _downloadAudioForStep(_steps[i], i).then((source) {
+            if (source != null && mounted) {
+              setState(() => _cachedAudioSources[i] = source);
+            }
+          }),
+      ]);
     } catch (e) {
-      debugPrint("Error precargando audios: $e");
+      debugPrint('Error precargando audios: $e');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isPreloadingAudio = false;
-        });
-      }
+      if (mounted) setState(() => _isPreloadingAudio = false);
     }
   }
 
   Future<AudioSource?> _downloadAudioForStep(String text, int stepIndex) async {
     try {
-      final url = Uri.parse('${Config.apiUrl2}/general/speech/tts/?text=$text');
-      final response = await http.get(url);
-
+      final response = await http.get(_ttsUri(text));
       if (response.statusCode == 200) {
         final audioBytes = response.bodyBytes;
-
         if (kIsWeb) {
-          final base64Audio = base64Encode(audioBytes);
-          final dataUri = 'data:audio/mp3;base64,$base64Audio';
-          return AudioSource.uri(Uri.parse(dataUri));
-        } else {
-          final tempDir = await getTemporaryDirectory();
-          final audioFile = File('${tempDir.path}/speech_step_${stepIndex}_${DateTime.now().millisecondsSinceEpoch}.mp3');
-          await audioFile.writeAsBytes(audioBytes);
-          return AudioSource.file(audioFile.path);
+          return AudioSource.uri(Uri.parse('data:audio/mp3;base64,${base64Encode(audioBytes)}'));
         }
+        final tempDir = await getTemporaryDirectory();
+        final audioFile =
+            File('${tempDir.path}/speech_step_${stepIndex}_${DateTime.now().millisecondsSinceEpoch}.mp3');
+        await audioFile.writeAsBytes(audioBytes);
+        return AudioSource.file(audioFile.path);
       }
     } catch (e) {
-      debugPrint("Error descargando audio para paso $stepIndex: $e");
+      debugPrint('Error descargando audio para paso $stepIndex: $e');
     }
     return null;
   }
 
   void _setupPlayerStateListener() {
-    currentPlayer?.playerStateStream.listen((state) {
-      if (mounted) {
-        // Manejar cambios de estado más granularmente
-        if (state.processingState == ProcessingState.completed &&
-            !_isPaused &&
-            isPlaying) {
-          _handleAudioComplete();
-        }
-
-        // Para móvil: sincronizar el estado del widget con el estado real del player
-        if (state.playing != isPlaying && !_isInDelay) {
-          setState(() {
-            isPlaying = state.playing;
-            _isPaused = !state.playing;
-          });
-        }
+    _playerSubscription?.cancel();
+    _playerSubscription = currentPlayer?.playerStateStream.listen((state) {
+      if (!mounted) return;
+      if (state.processingState == ProcessingState.completed && !_isPaused && isPlaying) {
+        _handleAudioComplete();
+      }
+      if (state.playing != isPlaying && !_isInDelay && state.processingState != ProcessingState.completed) {
+        setState(() {
+          isPlaying = state.playing;
+          _isPaused = !state.playing;
+        });
       }
     });
   }
@@ -200,76 +168,40 @@ class _StepScreenState extends State<StepScreen> {
       _isPaused = false;
       _isInDelay = false;
     });
-
     _cancelDelayTimer();
 
     try {
-      // Usar audio precargado si está disponible
-      AudioSource? audioSource = _cachedAudioSources[currentStep];
+      var audioSource = _cachedAudioSources[currentStep];
+      audioSource ??= await _downloadAudioForStep(text, currentStep);
+      if (audioSource == null) throw Exception('Audio no disponible');
+      if (!mounted) return;
 
-      if (audioSource != null) {
-        currentPlayer = AudioPlayer();
-        await currentPlayer?.setVolume(isMuted ? 0.0 : 1.0);
-        await currentPlayer?.setAudioSource(audioSource);
-      } else {
-        // Fallback: descargar en tiempo real si no está en cache
-        final url = Uri.parse('${Config.apiUrl2}/general/speech/tts/?text=$text');
-        final response = await http.get(url);
-
-        if (response.statusCode == 200) {
-          final audioBytes = response.bodyBytes;
-          currentPlayer = AudioPlayer();
-          await currentPlayer?.setVolume(isMuted ? 0.0 : 1.0);
-
-          if (kIsWeb) {
-            final base64Audio = base64Encode(audioBytes);
-            final dataUri = 'data:audio/mp3;base64,$base64Audio';
-            await currentPlayer?.setAudioSource(
-                AudioSource.uri(Uri.parse(dataUri))
-            );
-          } else {
-            final tempDir = await getTemporaryDirectory();
-            final audioFile = File('${tempDir.path}/speech_${DateTime.now().millisecondsSinceEpoch}.mp3');
-            await audioFile.writeAsBytes(audioBytes);
-            await currentPlayer?.setAudioSource(
-                AudioSource.file(audioFile.path)
-            );
-          }
-        }
-      }
-
-      // Configurar el listener ANTES de iniciar la reproducción
+      await _playerSubscription?.cancel();
+      await currentPlayer?.dispose();
+      currentPlayer = AudioPlayer();
+      await currentPlayer!.setVolume(isMuted ? 0.0 : 1.0);
+      await currentPlayer!.setAudioSource(audioSource);
       _setupPlayerStateListener();
-
-      // Iniciar reproducción
-      await currentPlayer?.play();
-
-      // Para móvil: verificar que el estado se actualizó correctamente
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (mounted && currentPlayer?.playing == true) {
-        setState(() {
-          isPlaying = true;
-          _isPaused = false;
-        });
-      }
-
+      await currentPlayer!.play();
     } catch (e) {
-      debugPrint("Error en la reproducción de audio: $e");
+      debugPrint('Error en la reproducción de audio: $e');
       if (mounted) {
         setState(() {
           isPlaying = false;
           _isPaused = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No pudimos reproducir el audio. Puedes seguir leyendo el paso.')),
+        );
       }
     }
   }
 
   void _handleAudioComplete() {
-    if (currentStep < widget.steps.length - 1) {
-      // Iniciar delay de 10 segundos
+    if (_isInDelay) return;
+    if (!_isLastStep) {
       _startDelayTimer();
     } else {
-      // Es el último step, terminar
       setState(() {
         isPlaying = false;
         _isInDelay = false;
@@ -281,86 +213,69 @@ class _StepScreenState extends State<StepScreen> {
   void _startDelayTimer() {
     setState(() {
       _isInDelay = true;
-      _remainingSeconds = 10;
+      _remainingSeconds = _autoAdvanceSeconds;
     });
+    _runDelayTimer();
+  }
 
+  void _runDelayTimer() {
+    _delayTimer?.cancel();
     _delayTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
-        setState(() {
-          _remainingSeconds--;
-        });
-
-        if (_remainingSeconds <= 0) {
-          timer.cancel();
-          if (mounted && !_isPaused) {
-            _autoAdvanceToNextStep();
-          }
-        }
-      } else {
+      if (!mounted) {
         timer.cancel();
+        return;
+      }
+      setState(() => _remainingSeconds--);
+      if (_remainingSeconds <= 0) {
+        timer.cancel();
+        if (!_isPaused) _autoAdvanceToNextStep();
       }
     });
   }
 
   void _autoAdvanceToNextStep() {
-    // Solo avanzar si no es el último paso
-    if (currentStep < widget.steps.length - 1) {
-      setState(() {
-        isPlaying = false;
-        _isInDelay = false;
-      });
-      _handleNextStep();
-    } else {
-      // Si es el último paso, solo limpiar el estado
-      setState(() {
-        isPlaying = false;
-        _isInDelay = false;
-        _isPaused = false;
-      });
-    }
+    setState(() {
+      isPlaying = false;
+      _isInDelay = false;
+    });
+    if (!_isLastStep) _handleNextStep();
   }
 
   void _cancelDelayTimer() {
     _delayTimer?.cancel();
     _delayTimer = null;
+    if (!mounted) return;
     setState(() {
       _isInDelay = false;
-      _remainingSeconds = 10;
+      _remainingSeconds = _autoAdvanceSeconds;
     });
   }
 
-  Future<void> _stopAudio() async {
+  Future<void> _pauseAudio() async {
     try {
-      // Pausar el audio actual
       await currentPlayer?.pause();
-
-      // Cancelar el delay si está activo
       _cancelDelayTimer();
-
       if (mounted) {
         setState(() {
           isPlaying = false;
           _isPaused = true;
         });
       }
-
-      // Pequeño delay y rebuild adicional para móvil
-      await Future.delayed(const Duration(milliseconds: 50));
-      if (mounted) {
-        setState(() {});
-      }
     } catch (e) {
-      debugPrint("Error al pausar audio: $e");
+      debugPrint('Error al pausar audio: $e');
     }
   }
 
   Future<void> _stopCurrentAudio() async {
+    await _playerSubscription?.cancel();
+    _playerSubscription = null;
     if (currentPlayer != null) {
       await currentPlayer?.stop();
       await currentPlayer?.dispose();
       currentPlayer = null;
     }
     _cancelDelayTimer();
+    if (!mounted) return;
     setState(() {
       isPlaying = false;
       _isPaused = false;
@@ -369,768 +284,519 @@ class _StepScreenState extends State<StepScreen> {
   }
 
   Future<void> _resumeAudio() async {
-    if (_isPaused && currentPlayer != null) {
-      try {
-        // Actualizar estado inmediatamente
-        if (mounted) {
-          setState(() {
-            isPlaying = true;
-            _isPaused = false;
-          });
-        }
-
-        // Pequeño delay para asegurar que el setState se procese en móvil
-        await Future.delayed(const Duration(milliseconds: 50));
-
-        // Reanudar reproducción
-        await currentPlayer?.play();
-
-        // Forzar un rebuild adicional para móvil
-        if (mounted) {
-          setState(() {});
-        }
-
-      } catch (e) {
-        debugPrint("Error al reanudar audio: $e");
-        if (mounted) {
-          setState(() {
-            isPlaying = false;
-            _isPaused = true;
-          });
-        }
-      }
-    }
-  }
-
-  Future<void> _handleNextStep() async {
-    await _stopCurrentAudio();
-    if (currentStep < widget.steps.length - 1) {
-      // Detener cualquier audio o delay actual
-
-      setState(() {
-        currentStep++;
-      });
-
-      // Pequeña pausa para que se actualice la UI
-      await Future.delayed(const Duration(milliseconds: 300));
-
-      // Reproducir el nuevo audio
-      await _playAudioFromAPI(widget.steps[currentStep]);
-    } else {
-      await _navigateToNextScreen();
-    }
-  }
-
-  Future<void> _navigateToNextScreen() async {
-    await _stopCurrentAudio();
-    if (isPlaying) {
-      await _stopAudio();
-    }
-
+    if (!_isPaused || currentPlayer == null) return;
     setState(() {
-      isLoading = true;
+      isPlaying = true;
+      _isPaused = false;
     });
-
     try {
-      if (mounted) {
-        final String apiUrl = "${Config.apiUrl2}/users/daily-activities?userId=${widget.userId}";
-
-        final response = await http.get(Uri.parse(apiUrl));
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          final userProgramas = List<Map<String, dynamic>>.from(data['userProgramas']);
-
-          // Buscar el programa del día actual
-          final currentProgram = userProgramas.firstWhere(
-                (programa) => programa['dia'] == widget.dia,
-            orElse: () => {},
-          );
-
-          final bool isCompleted = currentProgram['completed'] ?? false;
-
-          if (isCompleted) {
-            // Si ya está completado, mostrar CompletedDiaScreen
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CompletedDiaScreen(),
-              ),
-            );
-          } else {
-            // Si no está completado, mostrar FinalStepScreen
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => FinalStepScreen(
-                  userId: widget.userId,
-                  tecnicaId: widget.tecnicaId,
-                  sessionId: widget.sessionId,
-                ),
-              ),
-            );
-          }
-        } else {
-          throw Exception('Error al verificar estado de completado');
-        }
-      }
+      await currentPlayer?.play();
     } catch (e) {
-      debugPrint("Error al navegar: $e");
-      // En caso de error, ir a FinalStepScreen por defecto
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => FinalStepScreen(
-              userId: widget.userId,
-              tecnicaId: widget.tecnicaId,
-              sessionId: widget.sessionId,
-            ),
-          ),
-        );
-      }
-    } finally {
+      debugPrint('Error al reanudar audio: $e');
       if (mounted) {
         setState(() {
-          isLoading = false;
+          isPlaying = false;
+          _isPaused = true;
         });
       }
-    }
-  }
-
-  void _handlePreviousStep() async {
-    if (currentStep > 0) {
-      // Detener audio y delay actual completamente
-      await _stopCurrentAudio();
-
-      setState(() {
-        currentStep--;
-        isPlaying = false;
-        _isPaused = false;
-        _isInDelay = false;
-      });
-
-      // Dispose del player actual para evitar reproducción automática
-      currentPlayer?.dispose();
-      currentPlayer = null;
-
-      // Pequeña pausa para que se actualice la UI
-      await Future.delayed(const Duration(milliseconds: 300));
-
-      // Reproducir automáticamente el audio del paso anterior
-      await _playAudioFromAPI(widget.steps[currentStep]);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final dimensions = _getResponsiveDimensions(context);
-    final deviceType = _getDeviceType(MediaQuery.of(context).size.width);
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: deviceType == DeviceType.desktop
-            ? _buildDesktopLayout(dimensions)
-            : _buildMobileTabletLayout(dimensions, deviceType),
-      ),
-    );
-  }
-
-  Widget _buildDesktopLayout(ResponsiveDimensions dimensions) {
-    return Row(
-      children: [
-        // Panel izquierdo con imagen
-        Expanded(
-          flex: 2,
-          child: Container(
-            padding: EdgeInsets.all(dimensions.padding),
-            child: Column(
-              children: [
-                _buildHeader(dimensions),
-                const SizedBox(height: 24),
-                Expanded(
-                  child: _buildImageSection(dimensions),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // Panel derecho con contenido y controles
-        Expanded(
-          flex: 3,
-          child: Container(
-            padding: EdgeInsets.all(dimensions.padding),
-            child: Column(
-              children: [
-                _buildProgressIndicator(dimensions),
-                const SizedBox(height: 24),
-                Expanded(
-                  child: _buildTextContent(dimensions),
-                ),
-                _buildControls(dimensions),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMobileTabletLayout(ResponsiveDimensions dimensions, DeviceType deviceType) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: dimensions.maxContentWidth),
-        child: Column(
-          children: [
-            _buildHeader(dimensions),
-            _buildProgressIndicator(dimensions),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: dimensions.padding),
-                child: Column(
-                  children: [
-                    _buildImageSection(dimensions),
-                    SizedBox(height: dimensions.padding),
-                    _buildTextSizeControl(dimensions),
-                    SizedBox(height: dimensions.padding),
-                    Container(
-                      height: 1,
-                      width: double.infinity,
-                      color: Colors.black,
-                    ),
-                    SizedBox(height: dimensions.padding),
-                    _buildStepText(dimensions),
-                  ],
-                ),
-              ),
-            ),
-            _buildControls(dimensions),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(ResponsiveDimensions dimensions) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-          horizontal: dimensions.padding,
-          vertical: dimensions.padding * 0.75
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: dimensions.iconSize + 8,
-            height: dimensions.iconSize + 8,
-            child: IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: Icon(
-                Icons.arrow_back_ios_new,
-                color: Colors.black,
-                size: dimensions.iconSize * 0.8,
-              ),
-              padding: EdgeInsets.zero,
-            ),
-          ),
-          Expanded(
-            child: Center(
-              child: Text(
-                'Día ${widget.dia.toString().padLeft(2, '0')}',
-                style: TextStyle(
-                  color: const Color(0xFF4320AD),
-                  fontSize: dimensions.fontSize + 2,
-                  fontFamily: 'Inter',
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-          SizedBox(width: dimensions.iconSize + 8),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressIndicator(ResponsiveDimensions dimensions) {
-    return Container(
-      margin: EdgeInsets.all(dimensions.padding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.access_time,
-                          size: dimensions.fontSize,
-                          color: const Color(0xFF212121),
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          '10 min',
-                          style: TextStyle(
-                            color: const Color(0xFF212121),
-                            fontSize: dimensions.fontSize * 0.85,
-                            fontFamily: 'Inter',
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Container(
-                          width: 7,
-                          height: 7,
-                          decoration: const ShapeDecoration(
-                            color: Color(0xFFB7B7B7),
-                            shape: OvalBorder(),
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            traducirTipoTecnica(widget.tecnicaTipo),
-                            style: TextStyle(
-                              color: const Color(0xFF212121),
-                              fontSize: dimensions.fontSize * 0.85,
-                              fontFamily: 'Inter',
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      widget.tecnicaNombre,
-                      style: TextStyle(
-                        color: const Color(0xFF5027D0),
-                        fontSize: dimensions.titleFontSize,
-                        fontFamily: 'Inter',
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0x28000000),
-                      blurRadius: 5,
-                      offset: const Offset(0, 4),
-                      spreadRadius: 0,
-                    ),
-                  ],
-                ),
-                child: IconButton(
-                  onPressed: () {
-                    setState(() {
-                      isMuted = !isMuted;
-                      // Ajustar volumen del AudioPlayer actual
-                      currentPlayer?.setVolume(isMuted ? 0.0 : 1.0);
-                    });
-                  },
-                  icon: Icon(
-                    isMuted ? Icons.volume_off : Icons.volume_up,
-                    size: dimensions.iconSize,
-                    color: Colors.black,
-                  ),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    padding: EdgeInsets.all(dimensions.padding * 0.5),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildImageSection(ResponsiveDimensions dimensions) {
-    return Container(
-      width: double.infinity,
-      height: dimensions.imageHeight,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Image.network(
-          _getImageUrlByDay(),
-          fit: BoxFit.cover,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return Container(
-              color: Colors.grey[200],
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
-            );
-          },
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: Colors.grey[200],
-              child: Icon(
-                Icons.image_not_supported,
-                size: dimensions.iconSize * 2,
-                color: Colors.grey,
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextContent(ResponsiveDimensions dimensions) {
-    return Column(
-      children: [
-        _buildTextSizeControl(dimensions),
-        SizedBox(height: dimensions.padding),
-        Container(
-          height: 1,
-          width: double.infinity,
-          color: Colors.black,
-        ),
-        SizedBox(height: dimensions.padding),
-        Expanded(
-          child: _buildStepText(dimensions),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTextSizeControl(ResponsiveDimensions dimensions) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Tamaño de texto',
-            style: TextStyle(
-              color: const Color(0xFF212121),
-              fontSize: dimensions.fontSize * 0.85,
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        SizedBox(height: 12),
-        Row(
-          children: [
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  if (textSize > 18.0) {
-                    textSize = textSize == 22.0 ? 20.0 : 18.0;
-                  }
-                });
-              },
-              child: Container(
-                width: dimensions.iconSize + 8,
-                height: dimensions.iconSize + 8,
-                child: Icon(
-                  Icons.remove,
-                  size: dimensions.iconSize,
-                  color: Colors.black,
-                ),
-              ),
-            ),
-            SizedBox(width: 12),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return Container(
-                    height: 8,
-                    child: Stack(
-                      children: [
-                        Container(
-                          width: double.infinity,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFCECECE),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        FractionallySizedBox(
-                          widthFactor: (textSize - 18.0) / 4.0,
-                          child: Container(
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF4320AD),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          left: ((textSize - 18.0) / 4.0) * constraints.maxWidth - 6,
-                          top: -2,
-                          child: GestureDetector(
-                            onPanUpdate: (details) {
-                              double percentage = (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0);
-                              setState(() {
-                                double newSize = 18.0 + (percentage * 4.0);
-                                if (newSize <= 19.0) {
-                                  textSize = 18.0;
-                                } else if (newSize <= 21.0) {
-                                  textSize = 20.0;
-                                } else {
-                                  textSize = 22.0;
-                                }
-                              });
-                            },
-                            child: Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF4320AD),
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            SizedBox(width: 12),
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  if (textSize < 22.0) {
-                    textSize = textSize == 18.0 ? 20.0 : 22.0;
-                  }
-                });
-              },
-              child: Container(
-                width: dimensions.iconSize + 8,
-                height: dimensions.iconSize + 8,
-                child: Icon(
-                  Icons.add,
-                  size: dimensions.iconSize,
-                  color: Colors.black,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStepText(ResponsiveDimensions dimensions) {
-    return SingleChildScrollView(
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          widget.steps[currentStep],
-          style: TextStyle(
-            fontSize: textSize,
-            color: const Color(0xFF212121),
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w400,
-          ),
-          textAlign: TextAlign.left,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildControls(ResponsiveDimensions dimensions) {
-    return Container(
-      padding: EdgeInsets.all(dimensions.padding),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _buildControlButton(
-            icon: Icons.skip_previous,
-            onPressed: currentStep > 0 ? _handlePreviousStep : null,
-            isSecondary: true,
-            dimensions: dimensions,
-          ),
-          SizedBox(width: dimensions.padding),
-          _buildControlButton(
-            icon: _getPlayButtonIcon(),
-            onPressed: _getPlayButtonAction(),
-            isPrimary: true,
-            dimensions: dimensions,
-          ),
-          SizedBox(width: dimensions.padding),
-          _buildControlButton(
-            icon: currentStep == widget.steps.length - 1
-                ? Icons.check
-                : Icons.skip_next,
-            onPressed: isLoading ? null : _handleNextStep,
-            isSecondary: true,
-            isLoading: isLoading,
-            dimensions: dimensions,
-          ),
-        ],
-      ),
-    );
-  }
-
-  IconData _getPlayButtonIcon() {
-    // Si está en delay, mostrar pause/play según si está pausado
-    if (_isInDelay) {
-      return _isPaused ? Icons.play_arrow : Icons.pause;
-    }
-
-    // Si hay audio pausado, mostrar play
-    if (_isPaused && currentPlayer != null) {
-      return Icons.play_arrow;
-    }
-
-    // Si está reproduciendo, mostrar pause
-    if (isPlaying && !_isPaused) {
-      return Icons.pause;
-    }
-
-    // Por defecto mostrar play
-    return Icons.play_arrow;
-  }
-
-  VoidCallback? _getPlayButtonAction() {
-    if (_isInDelay) {
-      // Durante el delay, el botón pausa/reanuda el delay
-      return () {
-        if (_isPaused) {
-          _resumeFromDelay();
-        } else {
-          _pauseDelay();
-        }
-      };
-    } else if (_isPaused) {
-      // Audio pausado, reanudar
-      return _resumeAudio;
-    } else if (isPlaying) {
-      // Audio reproduciéndose, pausar
-      return _stopAudio;
-    } else {
-      // No hay audio, iniciar reproducción
-      return () => _playAudioFromAPI(widget.steps[currentStep]);
     }
   }
 
   void _pauseDelay() {
     _delayTimer?.cancel();
-    setState(() {
-      _isPaused = true;
-    });
+    setState(() => _isPaused = true);
   }
 
   void _resumeFromDelay() {
-    setState(() {
-      _isPaused = false;
-    });
-
-    // Reanudar el timer con el tiempo restante
-    _delayTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
-        setState(() {
-          _remainingSeconds--;
-        });
-
-        if (_remainingSeconds <= 0) {
-          timer.cancel();
-          if (mounted && !_isPaused) {
-            _autoAdvanceToNextStep();
-          }
-        }
-      } else {
-        timer.cancel();
-      }
-    });
+    setState(() => _isPaused = false);
+    _runDelayTimer();
   }
 
-  Widget _buildControlButton({
-    required IconData icon,
-    required VoidCallback? onPressed,
-    bool isPrimary = false,
-    bool isSecondary = false,
-    bool isLoading = false,
-    required ResponsiveDimensions dimensions,
-  }) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: isPrimary ? const Color(0xFF8A6FE0) : const Color(0xFFCCCCCC),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+  // ========== NAVEGACIÓN ENTRE PASOS ==========
+
+  Future<void> _handleNextStep() async {
+    await _stopCurrentAudio();
+    if (!_isLastStep) {
+      setState(() => currentStep++);
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (mounted) await _playAudioFromAPI(_steps[currentStep]);
+    } else {
+      await _navigateToNextScreen();
+    }
+  }
+
+  Future<void> _handlePreviousStep() async {
+    if (currentStep == 0) return;
+    await _stopCurrentAudio();
+    setState(() => currentStep--);
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (mounted) await _playAudioFromAPI(_steps[currentStep]);
+  }
+
+  Future<void> _navigateToNextScreen() async {
+    await _stopCurrentAudio();
+    setState(() => isLoading = true);
+
+    var alreadyCompleted = false;
+    try {
+      final response = await ApiService().get('users/daily-activities?userId=${widget.userId}');
+      final data = json.decode(response.body);
+      final userProgramas = List<Map<String, dynamic>>.from(data['userProgramas'] ?? []);
+      final currentProgram = userProgramas.firstWhere(
+        (p) => int.tryParse(p['dia'].toString()) == widget.dia,
+        orElse: () => {},
+      );
+      alreadyCompleted = currentProgram['completed'] == true || currentProgram['completed_date'] != null;
+    } catch (e) {
+      debugPrint('No se pudo verificar si el día está completado: $e');
+    }
+
+    if (!mounted) return;
+    setState(() => isLoading = false);
+
+    if (alreadyCompleted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => CompletedDiaScreen()),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => FinalStepScreen(
+            userId: widget.userId,
+            tecnicaId: widget.tecnicaId,
+            sessionId: widget.sessionId,
+            dia: widget.dia,
+          ),
         ),
-        minimumSize: Size(dimensions.buttonWidth, dimensions.buttonHeight),
+      );
+    }
+  }
+
+  // ========== UI ==========
+
+  IconData _playIcon() {
+    if (_isInDelay) return _isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded;
+    if (_isPaused && currentPlayer != null) return Icons.play_arrow_rounded;
+    if (isPlaying && !_isPaused) return Icons.pause_rounded;
+    return Icons.play_arrow_rounded;
+  }
+
+  String _playLabel() => _playIcon() == Icons.pause_rounded ? 'Pausar' : 'Reproducir';
+
+  VoidCallback? _playAction() {
+    if (_isInDelay) return _isPaused ? _resumeFromDelay : _pauseDelay;
+    if (_isPaused) return _resumeAudio;
+    if (isPlaying) return _pauseAudio;
+    return () => _playAudioFromAPI(_steps[currentStep]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final remainingMinutes = (_steps.length - currentStep - 1).clamp(1, 99);
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Column(
+              children: [
+                _buildHeader(),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                  child: Column(
+                    children: [
+                      ExcludeSemantics(
+                        child: Row(
+                          children: [
+                            for (var i = 0; i < _steps.length; i++) ...[
+                              if (i > 0) const SizedBox(width: 6),
+                              Expanded(
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 250),
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: i <= currentStep ? AppColors.primary : const Color(0xFFE6E2F0),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Semantics(
+                              liveRegion: true,
+                              child: Text('Paso ${currentStep + 1} de ${_steps.length}',
+                                  style: textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700)),
+                            ),
+                          ),
+                          Text('≈ $remainingMinutes min restantes',
+                              style: const TextStyle(fontSize: 13, color: AppColors.inkTertiary)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: SizedBox(height: 176, child: _StepImage(url: _getImageUrlByDay())),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(widget.tecnicaNombre, style: textTheme.titleLarge),
+                        const SizedBox(height: 4),
+                        Text('${traducirTipoTecnica(widget.tecnicaTipo)} · 5–10 min',
+                            style: const TextStyle(fontSize: 13, color: AppColors.inkSecondary)),
+                        const SizedBox(height: 12),
+                        _buildTextSizeControl(),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+                          decoration: BoxDecoration(
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 250),
+                            child: Text(
+                              _steps[currentStep],
+                              key: ValueKey(currentStep),
+                              style: TextStyle(fontSize: textSize, height: 1.5, fontWeight: FontWeight.w500, color: AppColors.ink),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _buildStatusRow(),
+                ),
+                _buildControls(),
+              ],
+            ),
+          ),
+        ),
       ),
-      child: isLoading
-          ? SizedBox(
-        width: dimensions.iconSize * 0.75,
-        height: dimensions.iconSize * 0.75,
-        child: const CircularProgressIndicator(
-          strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Volver a mi plan',
+            onPressed: () => Navigator.of(context).maybePop(),
+            style: IconButton.styleFrom(backgroundColor: AppColors.muted, minimumSize: const Size(44, 44)),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppColors.ink),
+          ),
+          Expanded(
+            child: Text(
+              'Día ${widget.dia.toString().padLeft(2, '0')}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+          ),
+          IconButton(
+            tooltip: isMuted ? 'Activar sonido' : 'Silenciar audio',
+            onPressed: () {
+              setState(() => isMuted = !isMuted);
+              currentPlayer?.setVolume(isMuted ? 0.0 : 1.0);
+            },
+            style: IconButton.styleFrom(backgroundColor: AppColors.muted, minimumSize: const Size(44, 44)),
+            icon: Icon(isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded, size: 21, color: AppColors.ink),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextSizeControl() {
+    return Row(
+      children: [
+        const Expanded(
+          child: Text('Tamaño del texto',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.inkSecondary)),
         ),
-      )
-          : Icon(
-        icon,
-        size: dimensions.iconSize * 1.5,
-        color: isPrimary ? Colors.white : Colors.black,
+        Container(
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(color: AppColors.muted, borderRadius: BorderRadius.circular(999)),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < _textSizes.length; i++)
+                Semantics(
+                  button: true,
+                  selected: textSize == _textSizes[i],
+                  label: 'Texto ${_textSizeLabels[i]}',
+                  excludeSemantics: true,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(999),
+                    onTap: () => _setTextSize(_textSizes[i]),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 48,
+                      height: 38,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: textSize == _textSizes[i] ? Colors.white : Colors.transparent,
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: textSize == _textSizes[i]
+                            ? [BoxShadow(color: AppColors.ink.withValues(alpha: 0.14), blurRadius: 4, offset: const Offset(0, 1))]
+                            : null,
+                      ),
+                      child: Text(
+                        'A',
+                        style: TextStyle(
+                          fontSize: 13.0 + i * 4,
+                          fontWeight: FontWeight.w800,
+                          color: textSize == _textSizes[i] ? AppColors.primaryDeep : AppColors.inkSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatusRow() {
+    final Widget content;
+    if (_isInDelay) {
+      content = Row(
+        key: const ValueKey('delay'),
+        children: [
+          const Icon(Icons.schedule_rounded, size: 18, color: AppColors.primaryDeep),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _isPaused ? 'Avance automático en pausa' : 'Siguiente paso en $_remainingSeconds s',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primaryDeep),
+            ),
+          ),
+          SizedBox(
+            width: 64,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: 1 - (_remainingSeconds / _autoAdvanceSeconds),
+                minHeight: 4,
+                backgroundColor: const Color(0xFFE6E2F0),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else if (isPlaying) {
+      content = const Row(
+        key: ValueKey('playing'),
+        children: [
+          Icon(Icons.graphic_eq_rounded, size: 18, color: AppColors.primaryDeep),
+          SizedBox(width: 8),
+          Text('Reproduciendo…', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primaryDeep)),
+        ],
+      );
+    } else if (!_cachedAudioSources.containsKey(currentStep) && _isPreloadingAudio) {
+      content = const Row(
+        key: ValueKey('loading'),
+        children: [
+          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+          SizedBox(width: 10),
+          Text('Preparando el audio…', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.inkSecondary)),
+        ],
+      );
+    } else if (!_cachedAudioSources.containsKey(currentStep)) {
+      content = const Row(
+        key: ValueKey('unavailable'),
+        children: [
+          Icon(Icons.volume_off_outlined, size: 18, color: AppColors.inkSecondary),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text('Audio no disponible ahora · puedes leer el paso',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.inkSecondary)),
+          ),
+        ],
+      );
+    } else {
+      content = const Row(
+        key: ValueKey('ready'),
+        children: [
+          Icon(Icons.check_circle_outline_rounded, size: 18, color: AppColors.success),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text('Audio listo · pulsa Reproducir para escuchar',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.successText)),
+          ),
+        ],
+      );
+    }
+    return Semantics(
+      liveRegion: true,
+      child: SizedBox(
+        height: 36,
+        child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: content),
+      ),
+    );
+  }
+
+  Widget _buildControls() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 10, 28, 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _ControlButton(
+            label: 'Anterior',
+            icon: Icons.skip_previous_rounded,
+            onPressed: currentStep > 0 && !isLoading ? _handlePreviousStep : null,
+          ),
+          _ControlButton(
+            label: _playLabel(),
+            icon: _playIcon(),
+            primary: true,
+            onPressed: isLoading ? null : _playAction(),
+          ),
+          _isLastStep
+              ? _ControlButton(
+                  label: 'Finalizar',
+                  icon: Icons.check_rounded,
+                  success: true,
+                  loading: isLoading,
+                  onPressed: isLoading ? null : _handleNextStep,
+                )
+              : _ControlButton(
+                  label: 'Siguiente',
+                  icon: Icons.skip_next_rounded,
+                  onPressed: isLoading ? null : _handleNextStep,
+                ),
+        ],
       ),
     );
   }
 }
 
-// Enums y clases auxiliares para la responsividad
-enum DeviceType { mobile, tablet, desktop }
-
-class ResponsiveDimensions {
-  final double padding;
-  final double imageHeight;
-  final double fontSize;
-  final double titleFontSize;
-  final double iconSize;
-  final double buttonWidth;
-  final double buttonHeight;
-  final double maxContentWidth;
-
-  ResponsiveDimensions({
-    required this.padding,
-    required this.imageHeight,
-    required this.fontSize,
-    required this.titleFontSize,
-    required this.iconSize,
-    required this.buttonWidth,
-    required this.buttonHeight,
-    required this.maxContentWidth,
+class _ControlButton extends StatelessWidget {
+  const _ControlButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.primary = false,
+    this.success = false,
+    this.loading = false,
   });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool primary;
+  final bool success;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = primary ? 72.0 : 56.0;
+    final background = primary
+        ? AppColors.primary
+        : success
+            ? AppColors.success
+            : AppColors.muted;
+    final foreground = primary || success ? Colors.white : AppColors.ink;
+    final labelColor = primary
+        ? AppColors.primaryDeep
+        : success
+            ? AppColors.successText
+            : AppColors.inkSecondary;
+
+    return SizedBox(
+      width: primary ? 96 : 72,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Semantics(
+            button: true,
+            label: label,
+            excludeSemantics: true,
+            child: Opacity(
+              opacity: onPressed == null && !loading ? 0.4 : 1,
+              child: Material(
+                color: background,
+                shape: const CircleBorder(),
+                elevation: primary ? 6 : 0,
+                shadowColor: AppColors.primary.withValues(alpha: 0.4),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onPressed,
+                  child: SizedBox(
+                    width: size,
+                    height: size,
+                    child: loading
+                        ? const Center(
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                            ),
+                          )
+                        : Icon(icon, size: primary ? 34 : 28, color: foreground),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(label,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, fontWeight: primary || success ? FontWeight.w700 : FontWeight.w600, color: labelColor)),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepImage extends StatelessWidget {
+  const _StepImage({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholder = Container(
+      color: AppColors.lavender,
+      alignment: Alignment.center,
+      child: const FuncyImage(FuncyPose.medita, size: 130),
+    );
+    if (url.isEmpty) return placeholder;
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      excludeFromSemantics: true,
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (wasSynchronouslyLoaded) return child;
+        return AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: frame == null ? placeholder : child);
+      },
+      errorBuilder: (context, error, stackTrace) => placeholder,
+    );
+  }
 }

@@ -11,8 +11,12 @@ import 'dart:convert';
 import '../config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http_parser/http_parser.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:fnlapp/Main/certificate_screen.dart';
+import '../Politicas y Terminos/condiciones_uso.dart';
+import '../Politicas y Terminos/politica_privacidad.dart';
+import '../theme/app_colors.dart';
+import '../Util/date_format_es.dart';
+import 'plan.dart' show totalProgramDays;
 
 class ProfileScreen extends StatefulWidget {
   final ProfileData? profileData;
@@ -20,6 +24,7 @@ class ProfileScreen extends StatefulWidget {
   final Function(String)? onImageSelected;
   final Function(String)? onProfileImageUpdated;
   final bool isDay21Completed;
+  final int completedDays;
 
   ProfileScreen({
     required this.profileData,
@@ -27,6 +32,7 @@ class ProfileScreen extends StatefulWidget {
     this.onImageSelected,
     this.onProfileImageUpdated,
     this.isDay21Completed = false,
+    this.completedDays = 0,
   });
 
   @override
@@ -44,6 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadSubscriptionData();
+    _loadTextSize();
   }
 
   // ========== MÉTODOS DE SUSCRIPCIÓN ==========
@@ -392,20 +399,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Cerrar sesión'),
-          content: Text('¿Deseas cerrar sesión en todos tus dispositivos?'),
+          title: const Text('¿Cerrar sesión?'),
+          content: const Text('Tu progreso queda guardado. Puedes cerrar la sesión solo aquí o en todos tus dispositivos.'),
+          actionsOverflowDirection: VerticalDirection.up,
+          actionsOverflowButtonSpacing: 4,
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Solo este dispositivo'),
+              child: const Text('Cancelar'),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text('Todos los dispositivos'),
+              child: const Text('En todos mis dispositivos'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Solo en este dispositivo'),
             ),
           ],
         );
@@ -413,68 +423,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+
   // ========== BUILD PRINCIPAL ==========
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width >= 600 && size.width < 1200;
-    final isDesktop = size.width >= 1200;
-    final horizontalPadding = isDesktop
-        ? 200.0
-        : isTablet
-            ? 80.0
-            : 16.0;
+    final textTheme = Theme.of(context).textTheme;
+    final profile = widget.profileData;
+    final name = (profile?.fullName ?? '${profile?.nombres ?? 'Usuario'} ${profile?.apellidos ?? ''}').trim();
+    final isCompany8 = profile?.idEmpresa == 8;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F4F4),
+      backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.only(bottom: 110),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        bottom: false,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
               children: [
-                SizedBox(height: size.height * 0.03),
-                Text(
-                  'Perfil',
-                  style: GoogleFonts.inter(
-                    color: const Color(0xFF212121),
-                    fontSize: size.width < 400
-                        ? 28.0
-                        : size.width < 600
-                            ? 32.0
-                            : 36.0,
-                    fontWeight: FontWeight.w700,
+                Text('Perfil', style: textTheme.headlineMedium),
+                const SizedBox(height: 14),
+                _buildProfileCard(name, isCompany8),
+                _sectionLabel('Tus datos'),
+                _group([
+                  _infoRow(Icons.alternate_email_rounded, 'Usuario', profile?.username ?? 'No disponible'),
+                  _infoRow(Icons.work_outline_rounded, 'Puesto', profile?.hierarchicalLevel ?? 'No disponible'),
+                  _infoRow(Icons.business_outlined, 'Empresa', profile?.nombreEmpresa ?? 'No disponible'),
+                ]),
+                _sectionLabel('Preferencias'),
+                _group([
+                  _actionRow(
+                    icon: Icons.text_fields_rounded,
+                    label: 'Tamaño del texto en actividades',
+                    value: _textSizeLabel,
+                    onTap: _chooseTextSize,
                   ),
-                ),
-                SizedBox(height: size.height * 0.015),
-                Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: isDesktop ? 800 : double.infinity,
-                    ),
-                    child: Column(
-                      children: [
-                        _buildProfileImage(size),
-                        SizedBox(height: size.height * 0.02),
-                        _buildUserName(size),
-                        SizedBox(height: size.height * 0.015),
-                        _buildSubscriptionBadge(size),
-                        SizedBox(height: size.height * 0.02),
-                        _buildInfoGrid(size, isTablet, isDesktop),
-                        SizedBox(height: size.height * 0.02),
-                        _buildSubscriptionButton(size, isDesktop),
-                        SizedBox(height: size.height * 0.015),
-                        _buildLogoutButton(size, isDesktop),
-                        SizedBox(height: size.height * 0.015),
-                        // Botón de certificado (visible solo si completó el programa)
-                        _buildCertificateButton(size, isDesktop),
-                        SizedBox(height: size.height * 0.02),
-                      ],
-                    ),
+                ]),
+                if (isCompany8) ...[
+                  _sectionLabel('Suscripción'),
+                  _group([_buildSubscriptionRow()]),
+                ],
+                _sectionLabel('Ayuda'),
+                _group([
+                  _actionRow(
+                    icon: Icons.description_outlined,
+                    label: 'Términos de uso',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CondicionesUsoScreen())),
                   ),
+                  _actionRow(
+                    icon: Icons.privacy_tip_outlined,
+                    label: 'Política de privacidad',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PoliticaPrivacidadScreen())),
+                  ),
+                ]),
+                const SizedBox(height: 20),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final result = await _showLogoutDialog();
+                    if (result != null) {
+                      await TokenService.instance.logout(logoutAll: result);
+                      widget.onLogout();
+                    }
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    backgroundColor: Colors.white,
+                    side: const BorderSide(color: AppColors.errorBorder, width: 1.5),
+                  ),
+                  icon: const Icon(Icons.logout_rounded, size: 18),
+                  label: const Text('Cerrar sesión'),
                 ),
               ],
             ),
@@ -486,564 +505,303 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ========== WIDGETS DE UI ==========
 
-  Widget _buildProfileImage(Size size) {
-    final imageSize = size.width < 400
-        ? 125.0
-        : size.width < 600
-            ? 140.0
-            : 160.0;
-
-    return GestureDetector(
-      onTap: _pickImage,
-      child: Container(
-        width: imageSize,
-        height: imageSize,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: const LinearGradient(
-            colors: [Color(0xFF52178F), Color(0xFFA88BC7)],
-            begin: Alignment(1.00, 1.00),
-            end: Alignment(1.00, 0.50),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF8A67C8).withOpacity(0.3),
-              blurRadius: size.width < 600 ? 15 : 25,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Container(
-          margin: const EdgeInsets.all(6),
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-          ),
-          child: CircleAvatar(
-            radius: (imageSize - 12) / 2,
-            backgroundColor: Colors.transparent,
-            backgroundImage: _getImageProvider(),
-            child: _getImageProvider() == null
-                ? Icon(
-                    Icons.person,
-                    size: size.width < 400
-                        ? 40
-                        : size.width < 600
-                            ? 50
-                            : 60,
-                    color: const Color(0xFF4320AD),
-                  )
-                : null,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUserName(Size size) {
-    return Text(
-      widget.profileData?.fullName ??
-          "${widget.profileData?.nombres ?? 'Usuario'} ${widget.profileData?.apellidos ?? ''}",
-      textAlign: TextAlign.center,
-      style: GoogleFonts.inter(
-        color: const Color(0xFF212121),
-        fontSize: size.width < 400
-            ? 20.0
-            : size.width < 600
-                ? 24.0
-                : 28.0,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-
-  Widget _buildSubscriptionBadge(Size size) {
-    // Verificar si el usuario es de company_id 8
-    int? companyId = widget.profileData?.idEmpresa;
-
-    // Si NO es company_id 8, no mostrar el badge
-    if (companyId != 8) {
-      return SizedBox.shrink();
-    }
-
-    if (_loadingSubscription) {
-      return SizedBox(
-        height: 30,
-        width: 30,
-        child: CircularProgressIndicator(strokeWidth: 2),
-      );
-    }
-
-    final isPro = _subscriptionData?.isPro ?? false;
+  Widget _buildProfileCard(String name, bool isCompany8) {
+    final textTheme = Theme.of(context).textTheme;
+    final completed = widget.completedDays.clamp(0, totalProgramDays);
+    final imageProvider = _getImageProvider();
+    final initial = name.isNotEmpty ? name.characters.first.toUpperCase() : '?';
 
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: size.width < 400 ? 12 : 16,
-        vertical: size.width < 400 ? 6 : 8,
-      ),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: isPro
-            ? LinearGradient(
-                colors: [Color(0xFF52178F), Color(0xFFA88BC7)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
-            : null,
-        color: isPro ? null : Colors.grey.shade300,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: isPro
-            ? [
-                BoxShadow(
-                  color: Color(0xFF8A67C8).withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    radius: 32,
+                    backgroundColor: AppColors.lavenderStrong,
+                    foregroundImage: imageProvider,
+                    child: Text(initial,
+                        style: const TextStyle(color: AppColors.primaryDeep, fontSize: 22, fontWeight: FontWeight.w800)),
+                  ),
+                  Positioned(
+                    right: -10,
+                    bottom: -10,
+                    child: IconButton(
+                      tooltip: 'Cambiar foto de perfil',
+                      onPressed: _pickImage,
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white, width: 3),
+                        minimumSize: const Size(36, 36),
+                        padding: EdgeInsets.zero,
+                      ),
+                      icon: const Icon(Icons.photo_camera_outlined, size: 16),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: textTheme.titleMedium, maxLines: 2, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 1),
+                    Text(
+                      widget.profileData?.email ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(color: AppColors.inkSecondary, fontWeight: FontWeight.w400),
+                    ),
+                    if (isCompany8 && !_loadingSubscription) ...[
+                      const SizedBox(height: 6),
+                      _subscriptionBadge(_subscriptionData?.isPro ?? false),
+                    ],
+                  ],
                 ),
-              ]
-            : null,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: Text('Programa de $totalProgramDays días', style: textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700))),
+              Text('$completed de $totalProgramDays',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primaryDeep)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(value: completed / totalProgramDays, minHeight: 8),
+          ),
+          const SizedBox(height: 12),
+          if (widget.isDay21Completed)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CertificateScreen(
+                        username: widget.profileData?.fullName ?? 'Usuario',
+                        completionDate: DateFormatEs.long(DateTime.now()),
+                        programName: 'Programa de Manejo de Estrés Laboral - 21 Días',
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.workspace_premium_outlined, size: 20),
+                label: const Text('Ver mi certificado'),
+              ),
+            )
+          else
+            const Row(
+              children: [
+                Icon(Icons.workspace_premium_outlined, size: 16, color: AppColors.inkSecondary),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Tu certificado se habilita al completar el Día 21 y el test de salida.',
+                    style: TextStyle(fontSize: 13, height: 18 / 13, color: AppColors.inkSecondary),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _subscriptionBadge(bool isPro) {
+    return Container(
+      height: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: isPro ? AppColors.streakBg : AppColors.muted,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            isPro ? Icons.workspace_premium : Icons.account_circle,
-            color: Colors.white,
-            size: size.width < 400 ? 16 : 18,
-          ),
-          SizedBox(width: 6),
-          Text(
-            isPro ? 'Funcy PRO' : 'Plan FREE',
-            style: GoogleFonts.inter(
-              color: Colors.white,
-              fontSize: size.width < 400 ? 13 : 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Icon(isPro ? Icons.star_rounded : Icons.person_outline_rounded,
+              size: 14, color: isPro ? AppColors.streak : AppColors.inkSecondary),
+          const SizedBox(width: 4),
+          Text(isPro ? 'Funcy PRO' : 'Plan gratuito',
+              style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: isPro ? AppColors.streakText : AppColors.inkSecondary)),
         ],
       ),
     );
   }
 
-  Widget _buildInfoGrid(Size size, bool isTablet, bool isDesktop) {
-    final cardPadding = size.width < 400
-        ? 16.0
-        : size.width < 600
-            ? 20.0
-            : 24.0;
-    final cardSpacing = size.width < 400 ? 12.0 : 16.0;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(cardPadding),
-      decoration: BoxDecoration(
-        color: const Color(0xFFDCD4F6),
-        borderRadius: BorderRadius.circular(size.width < 600 ? 16 : 20),
-      ),
-      child: isDesktop && size.width > 1200
-          ? _buildDesktopLayout(cardSpacing, size)
-          : _buildTabletMobileLayout(cardSpacing, size),
-    );
-  }
-
-  Widget _buildDesktopLayout(double cardSpacing, Size size) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildInfoCard(
-            icon: Icons.email_outlined,
-            title: 'ID',
-            value: widget.profileData?.username ?? 'No disponible',
-            size: size,
-          ),
-        ),
-        SizedBox(width: cardSpacing),
-        Expanded(
-          child: _buildInfoCard(
-            icon: Icons.female,
-            title: 'Género',
-            value: widget.profileData?.gender ?? 'No disponible',
-            size: size,
-          ),
-        ),
-        SizedBox(width: cardSpacing),
-        Expanded(
-          child: _buildInfoCard(
-            icon: Icons.person,
-            title: 'Puesto',
-            value: widget.profileData?.hierarchicalLevel ?? 'No disponible',
-            size: size,
-          ),
-        ),
-        SizedBox(width: cardSpacing),
-        Expanded(
-          child: _buildInfoCard(
-            icon: Icons.business_outlined,
-            title: 'Centro',
-            value: widget.profileData?.nombreEmpresa ?? 'No disponible',
-            size: size,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTabletMobileLayout(double cardSpacing, Size size) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildInfoCard(
-                icon: Icons.email_outlined,
-                title: 'ID',
-                value: widget.profileData?.username ?? 'No disponible',
-                size: size,
-              ),
-            ),
-            SizedBox(width: cardSpacing),
-            Expanded(
-              child: _buildInfoCard(
-                icon: Icons.female,
-                title: 'Género',
-                value: widget.profileData?.gender ?? 'No disponible',
-                size: size,
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: cardSpacing),
-        Row(
-          children: [
-            Expanded(
-              child: _buildInfoCard(
-                icon: Icons.person,
-                title: 'Puesto',
-                value: widget.profileData?.hierarchicalLevel ?? 'No disponible',
-                size: size,
-              ),
-            ),
-            SizedBox(width: cardSpacing),
-            Expanded(
-              child: _buildInfoCard(
-                icon: Icons.business_outlined,
-                title: 'Centro',
-                value: widget.profileData?.nombreEmpresa ?? 'No disponible',
-                size: size,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoCard({
-    required IconData icon,
-    required String title,
-    required String value,
-    required Size size,
-  }) {
-    final cardPadding = size.width < 400
-        ? 12.0
-        : size.width < 600
-            ? 16.0
-            : 20.0;
-    final iconSize = size.width < 400
-        ? 18.0
-        : size.width < 600
-            ? 20.0
-            : 22.0;
-    final titleFontSize = size.width < 400
-        ? 12.0
-        : size.width < 600
-            ? 14.0
-            : 16.0;
-    final valueFontSize = size.width < 400
-        ? 12.0
-        : size.width < 600
-            ? 14.0
-            : 16.0;
-
-    return Container(
-      padding: EdgeInsets.all(cardPadding),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(size.width < 600 ? 10 : 12),
-        boxShadow: size.width >= 600
-            ? [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: EdgeInsets.all(size.width < 400 ? 6 : 8),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF0EEFF),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: const Color(0xFF4320AD),
-              size: iconSize,
-            ),
-          ),
-          SizedBox(width: size.width < 400 ? 8 : 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.inter(
-                    color: const Color(0xFF3D3D3D),
-                    fontSize: titleFontSize,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: GoogleFonts.inter(
-                    color: Colors.black,
-                    fontSize: valueFontSize,
-                    fontWeight: FontWeight.w400,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSubscriptionButton(Size size, bool isDesktop) {
-    // Verificar si el usuario es de company_id 8
-    int? companyId = widget.profileData?.idEmpresa;
-
-    // Si NO es company_id 8, no mostrar el botón
-    if (companyId != 8) {
-      return SizedBox.shrink();
-    }
-
+  Widget _buildSubscriptionRow() {
     if (_loadingSubscription) {
-      return SizedBox(
-        height: 50,
-        child: Center(child: CircularProgressIndicator()),
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5))),
       );
     }
-
     final isPro = _subscriptionData?.isPro ?? false;
-    final buttonPadding = size.width < 400
-        ? 14.0
-        : size.width < 600
-            ? 16.0
-            : 18.0;
-    final fontSize = size.width < 400
-        ? 16.0
-        : size.width < 600
-            ? 16.0
-            : 18.0;
+    return _actionRow(
+      icon: Icons.workspace_premium_outlined,
+      label: isPro ? 'Funcy PRO' : 'Suscríbete a Funcy PRO',
+      value: isPro ? 'Activa' : null,
+      valueColor: AppColors.successText,
+      onTap: isPro
+          ? _cancelSubscription
+          : () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => SubscriptionScreen()),
+              );
+              if (result == true) await _loadSubscriptionData();
+            },
+    );
+  }
 
-    return Container(
-      width: double.infinity,
-      constraints: BoxConstraints(
-        maxWidth: isDesktop ? 400 : size.width * 0.8,
-      ),
-      child: ElevatedButton.icon(
-        onPressed: isPro
-            ? _cancelSubscription
-            : () async {
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => SubscriptionScreen()),
-                );
-                if (result == true) {
-                  await _loadSubscriptionData();
-                }
-              },
-        icon: Icon(
-          isPro ? Icons.cancel : Icons.workspace_premium,
-          size: size.width < 400 ? 18 : 20,
-        ),
-        label: Text(
-          isPro ? 'Cancelar suscripción' : 'Suscríbete a Funcy PRO',
-          style: GoogleFonts.inter(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isPro ? Colors.red : Color(0xFF4320AD),
-          foregroundColor: Colors.white,
-          padding: EdgeInsets.symmetric(
-            horizontal: size.width < 400 ? 24 : 32,
-            vertical: buttonPadding,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(40),
-          ),
-          elevation: 4,
-        ),
+  Widget _sectionLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 22, 4, 8),
+      child: Semantics(
+        header: true,
+        child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.inkTertiary)),
       ),
     );
   }
 
-  Widget _buildLogoutButton(Size size, bool isDesktop) {
-    final buttonPadding = size.width < 400
-        ? 14.0
-        : size.width < 600
-            ? 16.0
-            : 18.0;
-    final fontSize = size.width < 400
-        ? 16.0
-        : size.width < 600
-            ? 16.0
-            : 18.0;
-
+  Widget _group(List<Widget> rows) {
     return Container(
-      width: double.infinity,
-      constraints: BoxConstraints(
-        maxWidth: isDesktop ? 400 : size.width * 0.8,
-      ),
-      child: ElevatedButton(
-        onPressed: () async {
-          final result = await _showLogoutDialog();
-          if (result != null) {
-            await TokenService.instance.logout(logoutAll: result);
-            widget.onLogout();
-          }
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF6D4BD8),
-          padding: EdgeInsets.symmetric(
-            horizontal: size.width < 400 ? 24 : 32,
-            vertical: buttonPadding,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(40),
-            side: const BorderSide(
-              color: Color(0xFF6D4BD8),
-              width: 1.5,
-            ),
-          ),
-          elevation: size.width >= 600 ? 2 : 0,
-          shadowColor: size.width >= 600 ? Colors.black.withOpacity(0.1) : null,
-        ),
-        child: Text(
-          'Cerrar sesión',
-          style: GoogleFonts.inter(
-            color: const Color(0xFF6D4BD8),
-            fontSize: fontSize,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Botón para ver el certificado (disponible después de completar el programa)
-  Widget _buildCertificateButton(Size size, bool isDesktop) {
-    final buttonPadding = size.width < 400
-        ? 14.0
-        : size.width < 600
-            ? 16.0
-            : 18.0;
-    final fontSize = size.width < 400
-        ? 14.0
-        : size.width < 600
-            ? 15.0
-            : 16.0;
-
-    // Si no ha completado el exit test, no mostrar el botón del certificado
-    if (!widget.isDay21Completed) {
-      return SizedBox.shrink();
-    }
-
-    return Container(
-      width: double.infinity,
-      constraints: BoxConstraints(
-        maxWidth: isDesktop ? 400 : size.width * 0.8,
-      ),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF6D4BD8), Color(0xFF5027D0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(40),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0xFF6D4BD8).withOpacity(0.3),
-            blurRadius: 12,
-            offset: Offset(0, 4),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const Divider(height: 1),
+            rows[i],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: AppColors.primaryDeep),
+          const SizedBox(width: 12),
+          Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14, color: AppColors.inkSecondary),
+            ),
           ),
         ],
       ),
-      child: ElevatedButton.icon(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CertificateScreen(
-                username: widget.profileData?.fullName ?? 'Usuario',
-                completionDate:
-                    '${DateTime.now().day} de ${_getMonthName(DateTime.now().month)} de ${DateTime.now().year}',
-                programName: 'Programa de Manejo de Estrés Laboral - 21 Días',
-              ),
-            ),
-          );
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          foregroundColor: Colors.white,
-          shadowColor: Colors.transparent,
-          padding: EdgeInsets.symmetric(
-            horizontal: size.width < 400 ? 24 : 32,
-            vertical: buttonPadding,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(40),
-          ),
-        ),
-        icon: const Icon(Icons.workspace_premium, size: 22),
-        label: Text(
-          'Ver Mi Certificado',
-          style: GoogleFonts.inter(
-            color: Colors.white,
-            fontSize: fontSize,
-            fontWeight: FontWeight.w600,
+    );
+  }
+
+  Widget _actionRow({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    String? value,
+    Color valueColor = AppColors.inkSecondary,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 54),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: AppColors.primaryDeep),
+              const SizedBox(width: 12),
+              Expanded(child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
+              if (value != null) ...[
+                Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: valueColor)),
+                const SizedBox(width: 4),
+              ],
+              const Icon(Icons.chevron_right_rounded, color: AppColors.inkTertiary),
+            ],
           ),
         ),
       ),
     );
   }
 
-  String _getMonthName(int month) {
-    const months = [
-      'enero',
-      'febrero',
-      'marzo',
-      'abril',
-      'mayo',
-      'junio',
-      'julio',
-      'agosto',
-      'septiembre',
-      'octubre',
-      'noviembre',
-      'diciembre'
-    ];
-    return months[month - 1];
+  // ========== TAMAÑO DE TEXTO ==========
+
+  static const _textSizes = [(17.0, 'Pequeño'), (20.0, 'Mediano'), (24.0, 'Grande')];
+  double _stepTextSize = 20.0;
+
+  String get _textSizeLabel =>
+      _textSizes.firstWhere((t) => t.$1 == _stepTextSize, orElse: () => _textSizes[1]).$2;
+
+  Future<void> _loadTextSize() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getDouble('stepTextSize');
+    if (value != null && mounted) setState(() => _stepTextSize = value);
+  }
+
+  Future<void> _chooseTextSize() async {
+    final selected = await showModalBottomSheet<double>(
+      context: context,
+      useSafeArea: true,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text('Tamaño del texto', style: Theme.of(sheetContext).textTheme.titleLarge),
+            ),
+            const SizedBox(height: 8),
+            for (final option in _textSizes)
+              ListTile(
+                onTap: () => Navigator.of(sheetContext).pop(option.$1),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                title: Text(option.$2, style: TextStyle(fontSize: option.$1 - 2, fontWeight: FontWeight.w600)),
+                trailing: option.$1 == _stepTextSize
+                    ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
+                    : const Icon(Icons.circle_outlined, color: AppColors.placeholder),
+                selected: option.$1 == _stepTextSize,
+              ),
+          ],
+        ),
+      ),
+    );
+    if (selected == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('stepTextSize', selected);
+    if (mounted) setState(() => _stepTextSize = selected);
   }
 }

@@ -1,540 +1,338 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_rating_bar/flutter_rating_bar.dart';
-import 'package:http/http.dart' as http;
 import 'package:fnlapp/Main/home.dart';
-import 'dart:convert';
-import '../config.dart';
-import '../Util/api_service.dart';
 
+import '../theme/app_colors.dart';
+import '../theme/funcy.dart';
+import '../Util/api_service.dart';
+import '../widgets/app_buttons.dart';
+import '../widgets/state_views.dart';
+import 'plan.dart' show totalProgramDays;
+
+/// Cierre de la actividad del día: celebración, cómo se siente el usuario y
+/// comentario opcional. Al guardar, el día queda completado.
 class FinalStepScreen extends StatefulWidget {
   final int userId;
   final int tecnicaId;
   final int sessionId;
+  final int? dia;
 
   const FinalStepScreen({
     Key? key,
     required this.userId,
     required this.tecnicaId,
     required this.sessionId,
+    this.dia,
   }) : super(key: key);
 
   @override
   State<FinalStepScreen> createState() => _FinalStepScreenState();
 }
 
-class _FinalStepScreenState extends State<FinalStepScreen>
-    with SingleTickerProviderStateMixin {
+class _FinalStepScreenState extends State<FinalStepScreen> {
   final TextEditingController _commentController = TextEditingController();
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-
-  double _rating = 3.0;
-  MoodLevel _selectedMood = MoodLevel.neutral;
+  int? _feeling; // 1 (peor) a 5 (mucho mejor)
   bool _isLoading = false;
-  String _feedbackMessage = '';
 
-  // Colores del tema
-  static const Color _primaryColor = Color(0xFF4B158D);
-  static const Color _backgroundOverlay = Color(0xFF2D0A4E);
-  static const Color _textColor = Color(0xFFF6F6F6);
-  static const Color _starColor = Color(0xFFF1D93E);
-
-  // Helper method para obtener el tipo de dispositivo
-  DeviceType _getDeviceType(double width) {
-    if (width < 600) return DeviceType.mobile;
-    if (width < 1024) return DeviceType.tablet;
-    return DeviceType.desktop;
-  }
-
-  // Helper method para obtener dimensiones responsivas
-  ResponsiveDimensions _getResponsiveDimensions(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final deviceType = _getDeviceType(size.width);
-
-    switch (deviceType) {
-      case DeviceType.mobile:
-        return ResponsiveDimensions(
-          padding: 20.0,
-          headerFontSize: 18.0,
-          sectionSpacing: 32.0,
-          starSize: 48.0,
-          moodIconSize: 40.0,
-          textFieldHeight: 4,
-          buttonWidth: size.width * 0.8,
-          buttonHeight: 56.0,
-          maxContentWidth: size.width,
-          topSpacing: 60.0,
-          textFieldFontSize: 15.0,
-          moodTextSize: 16.0,
-        );
-      case DeviceType.tablet:
-        return ResponsiveDimensions(
-          padding: 32.0,
-          headerFontSize: 22.0,
-          sectionSpacing: 40.0,
-          starSize: 58.0,
-          moodIconSize: 48.0,
-          textFieldHeight: 5,
-          buttonWidth: 300.0,
-          buttonHeight: 64.0,
-          maxContentWidth: size.width * 0.8,
-          topSpacing: 80.0,
-          textFieldFontSize: 17.0,
-          moodTextSize: 18.0,
-        );
-      case DeviceType.desktop:
-        return ResponsiveDimensions(
-          padding: 40.0,
-          headerFontSize: 24.0,
-          sectionSpacing: 48.0,
-          starSize: 68.0,
-          moodIconSize: 56.0,
-          textFieldHeight: 6,
-          buttonWidth: 320.0,
-          buttonHeight: 72.0,
-          maxContentWidth: 600.0,
-          topSpacing: 100.0,
-          textFieldFontSize: 18.0,
-          moodTextSize: 20.0,
-        );
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-    _animationController.forward();
-  }
+  static const _feelings = [
+    (Icons.sentiment_very_dissatisfied_rounded, 'Peor que antes'),
+    (Icons.sentiment_dissatisfied_rounded, 'Un poco peor'),
+    (Icons.sentiment_neutral_rounded, 'Igual que antes'),
+    (Icons.sentiment_satisfied_rounded, 'Mejor'),
+    (Icons.sentiment_very_satisfied_rounded, 'Mucho mejor'),
+  ];
 
   @override
   void dispose() {
     _commentController.dispose();
-    _animationController.dispose();
     super.dispose();
   }
 
-  bool get _isFormValid =>
-      _commentController.text.trim().isNotEmpty && _rating > 0;
+  Future<void> _submit({required bool skipped}) async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
 
-  Future<void> _submitFeedback() async {
-    if (!_isFormValid || _isLoading) return;
-
-    setState(() {
-      _isLoading = true;
-      _feedbackMessage = '';
-    });
-
-    try {
-      await _sendFeedbackToServer();
-      _showSuccessAndNavigate();
-    } catch (e) {
-      _showErrorMessage('Error de conexión: ${e.toString()}');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _sendFeedbackToServer() async {
-    final Map<String, dynamic> requestData = {
-      "comentario": _commentController.text.trim(),
-      "estrellas": _rating.toInt(),
-      "caritas": _selectedMood.value,
+    final feeling = _feeling ?? 3;
+    final comment = _commentController.text.trim();
+    final requestData = {
+      'comentario': (skipped || comment.isEmpty) ? 'Sin comentario' : comment,
+      'estrellas': feeling,
+      // El servidor usa 3 caritas: 1 = mal, 2 = igual, 3 = bien.
+      'caritas': feeling <= 2 ? 1 : (feeling == 3 ? 2 : 3),
     };
 
-    final apiService = ApiService();
-    final response = await apiService.put(
-      'programs/sessions/${widget.sessionId}/complete/${widget.userId}',
-      requestData,
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception('Server error: ${response.statusCode}');
+    try {
+      await ApiService().put(
+        'programs/sessions/${widget.sessionId}/complete/${widget.userId}',
+        requestData,
+      );
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyErrorMessage(e))),
+      );
     }
-  }
-
-  void _showSuccessAndNavigate() {
-    setState(() {
-      _feedbackMessage = 'Comentario enviado exitosamente';
-    });
-
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => HomeScreen()),
-              (Route<dynamic> route) => false,
-        );
-      }
-    });
-  }
-
-  void _showErrorMessage(String message) {
-    setState(() {
-      _feedbackMessage = message;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final dimensions = _getResponsiveDimensions(context);
-    final deviceType = _getDeviceType(MediaQuery.of(context).size.width);
+    final textTheme = Theme.of(context).textTheme;
+    final dia = widget.dia;
+    final percent = dia == null ? null : ((dia / totalProgramDays) * 100).round();
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: _buildBody(dimensions, deviceType),
-    );
-  }
-
-  Widget _buildBody(ResponsiveDimensions dimensions, DeviceType deviceType) {
-    return Container(
-      decoration: const BoxDecoration(
-        image: DecorationImage(
-          image: NetworkImage(
-              'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/fondo_rese%C3%B1a.png'
-          ),
-          fit: BoxFit.cover,
-        ),
-      ),
-      child: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: deviceType == DeviceType.desktop
-              ? _buildDesktopLayout(dimensions)
-              : _buildMobileTabletLayout(dimensions),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDesktopLayout(ResponsiveDimensions dimensions) {
-    return Center(
-      child: Container(
-        constraints: BoxConstraints(maxWidth: dimensions.maxContentWidth),
-        padding: EdgeInsets.all(dimensions.padding),
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(height: dimensions.topSpacing),
-                    _buildHeaderText(dimensions),
-                    SizedBox(height: dimensions.sectionSpacing),
-                    _buildRatingSection(dimensions),
-                    SizedBox(height: dimensions.sectionSpacing),
-                    _buildCommentSection(dimensions),
-                    SizedBox(height: dimensions.sectionSpacing),
-                    _buildMoodSection(dimensions),
-                    SizedBox(height: dimensions.sectionSpacing * 0.75),
-                    _buildFeedbackMessage(dimensions),
-                  ],
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          width: 172,
+                          height: 172,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: 156,
+                                height: 156,
+                                decoration: const BoxDecoration(color: AppColors.lavender, shape: BoxShape.circle),
+                              ),
+                              const FuncyImage(FuncyPose.celebra, size: 172, semanticLabel: 'Funcy celebrando con confeti'),
+                              Positioned(
+                                right: 10,
+                                bottom: 12,
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.success,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 3),
+                                  ),
+                                  child: const Icon(Icons.check_rounded, color: Colors.white, size: 22),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Semantics(
+                          header: true,
+                          child: Text(
+                            dia == null ? '¡Actividad completada!' : '¡Día $dia completado!',
+                            style: textTheme.headlineSmall,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Bien hecho. Cuéntanos cómo te sientes para seguir mejorando tu plan.',
+                          style: textTheme.bodyMedium?.copyWith(color: AppColors.inkSecondary),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (percent != null) ...[
+                          const SizedBox(height: 14),
+                          Wrap(
+                            spacing: 8,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              _Pill(
+                                label: '$dia de $totalProgramDays días',
+                                icon: Icons.local_fire_department_rounded,
+                                iconColor: AppColors.streak,
+                                background: AppColors.streakBg,
+                                foreground: AppColors.streakText,
+                              ),
+                              _Pill(
+                                label: '$percent% del programa',
+                                background: AppColors.lavender,
+                                foreground: AppColors.primaryDeep,
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 20),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFBFAFD),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.borderSoft),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Semantics(
+                                header: true,
+                                child: Text('¿Cómo te sientes ahora?', style: textTheme.labelLarge),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  for (var i = 0; i < _feelings.length; i++)
+                                    _FeelingButton(
+                                      icon: _feelings[i].$1,
+                                      label: _feelings[i].$2,
+                                      selected: _feeling == i + 1,
+                                      onTap: () => setState(() => _feeling = i + 1),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              const Row(
+                                children: [
+                                  Expanded(
+                                    child: Text('Peor que antes',
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.inkTertiary)),
+                                  ),
+                                  Text('Mucho mejor',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.inkTertiary)),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Text.rich(
+                                TextSpan(
+                                  text: 'Comentario ',
+                                  style: textTheme.labelMedium,
+                                  children: const [
+                                    TextSpan(
+                                      text: '(opcional)',
+                                      style: TextStyle(fontWeight: FontWeight.w500, color: AppColors.inkTertiary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: _commentController,
+                                minLines: 2,
+                                maxLines: 4,
+                                textCapitalization: TextCapitalization.sentences,
+                                decoration: const InputDecoration(
+                                  hintText: '¿Algo que quieras contarnos sobre la actividad?',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            _buildSubmitButton(dimensions),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMobileTabletLayout(ResponsiveDimensions dimensions) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: dimensions.maxContentWidth),
-        child: Padding(
-          padding: EdgeInsets.all(dimensions.padding),
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      SizedBox(height: dimensions.topSpacing),
-                      _buildHeaderText(dimensions),
-                      SizedBox(height: dimensions.sectionSpacing),
-                      _buildRatingSection(dimensions),
-                      SizedBox(height: dimensions.sectionSpacing),
-                      _buildCommentSection(dimensions),
-                      SizedBox(height: dimensions.sectionSpacing),
-                      _buildMoodSection(dimensions),
-                      SizedBox(height: dimensions.sectionSpacing * 0.75),
-                      _buildFeedbackMessage(dimensions),
+                      AppPrimaryButton(
+                        label: 'Guardar y volver a mi plan',
+                        loading: _isLoading,
+                        onPressed: _feeling == null ? null : () => _submit(skipped: false),
+                      ),
+                      if (_feeling == null)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 6),
+                          child: Text('Elige cómo te sientes para guardar.',
+                              style: TextStyle(fontSize: 12, color: AppColors.inkTertiary)),
+                        ),
+                      TextButton(
+                        onPressed: _isLoading ? null : () => _submit(skipped: true),
+                        child: const Text('Omitir por ahora'),
+                      ),
                     ],
                   ),
                 ),
-              ),
-              _buildSubmitButton(dimensions),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildHeaderText(ResponsiveDimensions dimensions) {
-    return Text(
-      "Califica tu experiencia con la técnica de relajación de hoy que te ofreció Funcy",
-      style: TextStyle(
-        color: _textColor,
-        fontSize: dimensions.headerFontSize,
-        fontFamily: 'Inter',
-        fontWeight: FontWeight.w600,
-        height: 1.4,
-      ),
-      textAlign: TextAlign.center,
-    );
-  }
+class _FeelingButton extends StatelessWidget {
+  const _FeelingButton({required this.icon, required this.label, required this.selected, required this.onTap});
 
-  Widget _buildRatingSection(ResponsiveDimensions dimensions) {
-    return Column(
-      children: [
-        RatingBar.builder(
-          initialRating: _rating,
-          minRating: 1,
-          direction: Axis.horizontal,
-          allowHalfRating: false,
-          itemCount: 5,
-          itemSize: dimensions.starSize,
-          itemPadding: EdgeInsets.symmetric(horizontal: dimensions.starSize * 0.05),
-          glowColor: _starColor.withOpacity(0.3),
-          unratedColor: const Color(0xFFB7B7B7),
-          itemBuilder: (context, index) => Icon(
-            Icons.star_rounded,
-            color: _starColor,
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: label,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: selected ? AppColors.primary : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: 2),
+            ),
+            child: Icon(icon, size: 30, color: selected ? Colors.white : AppColors.primaryDeep),
           ),
-          onRatingUpdate: (rating) {
-            setState(() {
-              _rating = rating;
-            });
-          },
         ),
-      ],
+      ),
     );
   }
+}
 
-  Widget _buildCommentSection(ResponsiveDimensions dimensions) {
+class _Pill extends StatelessWidget {
+  const _Pill({
+    required this.label,
+    required this.background,
+    required this.foreground,
+    this.icon,
+    this.iconColor,
+  });
+
+  final String label;
+  final Color background;
+  final Color foreground;
+  final IconData? icon;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(999)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 16, color: iconColor ?? foreground),
+            const SizedBox(width: 6),
+          ],
+          Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: foreground)),
         ],
       ),
-      child: TextField(
-        controller: _commentController,
-        maxLines: dimensions.textFieldHeight,
-        decoration: InputDecoration(
-          filled: true,
-          fillColor: Colors.white,
-          hintText: "Deja un comentario sobre la técnica",
-          hintStyle: TextStyle(
-            color: const Color(0xFF909090),
-            fontSize: dimensions.textFieldFontSize,
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w400,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: EdgeInsets.all(dimensions.padding * 0.8),
-        ),
-        style: TextStyle(
-          fontSize: dimensions.textFieldFontSize,
-          fontFamily: 'Inter',
-        ),
-        onChanged: (_) => setState(() {}),
-      ),
     );
   }
-
-  Widget _buildMoodSection(ResponsiveDimensions dimensions) {
-    return Column(
-      children: [
-        Text(
-          "¿Qué tan aliviado te sientes luego de la sesión de hoy?",
-          style: TextStyle(
-            color: _textColor,
-            fontSize: dimensions.moodTextSize,
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w500,
-            height: 1.4,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        SizedBox(height: dimensions.sectionSpacing * 0.6),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: MoodLevel.values.map((mood) {
-            final isSelected = _selectedMood == mood;
-            return _buildMoodButton(mood, isSelected, dimensions);
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMoodButton(MoodLevel mood, bool isSelected, ResponsiveDimensions dimensions) {
-    final buttonSize = dimensions.moodIconSize + 16;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedMood = mood;
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: buttonSize,
-        height: buttonSize,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? mood.color.withOpacity(0.2)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(buttonSize / 2),
-          border: Border.all(
-            color: isSelected ? mood.color : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Icon(
-          mood.icon,
-          color: isSelected ? mood.color : Colors.white.withOpacity(0.6),
-          size: dimensions.moodIconSize,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFeedbackMessage(ResponsiveDimensions dimensions) {
-    if (_feedbackMessage.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      padding: EdgeInsets.all(dimensions.padding * 0.8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        _feedbackMessage,
-        style: TextStyle(
-          fontSize: dimensions.textFieldFontSize,
-          color: _textColor,
-          fontWeight: FontWeight.w500,
-        ),
-        textAlign: TextAlign.center,
-      ),
-    );
-  }
-
-  Widget _buildSubmitButton(ResponsiveDimensions dimensions) {
-    return Padding(
-      padding: EdgeInsets.only(
-        top: dimensions.padding * 0.4,
-        bottom: dimensions.padding * 2.5,
-      ),
-      child: SizedBox(
-        width: dimensions.buttonWidth,
-        height: dimensions.buttonHeight,
-        child: ElevatedButton(
-          onPressed: _isFormValid && !_isLoading ? _submitFeedback : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF6D4BD8),
-            disabledBackgroundColor: const Color(0xFFD7D7D7),
-            foregroundColor: Colors.white,
-            disabledForegroundColor: const Color(0xFF868686),
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(40),
-            ),
-          ),
-          child: _isLoading
-              ? SizedBox(
-            height: dimensions.buttonHeight * 0.4,
-            width: dimensions.buttonHeight * 0.4,
-            child: const CircularProgressIndicator(
-              color: Colors.white,
-              strokeWidth: 2.5,
-            ),
-          )
-              : Text(
-            'Enviar',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: dimensions.headerFontSize + 2,
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-enum MoodLevel {
-  sad(1, Icons.sentiment_very_dissatisfied, Colors.red),
-  neutral(2, Icons.sentiment_neutral, Colors.amber),
-  happy(3, Icons.sentiment_very_satisfied, Colors.green);
-
-  const MoodLevel(this.value, this.icon, this.color);
-
-  final int value;
-  final IconData icon;
-  final Color color;
-}
-
-// Enums y clases auxiliares para la responsividad
-enum DeviceType { mobile, tablet, desktop }
-
-class ResponsiveDimensions {
-  final double padding;
-  final double headerFontSize;
-  final double sectionSpacing;
-  final double starSize;
-  final double moodIconSize;
-  final int textFieldHeight;
-  final double buttonWidth;
-  final double buttonHeight;
-  final double maxContentWidth;
-  final double topSpacing;
-  final double textFieldFontSize;
-  final double moodTextSize;
-
-  ResponsiveDimensions({
-    required this.padding,
-    required this.headerFontSize,
-    required this.sectionSpacing,
-    required this.starSize,
-    required this.moodIconSize,
-    required this.textFieldHeight,
-    required this.buttonWidth,
-    required this.buttonHeight,
-    required this.maxContentWidth,
-    required this.topSpacing,
-    required this.textFieldFontSize,
-    required this.moodTextSize,
-  });
 }

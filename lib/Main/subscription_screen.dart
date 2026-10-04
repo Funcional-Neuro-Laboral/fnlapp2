@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../services/google_play_verification_service.dart';
 import '../services/subscription_service.dart';
@@ -426,7 +425,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         SizedBox(height: isLandscape ? 10 : 14),
         Text(
           'Funcy Pro',
-          style: GoogleFonts.inter(
+          style: TextStyle(
             fontSize: titleSize,
             fontWeight: FontWeight.w700,
             color: Colors.white,
@@ -438,7 +437,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           child: Text(
             'Desbloquea tu mejor versión con Funcy',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: TextStyle(
               fontSize: subtitleSize,
               fontWeight: FontWeight.w600,
               color: Colors.white,
@@ -511,7 +510,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 Expanded(
                   child: Text(
                     feature['text'] as String,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
                       fontSize: fontSize,
                       fontWeight: FontWeight.w500,
                       color: Color(0xFF212121),
@@ -543,7 +542,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       return Center(
         child: Text(
           'Servicio no disponible',
-          style: GoogleFonts.inter(
+          style: TextStyle(
             fontSize: isTablet ? 18.0 : 16.0,
             color: Colors.white,
           ),
@@ -563,7 +562,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           fit: BoxFit.scaleDown,
           child: Text(
             product.price,
-            style: GoogleFonts.inter(
+            style: TextStyle(
               fontSize: priceSize,
               fontWeight: FontWeight.w600,
               color: Colors.white,
@@ -581,7 +580,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         SizedBox(height: 4),
         Text(
           'por mes',
-          style: GoogleFonts.inter(
+          style: TextStyle(
             fontSize: labelSize,
             fontWeight: FontWeight.w500,
             color: Colors.white.withOpacity(0.9),
@@ -632,7 +631,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   )
                 : Text(
                     'Suscríbete a Funcy PRO',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
                       fontSize: buttonTextSize,
                       fontWeight: FontWeight.w600,
                     ),

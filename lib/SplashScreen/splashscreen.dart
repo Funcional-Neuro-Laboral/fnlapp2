@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 
+import '../theme/app_colors.dart';
+import '../Util/token_service.dart';
+import '../widgets/brand_background.dart';
+
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -18,7 +22,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkAuthAndNavigate() async {
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -26,14 +30,33 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (token == null || token.isEmpty) {
       await prefs.remove('token');
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/welcome');
       return;
     }
+
+    // Si el token venció, se intenta renovar antes de entrar.
+    if (!_isTokenValid(token)) {
+      final refreshed = await TokenService.instance.refreshTokenManually(notify: false);
+      if (!refreshed) {
+        final stillHasToken = prefs.getString('token') != null;
+        if (!mounted) return;
+        if (!stillHasToken) {
+          // El servidor rechazó la sesión: volver a iniciar sesión.
+          Navigator.pushReplacementNamed(context, '/login', arguments: LoginArgs.sessionExpired);
+          return;
+        }
+        // Sin conexión: se continúa y la app mostrará el estado sin conexión.
+      }
+    }
+
+    await TokenService.instance.initializeTokenRefresh();
 
     final permisopoliticas = prefs.getBool('permisopoliticas') ?? false;
     final userresponsebool = prefs.getBool('userresponsebool') ?? false;
     final testestresbool = prefs.getBool('testestresbool') ?? false;
 
+    if (!mounted) return;
     if (permisopoliticas && userresponsebool && testestresbool) {
       Navigator.pushReplacementNamed(context, '/home');
     } else {
@@ -41,47 +64,43 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
-  // --- FUNCIÓN CORREGIDA ---
-  // Esta versión es más robusta y maneja diferentes tipos de números.
   bool _isTokenValid(String token) {
     try {
-      final jwt = JWT.decode(token);
-      final payload = jwt.payload;
-
-      // 1. Verificamos que la clave 'exp' exista y que sea un número.
-      if (payload['exp'] is num) {
-        // 2. Si es un número, lo obtenemos de forma segura.
+      final payload = JWT.decode(token).payload;
+      if (payload is Map && payload['exp'] is num) {
         final num exp = payload['exp'];
-        // 3. Lo convertimos a entero y luego a una fecha.
         final expirationTime = DateTime.fromMillisecondsSinceEpoch(exp.toInt() * 1000);
-        // 4. Comparamos con la fecha y hora actual.
         return DateTime.now().isBefore(expirationTime);
       }
-      // Si 'exp' no existe o no es un número, el token es inválido.
-      return false;
+      // Sin fecha de expiración: se considera válido y el servidor decide.
+      return true;
     } catch (e) {
-      print('Error al validar el token: $e');
       return false;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: NetworkImage(
-                'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/inicio_splash.png'),
-            fit: BoxFit.cover,
+    return const Scaffold(
+      body: BrandBackground(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FnlLogo(width: 200),
+              SizedBox(height: 32),
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.primary),
+              ),
+            ],
           ),
-        ),
-        child: const Center(
-          // child: Image.asset('assets/logo.png', width: 200),
         ),
       ),
     );
   }
 }
+
+/// Argumentos opcionales al abrir la pantalla de inicio de sesión.
+enum LoginArgs { sessionExpired }

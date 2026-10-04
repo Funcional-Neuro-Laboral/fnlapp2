@@ -669,7 +669,6 @@ class _CertificateScreenState extends State<CertificateScreen>
               fontSize: titleSize,
               fontWeight: FontWeight.bold,
               color: const Color(0xFF212121),
-              fontFamily: 'Inter',
             ),
           ),
           SizedBox(height: isDesktop ? 20 : (isMediumTablet ? 16 : 12)),
@@ -685,7 +684,6 @@ class _CertificateScreenState extends State<CertificateScreen>
               style: TextStyle(
                 fontSize: subtitleSize,
                 color: const Color(0xFF757575),
-                fontFamily: 'Inter',
                 height: 1.6,
               ),
             ),
@@ -722,7 +720,6 @@ class _CertificateScreenState extends State<CertificateScreen>
                       fontSize: badgeTextSize,
                       fontWeight: FontWeight.w600,
                       color: const Color(0xFF6D4BD8),
-                      fontFamily: 'Inter',
                     ),
                   ),
                 ),
@@ -776,7 +773,6 @@ class _CertificateScreenState extends State<CertificateScreen>
                 fontSize: buttonTextSize,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
-                fontFamily: 'Inter',
               ),
             ),
             style: ElevatedButton.styleFrom(
@@ -805,7 +801,6 @@ class _CertificateScreenState extends State<CertificateScreen>
                 fontSize: buttonTextSize,
                 fontWeight: FontWeight.w600,
                 color: const Color(0xFF6D4BD8),
-                fontFamily: 'Inter',
               ),
             ),
             style: OutlinedButton.styleFrom(
@@ -840,7 +835,6 @@ class _CertificateScreenState extends State<CertificateScreen>
               fontSize: textButtonSize,
               color: const Color(0xFF757575),
               fontWeight: FontWeight.w500,
-              fontFamily: 'Inter',
             ),
           ),
         ),

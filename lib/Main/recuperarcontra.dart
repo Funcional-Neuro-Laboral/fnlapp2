@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/svg.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config.dart';
+import '../theme/app_colors.dart';
+import '../theme/funcy.dart';
+import '../widgets/app_buttons.dart';
+import '../widgets/app_text_field.dart';
+import '../widgets/brand_background.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   @override
@@ -17,116 +21,75 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   bool isLoading = false;
   int currentStep = 1; // 1: Email, 2: Code, 3: Password, 4: Finish
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
 
-  void _handleEmailStep() {
-    if (_formKey.currentState!.validate()) {
-      _sendResetEmail();
+  void _submitCurrentStep() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    switch (currentStep) {
+      case 1:
+        _sendResetEmail();
+        break;
+      case 2:
+        _verifyCode();
+        break;
+      case 3:
+        _resetPassword();
+        break;
     }
   }
 
-  void _handleCodeStep() {
-    if (_formKey.currentState!.validate()) {
-      _verifyCode();
-    }
-  }
-
-  void _handlePasswordStep() {
-    if (_formKey.currentState!.validate()) {
-      _resetPassword();
-    }
-  }
-
-  // Metodo para avanzar al siguiente paso
   void _nextStep() {
     setState(() {
       currentStep++;
     });
   }
 
-  // Metodo para obtener el contenido según el paso actual
-  Widget _getCurrentStepContent() {
-    switch (currentStep) {
-      case 1:
-        return _buildEmailStep();
-      case 2:
-        return _buildCodeStep();
-      case 3:
-        return _buildPasswordStep();
-      case 4:
-        return _buildFinishStep();
-      default:
-        return _buildEmailStep();
-    }
-  }
-
   // Metodo para enviar codigo al correo
   Future<void> _sendResetEmail() async {
-    setState(() {
-      isLoading = true;
-    });
-
+    setState(() => isLoading = true);
     try {
       final response = await http.post(
         Uri.parse('${Config.apiUrl2}/users/recovery-password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': emailController.text.trim()}),
       );
-
-      setState(() {
-        isLoading = false;
-      });
-
+      if (!mounted) return;
+      setState(() => isLoading = false);
       if (response.statusCode == 200) {
-        _nextStep(); // Avanzar al paso de verificación de código
+        _nextStep();
       } else {
-        _showSnackBar('Error al enviar el correo de recuperación');
+        _showSnackBar('No pudimos enviar el correo. Revisa que la dirección sea correcta.');
       }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      _showSnackBar('Error de conexión. Intenta nuevamente.');
+      if (!mounted) return;
+      setState(() => isLoading = false);
+      _showSnackBar('No hay conexión a internet. Inténtalo de nuevo.');
     }
   }
 
   // Método para reenviar código
   Future<void> _resendCode() async {
-    setState(() {
-      isLoading = true;
-    });
-
+    setState(() => isLoading = true);
     try {
       final response = await http.post(
         Uri.parse('${Config.apiUrl2}/users/recovery-password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': emailController.text.trim()}),
       );
-
-      setState(() {
-        isLoading = false;
-      });
-
-      if (response.statusCode == 200) {
-        _showSnackBar('Código reenviado exitosamente');
-      } else {
-        _showSnackBar('Error al reenviar el código');
-      }
+      if (!mounted) return;
+      setState(() => isLoading = false);
+      _showSnackBar(response.statusCode == 200
+          ? 'Te enviamos un nuevo código.'
+          : 'No pudimos reenviar el código. Inténtalo de nuevo.');
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      _showSnackBar('Error de conexión. Intenta nuevamente.');
+      if (!mounted) return;
+      setState(() => isLoading = false);
+      _showSnackBar('No hay conexión a internet. Inténtalo de nuevo.');
     }
   }
 
   // Metodo para verificar codigo
   Future<void> _verifyCode() async {
-    setState(() {
-      isLoading = true;
-    });
-
+    setState(() => isLoading = true);
     try {
       final response = await http.post(
         Uri.parse('${Config.apiUrl2}/users/validate-code'),
@@ -136,30 +99,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           'code': codeController.text.trim(),
         }),
       );
-
-      setState(() {
-        isLoading = false;
-      });
-
+      if (!mounted) return;
+      setState(() => isLoading = false);
       if (response.statusCode == 200) {
-        _nextStep(); // Avanzar al paso de nueva contraseña
+        _nextStep();
       } else {
-        _showSnackBar('Código incorrecto, expirado o ya utilizado.');
+        _showSnackBar('El código es incorrecto, expiró o ya se usó.');
       }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      _showSnackBar('Error de conexión. Intenta nuevamente.');
+      if (!mounted) return;
+      setState(() => isLoading = false);
+      _showSnackBar('No hay conexión a internet. Inténtalo de nuevo.');
     }
   }
 
   // Metodo para resetear la contraseña
   Future<void> _resetPassword() async {
-    setState(() {
-      isLoading = true;
-    });
-
+    setState(() => isLoading = true);
     try {
       final response = await http.put(
         Uri.parse('${Config.apiUrl2}/users/reset-password'),
@@ -170,563 +126,196 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           'newPassword': passwordController.text,
         }),
       );
-
-      setState(() {
-        isLoading = false;
-      });
-
+      if (!mounted) return;
+      setState(() => isLoading = false);
       if (response.statusCode == 200) {
-        _nextStep(); // Avanzar al paso final
+        _nextStep();
       } else {
-        _showSnackBar('Error al restablecer la contraseña. Verifica los datos.');
+        _showSnackBar('No pudimos cambiar la contraseña. Verifica los datos.');
       }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      _showSnackBar('Error de conexión. Intenta nuevamente.');
+      if (!mounted) return;
+      setState(() => isLoading = false);
+      _showSnackBar('No hay conexión a internet. Inténtalo de nuevo.');
     }
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          // Fondo de pantalla completo
-          Positioned.fill(
-            child: Container(
-              color: Color(0xFF5027D0),
-              child: SvgPicture.network(
-                'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/wallpaper+log-in.svg',
-                fit: BoxFit.cover,
+      body: BrandBackground(
+        child: SafeArea(
+          child: Stack(
+            children: [
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 64, 24, 24),
+                    child: Form(
+                      key: _formKey,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 250),
+                        child: KeyedSubtree(
+                          key: ValueKey(currentStep),
+                          child: _buildStep(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-          // Contenido principal
-          SafeArea(
-            child: Column(
-              children: [
-                // Espacio superior para el logo (flexible)
-                Flexible(
-                  flex: 2,
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24.0),
-                      child: Image.network(
-                        'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/logo.png',
-                        fit: BoxFit.contain,
-                      ),
-                    ),
+              if (currentStep < 4)
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: IconButton(
+                    tooltip: currentStep == 1 ? 'Volver' : 'Paso anterior',
+                    style: IconButton.styleFrom(backgroundColor: AppColors.muted, minimumSize: const Size(44, 44)),
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                    onPressed: () {
+                      if (currentStep == 1) {
+                        Navigator.of(context).pop();
+                      } else {
+                        setState(() => currentStep--);
+                      }
+                    },
                   ),
                 ),
-                // Contenedor blanco sobrepuesto
-                Flexible(
-                  flex: 5,
-                  child: Center(
-                    child: Container(
-                      width: MediaQuery.of(context).size.width > 600
-                          ? 900
-                          : double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(30),
-                          topRight: Radius.circular(30),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: Offset(0, -2),
-                          ),
-                        ],
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-                        child: Form(
-                          key: _formKey,
-                          child: _getCurrentStepContent(),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildEmailStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        SizedBox(height: 4),
-        Text(
-          'Recuperar Contraseña',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Color(0xFF020107),
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Inter',
-          ),
-        ),
-        SizedBox(height: 16),
-        Text(
-          'Ingresa tu correo electrónico y te ayudaremos a restablecer tu contraseña.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 18,
-            color: Color(0xFF020107),
-            fontFamily: 'Roboto',
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-        SizedBox(height: 52),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildStep(BuildContext context) {
+    switch (currentStep) {
+      case 1:
+        return _StepLayout(
+          title: 'Recuperar contraseña',
+          subtitle: 'Ingresa tu correo y te enviaremos un código para restablecer tu contraseña.',
           children: [
-            Text(
-              'Dirección de correo electrónico',
-              style: TextStyle(
-                color: Color(0xFF212121),
-                fontSize: 16,
-                fontFamily: 'Roboto',
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            SizedBox(height: 8),
-            TextFormField(
+            AppTextField(
+              label: 'Correo electrónico',
+              hint: 'ejemplo@correo.com',
               controller: emailController,
+              icon: Icons.mail_outline_rounded,
               keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                hintText: 'ejemplo@correo.com',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    width: 1,
-                    color: const Color(0xFF7F7F7F),
-                  ),
-                ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.email],
+              onSubmitted: (_) => _submitCurrentStep(),
               validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Este campo es requerido';
-                }
-                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                final text = value?.trim() ?? '';
+                if (text.isEmpty) return 'Este campo es obligatorio';
+                if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(text)) {
                   return 'Ingresa un correo válido';
                 }
                 return null;
               },
             ),
+            const SizedBox(height: 24),
+            AppPrimaryButton(label: 'Enviar código', loading: isLoading, onPressed: _submitCurrentStep),
           ],
-        ),
-        Spacer(), // Esto empuja el botón hacia abajo
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: isLoading ? null : _handleEmailStep,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF6D4BD8),
-              padding: EdgeInsets.symmetric(vertical: 16),
-              elevation: 4,
-              shadowColor: Color(0x26000000),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(40),
-              ),
-            ),
-            child: isLoading
-                ? CircularProgressIndicator(color: Colors.white)
-                : Text(
-              'Continuar',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-        SizedBox(height: 24),
-      ],
-    );
-  }
-
-
-  Widget _buildCodeStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        SizedBox(height: 4),
-        Text(
-          'Verificar código',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Color(0xFF020107),
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Inter',
-          ),
-        ),
-        SizedBox(height: 16),
-        Text(
-          'Hemos enviado un código de verificación de 6 digitos a tu correo electrónico.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 18,
-            color: Color(0xFF020107),
-            fontFamily: 'Roboto',
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-        SizedBox(height: 52),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        );
+      case 2:
+        return _StepLayout(
+          title: 'Verificar código',
+          subtitle: 'Te enviamos un código de 6 dígitos a ${emailController.text.trim()}.',
           children: [
-            Text(
-              'Código de verificación',
-              style: TextStyle(
-                color: Color(0xFF212121),
-                fontSize: 16,
-                fontFamily: 'Roboto',
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            SizedBox(height: 8),
-            TextFormField(
+            AppTextField(
+              label: 'Código de verificación',
+              hint: '000000',
               controller: codeController,
+              icon: Icons.pin_outlined,
               keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              decoration: InputDecoration(
-                hintText: 'XXXXXX',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    width: 1,
-                    color: const Color(0xFF7F7F7F),
-                  ),
-                ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.oneTimeCode],
+              onSubmitted: (_) => _submitCurrentStep(),
               validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Este campo es requerido';
-                }
-                if (value.length != 6) {
-                  return 'El código debe tener 6 dígitos';
-                }
+                final text = value?.trim() ?? '';
+                if (text.isEmpty) return 'Este campo es obligatorio';
+                if (text.length != 6) return 'El código tiene 6 dígitos';
                 return null;
               },
             ),
+            const SizedBox(height: 8),
+            Center(
+              child: TextButton(
+                onPressed: isLoading ? null : _resendCode,
+                child: const Text('¿No recibiste el código? Reenviar'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            AppPrimaryButton(label: 'Verificar código', loading: isLoading, onPressed: _submitCurrentStep),
           ],
-        ),
-        SizedBox(height: 24),
-        TextButton(
-          onPressed: isLoading ? null : () => _resendCode(),
-          child: Text(
-            '¿No recibiste el código? Reenviar',
-            style: TextStyle(
-              color: Color(0xFF6D4BD8),
-              fontSize: 16,
-              fontFamily: 'Roboto',
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        Spacer(), // Esto empuja el botón hacia abajo
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: isLoading ? null : _handleCodeStep,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF6D4BD8),
-              padding: EdgeInsets.symmetric(vertical: 16),
-              elevation: 4,
-              shadowColor: Color(0x26000000),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(40),
-              ),
-            ),
-            child: isLoading
-                ? CircularProgressIndicator(color: Colors.white)
-                : Text(
-              'Verificar código',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-        SizedBox(height: 24),
-      ],
-    );
-  }
-
-  Widget _buildPasswordStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        SizedBox(height: 4),
-        Text(
-          'Recuperar Contraseña',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Color(0xFF020107),
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Inter',
-          ),
-        ),
-        SizedBox(height: 16),
-        Text(
-          '¡Bien! Ya casi estamos. Ingresa una nueva contraseña',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 18,
-            color: Color(0xFF020107),
-            fontFamily: 'Roboto',
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-        SizedBox(height: 32),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        );
+      case 3:
+        return _StepLayout(
+          title: 'Nueva contraseña',
+          subtitle: '¡Bien! Ya casi estamos. Ingresa tu nueva contraseña.',
           children: [
-            Text(
-              'Nueva contraseña',
-              style: TextStyle(
-                color: Color(0xFF212121),
-                fontSize: 16,
-                fontFamily: 'Roboto',
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            SizedBox(height: 8),
-            TextFormField(
+            AppTextField(
+              label: 'Nueva contraseña',
+              hint: 'Mínimo 6 caracteres',
               controller: passwordController,
-              obscureText: _obscurePassword,
-              decoration: InputDecoration(
-                hintText: 'Ingresa tu nueva contraseña',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    width: 1,
-                    color: Colors.white,
-                  ),
-                ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                suffixIcon: Padding(
-                  padding: EdgeInsets.only(right: 8.0),
-                  child: IconButton(
-                    icon: Icon(
-                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                      color: Colors.grey[600],
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _obscurePassword = !_obscurePassword;
-                      });
-                    },
-                  ),
-                ),
-              ),
+              icon: Icons.lock_outline_rounded,
+              isPassword: true,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.newPassword],
               validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Este campo es requerido';
-                }
-                if (value.length < 6) {
-                  return 'La contraseña debe tener al menos 6 caracteres';
-                }
+                if (value == null || value.isEmpty) return 'Este campo es obligatorio';
+                if (value.length < 6) return 'Usa al menos 6 caracteres';
                 return null;
               },
             ),
-            SizedBox(height: 24),
-            Text(
-              'Repetir contraseña',
-              style: TextStyle(
-                color: Color(0xFF212121),
-                fontSize: 16,
-                fontFamily: 'Roboto',
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            SizedBox(height: 8),
-            TextFormField(
+            const SizedBox(height: 16),
+            AppTextField(
+              label: 'Repetir contraseña',
+              hint: 'Repite tu nueva contraseña',
               controller: confirmPasswordController,
-              obscureText: _obscureConfirmPassword,
-              decoration: InputDecoration(
-                hintText: 'Repite tu nueva contraseña',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    width: 1,
-                    color: Colors.white,
-                  ),
-                ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                suffixIcon: Padding(
-                  padding: EdgeInsets.only(right: 8.0),
-                  child: IconButton(
-                    icon: Icon(
-                      _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                      color: Colors.grey[600],
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _obscureConfirmPassword = !_obscureConfirmPassword;
-                      });
-                    },
-                  ),
-                ),
-              ),
+              icon: Icons.lock_outline_rounded,
+              isPassword: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _submitCurrentStep(),
               validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Este campo es requerido';
-                }
-                if (value != passwordController.text) {
-                  return 'Las contraseñas no coinciden';
-                }
+                if (value == null || value.isEmpty) return 'Este campo es obligatorio';
+                if (value != passwordController.text) return 'Las contraseñas no coinciden';
                 return null;
               },
             ),
+            const SizedBox(height: 24),
+            AppPrimaryButton(label: 'Cambiar contraseña', loading: isLoading, onPressed: _submitCurrentStep),
           ],
-        ),
-        Spacer(), // Esto empuja el botón hacia abajo
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: isLoading ? null : _handlePasswordStep,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF6D4BD8),
-              padding: EdgeInsets.symmetric(vertical: 16),
-              elevation: 4,
-              shadowColor: Color(0x26000000),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(40),
-              ),
+        );
+      default:
+        final textTheme = Theme.of(context).textTheme;
+        return Column(
+          children: [
+            Container(
+              width: 180,
+              height: 180,
+              decoration: const BoxDecoration(color: AppColors.lavender, shape: BoxShape.circle),
+              alignment: Alignment.center,
+              child: const FuncyImage(FuncyPose.celebra, size: 190, semanticLabel: 'Funcy celebrando'),
             ),
-            child: isLoading
-                ? CircularProgressIndicator(color: Colors.white)
-                : Text(
-              'Cambiar contraseña',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w600,
-              ),
+            const SizedBox(height: 24),
+            Text('¡Contraseña actualizada!', style: textTheme.headlineSmall, textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            Text(
+              'Ya puedes iniciar sesión con tu nueva contraseña.',
+              style: textTheme.bodyMedium?.copyWith(color: AppColors.inkSecondary),
+              textAlign: TextAlign.center,
             ),
-          ),
-        ),
-        SizedBox(height: 24),
-      ],
-    );
-  }
-
-  Widget _buildFinishStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        SizedBox(height: 32),
-        // Imagen de Funcy
-        Container(
-          width: 200,
-          height: 200,
-          child: Image.network(
-            'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/funcy_like.png',
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) {
-              return Icon(
-                Icons.check_circle,
-                size: 120,
-                color: Color(0xFF6D4BD8),
-              );
-            },
-          ),
-        ),
-        SizedBox(height: 22),
-        Text(
-          '¡Contraseña restablecida exitosamente!',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Color(0xFF020107),
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Inter',
-          ),
-        ),
-        SizedBox(height: 16),
-        Text(
-          'Funcy está orgulloso de ti ;)',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 18,
-            color: Color(0xFF020107),
-            fontFamily: 'Roboto',
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-        Text(
-          'Ya puedes iniciar sesión con tu nueva contraseña.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 18,
-            color: Color(0xFF020107),
-            fontFamily: 'Roboto',
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-        Spacer(), // Esto empuja el botón hacia abajo
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF6D4BD8),
-              padding: EdgeInsets.symmetric(vertical: 16),
-              elevation: 4,
-              shadowColor: Color(0x26000000),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(40),
-              ),
-            ),
-            child: Text(
-              '¡Vamos!',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-        SizedBox(height: 24),
-      ],
-    );
+            const SizedBox(height: 28),
+            AppPrimaryButton(label: 'Ir a iniciar sesión', onPressed: () => Navigator.of(context).pop()),
+          ],
+        );
+    }
   }
 
   @override
@@ -736,5 +325,36 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     passwordController.dispose();
     confirmPasswordController.dispose();
     super.dispose();
+  }
+}
+
+class _StepLayout extends StatelessWidget {
+  const _StepLayout({required this.title, required this.subtitle, required this.children});
+
+  final String title;
+  final String subtitle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return AutofillGroup(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Center(child: FnlLogo(width: 176)),
+          const SizedBox(height: 28),
+          Text(title, style: textTheme.headlineSmall, textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: textTheme.bodyMedium?.copyWith(color: AppColors.inkSecondary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 28),
+          ...children,
+        ],
+      ),
+    );
   }
 }
