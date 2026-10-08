@@ -11,7 +11,7 @@ import 'dart:convert';
 import '../config.dart' as app_config;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http_parser/http_parser.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:google_fonts/google_fonts.dart' hide Config;
 import 'package:fnlapp/Main/certificate_screen.dart';
 import 'package:fnlapp/SplashScreen/welcome_screen.dart' show FuncyColors;
 
