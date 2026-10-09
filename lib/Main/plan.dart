@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 import 'package:fnlapp/Main/testestres_form.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../Util/translations.dart';
-import 'package:fnlapp/SplashScreen/welcome_screen.dart' show FuncyColors;
 
 // Constantes
 class AppConstants {
@@ -15,24 +14,91 @@ class AppConstants {
   static const int percentageMultiplier = 1000;
   static const int percentageDivider = 10;
   static const double cardImageHeight = 150.0;
-  static const double cardBorderRadius = 20.0;
-  static const double progressBarHeight = 12.0;
+  static const double cardBorderRadius = 24.0;
+  static const double progressBarHeight = 14.0;
   static const double maxContentWidth = 480.0;
 }
 
-// Colores del tema
 class AppColors {
-  static const Color primary = FuncyColors.primary;
-  static const Color secondary = FuncyColors.primaryLight;
-  static const Color textPrimary = Color(0xFF212121);
-  static const Color textSecondary = Color(0xFF4A4A4A);
+  static const Color primary = Color(0xFF6428E8);
+  static const Color secondary = Color(0xFF814CF4);
+  static const Color textPrimary = Color(0xFF0B1457);
+  static const Color textSecondary = Color(0xFF70779C);
   static const Color cardBackground = Colors.white;
-  static const Color lockedBackground = Color(0xFFFAF9FD);
-  static const Color badgeBackground = Color(0xFFDCD4F6);
-  static const Color badgeText = Color(0xFF10082A);
-  static const Color progressBackground = Color(0xFFEFEAF8);
-  static const Color progressGradientStart = FuncyColors.primaryLight;
-  static const Color progressGradientEnd = FuncyColors.primary;
+  static const Color lockedBackground = Color(0xFFFCFBFF);
+  static const Color badgeBackground = Color(0xFFF4F1FF);
+  static const Color badgeText = Color(0xFF6428E8);
+  static const Color progressBackground = Color(0xFFEAE4FC);
+  static const Color progressGradientStart = Color(0xFF5425E8);
+  static const Color progressGradientEnd = Color(0xFF814CF4);
+}
+
+class _FnlColors {
+  static const blue = Color(0xFF0B1457);
+  static const violet = Color(0xFF6428E8);
+  static const violetSecondary = Color(0xFF814CF4);
+  static const gradientStart = Color(0xFF5425E8);
+  static const lavender = Color(0xFFF4F1FF);
+  static const lavenderDeep = Color(0xFFEAE4FC);
+  static const canvas = Color(0xFFFCFBFF);
+  static const body = Color(0xFF70779C);
+  static const border = Color(0xFFD9DCEF);
+  static const bubbleBorder = Color(0xFFDCD3FA);
+  static const white = Color(0xFFFFFFFF);
+}
+
+class _FnlSpace {
+  static const double xs = 8;
+  static const double sm = 16;
+  static const double md = 24;
+}
+
+class _FnlText {
+  static TextStyle h1(double size) => GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        color: _FnlColors.blue,
+        height: 1.2,
+      );
+
+  static TextStyle h2(double size, {Color color = _FnlColors.blue}) =>
+      GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        color: color,
+        height: 1.25,
+      );
+
+  static TextStyle body({
+    double size = 16,
+    Color color = _FnlColors.body,
+    FontWeight weight = FontWeight.w400,
+  }) =>
+      GoogleFonts.roboto(
+        fontSize: size,
+        fontWeight: weight,
+        color: color,
+        height: 1.5,
+      );
+
+  static TextStyle label({
+    double size = 14,
+    Color color = _FnlColors.violet,
+    double letterSpacing = 0,
+  }) =>
+      GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w700,
+        color: color,
+        letterSpacing: letterSpacing,
+      );
+
+  static TextStyle button({Color color = _FnlColors.white}) =>
+      GoogleFonts.manrope(
+        fontSize: 17,
+        fontWeight: FontWeight.w700,
+        color: color,
+      );
 }
 
 // Modelo de datos
@@ -86,11 +152,19 @@ class Programa {
     );
   }
 
+  // Indica si el día ya fue completado
+  bool get isCompleted =>
+      completedDate != null && completedDate!.trim().isNotEmpty;
+
   bool get isUnlocked {
     if (!unlocked) return false;
 
     if (startDate != null) {
-      DateTime temp = DateTime.parse(startDate!).toLocal();
+      // tryParse: una fecha mal formada ya no rompe toda la lista
+      final parsed = DateTime.tryParse(startDate!);
+      if (parsed == null) return false;
+
+      DateTime temp = parsed.toLocal();
       DateTime date = DateTime(temp.year, temp.month, temp.day);
       DateTime now = DateTime.now();
       DateTime today = DateTime(now.year, now.month, now.day);
@@ -133,8 +207,9 @@ class Programa {
 
   String get formattedStartDate {
     if (startDate == null) return '';
-    return DateFormat('dd/MM/yyyy')
-        .format(DateTime.parse(startDate!).toLocal());
+    final parsed = DateTime.tryParse(startDate!);
+    if (parsed == null) return '';
+    return DateFormat('dd/MM/yyyy').format(parsed.toLocal());
   }
 }
 
@@ -157,12 +232,28 @@ class PlanScreen extends StatefulWidget {
 }
 
 class _PlanScreenState extends State<PlanScreen> {
+  static const String _baseUrl =
+      'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/';
+  static const String _funcyUrl = '${_baseUrl}funcy.png';
+  static const String _happyUrl = '${_baseUrl}happy.png';
+
   bool _hasShownModal = false;
+  bool _imagesPrecached = false;
 
   @override
   void initState() {
     super.initState();
     _checkAndShowModal();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_imagesPrecached) {
+      precacheImage(const NetworkImage(_funcyUrl), context);
+      precacheImage(const NetworkImage(_happyUrl), context);
+      _imagesPrecached = true;
+    }
   }
 
   @override
@@ -183,9 +274,11 @@ class _PlanScreenState extends State<PlanScreen> {
         prefs.getBool('hasShownExitTestModal') ?? false;
 
     if (!hasShownExitTestModal && !_hasShownModal) {
+
+      _hasShownModal = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         _showExitTestModal();
-        _hasShownModal = true;
       });
     }
   }
@@ -195,148 +288,116 @@ class _PlanScreenState extends State<PlanScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('hasShownExitTestModal', true);
 
+    if (!mounted) return;
+
+    const double mascotHeight = 96;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
-        final screenSize = MediaQuery.of(context).size;
-        final isTablet = screenSize.width > 600;
-        final isMobile = screenSize.width <= 600;
-
-        // Configuración responsive
-        final modalWidth = isTablet
-            ? screenSize.width * 0.5 // 50% en tablet
-            : screenSize.width * 0.85; // 85% en móvil
-
-        final maxWidth = isTablet ? 500.0 : 350.0;
-        final padding = isTablet ? 32.0 : 24.0;
-        final iconSize = isTablet ? 56.0 : 48.0;
-        final titleFontSize = isTablet ? 28.0 : 24.0;
-        final bodyFontSize = isTablet ? 18.0 : 16.0;
-        final buttonFontSize = isTablet ? 18.0 : 16.0;
-        final buttonPadding = isTablet
-            ? const EdgeInsets.symmetric(horizontal: 32, vertical: 20)
-            : const EdgeInsets.symmetric(horizontal: 24, vertical: 16);
-
+      barrierColor: _FnlColors.blue.withOpacity(0.55),
+      builder: (BuildContext dialogContext) {
         return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Container(
-            width: modalWidth,
-            constraints: BoxConstraints(
-              maxWidth: maxWidth,
-              maxHeight: screenSize.height * 0.7,
-            ),
-            padding: EdgeInsets.all(padding),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Stack(
-              children: [
-                SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(
+              horizontal: _FnlSpace.md, vertical: _FnlSpace.md),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.85, end: 1.0),
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutBack,
+            builder: (context, scale, child) =>
+                Transform.scale(scale: scale, child: child),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.topCenter,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: mascotHeight / 2),
+                    padding: const EdgeInsets.fromLTRB(
+                        _FnlSpace.md,
+                        mascotHeight / 2 + _FnlSpace.sm,
+                        _FnlSpace.md,
+                        _FnlSpace.md),
+                    decoration: BoxDecoration(
+                      color: _FnlColors.white,
+                      borderRadius: BorderRadius.circular(28),
+                      border:
+                          Border.all(color: _FnlColors.bubbleBorder, width: 2),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: _FnlColors.bubbleBorder,
+                          offset: Offset(0, 6),
+                          blurRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              '¡Felicidades!',
-                              style: TextStyle(
-                                color: const Color(0xFF212121),
-                                fontSize: titleFontSize,
-                                fontFamily: 'Inter',
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                          Text(
+                            '¡Felicidades!',
+                            textAlign: TextAlign.center,
+                            style: _FnlText.h2(24),
+                          ),
+                          const SizedBox(height: _FnlSpace.xs),
+                          Text(
+                            'Completaste el programa con éxito, ahora puedes realizar tu test de salida para terminar tu fase.',
+                            textAlign: TextAlign.center,
+                            style: _FnlText.body(),
+                          ),
+                          const SizedBox(height: _FnlSpace.md),
+                          _PrimaryButton(
+                            label: 'Test de salida',
+                            icon: Icons.arrow_forward_rounded,
+                            onTap: () {
+                              Navigator.of(dialogContext).pop();
+                              if (!mounted) return;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      TestEstresQuestionScreen(),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
-                      SizedBox(height: isTablet ? 20 : 16),
-                      Text(
-                        'Completaste el programa con éxito, ahora puedes realizar tu test de salida para terminar tu fase.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: const Color(0xFF212121),
-                          fontSize: bodyFontSize,
-                          fontFamily: 'Inter',
-                          fontWeight: FontWeight.w400,
-                          height: 1.4,
-                        ),
-                      ),
-                      SizedBox(height: isTablet ? 32 : 24),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).pop(); 
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => TestEstresQuestionScreen(),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          constraints: BoxConstraints(
-                            maxWidth: isTablet ? 280 : 240,
-                          ),
-                          padding: buttonPadding,
-                          clipBehavior: Clip.antiAlias,
-                          decoration: ShapeDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                FuncyColors.primary,
-                                FuncyColors.primaryDark,
-                              ],
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(40),
-                            ),
-                            shadows: [
-                              BoxShadow(
-                                color: FuncyColors.primary.withOpacity(0.35),
-                                blurRadius: 14,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Text(
-                              'Test de salida',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: buttonFontSize,
-                                fontFamily: 'Inter',
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                // Botón de cerrar 
-                Positioned(
-                  top: isTablet ? -16 : -12,
-                  right: isTablet ? -16 : -12,
-                  child: GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      padding: EdgeInsets.all(isTablet ? 12 : 8),
-                      child: Icon(
-                        Icons.close,
-                        color: const Color(0xFF212121),
-                        size: isTablet ? 28 : 24,
+                  // Botón de cerrar
+                  Positioned(
+                    top: mascotHeight / 2 + 12,
+                    right: 12,
+                    child: Material(
+                      color: _FnlColors.lavender,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => Navigator.of(dialogContext).pop(),
+                        child: const SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: Icon(
+                            Icons.close_rounded,
+                            size: 20,
+                            color: _FnlColors.violet,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                  SizedBox(
+                    height: mascotHeight,
+                    child: _buildMascot(_happyUrl, mascotHeight),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -344,10 +405,54 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
+  Widget _buildMascot(String url, double height) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: height * 0.7,
+          height: height * 0.7,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: _FnlColors.violetSecondary.withOpacity(0.22),
+                blurRadius: 40,
+                spreadRadius: 8,
+              ),
+            ],
+          ),
+        ),
+        Image.network(
+          url,
+          height: height,
+          fit: BoxFit.contain,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return SizedBox(
+              height: height,
+              width: height,
+              child: const Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: _FnlColors.violetSecondary,
+                  ),
+                ),
+              ),
+            );
+          },
+          errorBuilder: (_, __, ___) => SizedBox(height: height, width: height),
+        ),
+      ],
+    );
+  }
+
   List<Programa> get _parsedProgramas {
     return widget.programas
-        .where((p) =>
-            p['nombre_tecnica'] != null && p['nombre_tecnica'].isNotEmpty)
+        .where((p) => (p['nombre_tecnica']?.toString() ?? '').isNotEmpty)
         .map((p) => Programa.fromMap(p))
         .toList();
   }
@@ -355,8 +460,10 @@ class _PlanScreenState extends State<PlanScreen> {
   double get _progressPercentage {
     if (widget.programas.isEmpty) return 0;
 
-    final completedCount =
-        widget.programas.where((x) => x['completed_date'] != null).length;
+    final completedCount = widget.programas.where((x) {
+      final value = x['completed_date'];
+      return value != null && value.toString().trim().isNotEmpty;
+    }).length;
 
     return ((completedCount /
                 AppConstants.totalPrograms *
@@ -365,68 +472,54 @@ class _PlanScreenState extends State<PlanScreen> {
         AppConstants.percentageDivider);
   }
 
+  String get _progressLabel {
+    final v = _progressPercentage;
+    return v == v.roundToDouble() ? '${v.toInt()}%' : '${v.toStringAsFixed(1)}%';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final titleSize = MediaQuery.of(context).size.width < 400 ? 28.0 : 34.0;
+
     return Scaffold(
+      backgroundColor: _FnlColors.canvas,
       body: Stack(
         children: [
-          // Mismo lenguaje visual del login
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  FuncyColors.primaryDark,
-                  FuncyColors.primary,
-                  FuncyColors.primaryLight,
-                ],
-                stops: [0.0, 0.4, 1.0],
-              ),
-            ),
-          ),
-          Positioned(
-            top: -90,
+          // Círculos decorativos
+          const Positioned(
+            top: -70,
             right: -70,
-            child: _decorativeCircle(220, Colors.white.withOpacity(0.06)),
+            child: IgnorePointer(child: _DecorCircle(size: 220)),
           ),
-          Positioned(
-            top: 220,
-            left: -80,
-            child: _decorativeCircle(170, Colors.white.withOpacity(0.05)),
+          const Positioned(
+            bottom: -90,
+            left: -90,
+            child: IgnorePointer(child: _DecorCircle(size: 240)),
           ),
-
           SafeArea(
-            child: Stack(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 130.0),
-                  child: SingleChildScrollView(
-                    child: Center(
-                      // limita el ancho de todo el contenido
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxWidth: AppConstants.maxContentWidth,
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20.0, vertical: 20.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _buildHeader(),
-                              const SizedBox(height: 18),
-                              _buildProgressSection(context),
-                              const SizedBox(height: 22),
-                              _buildContent(context),
-                            ],
-                          ),
-                        ),
-                      ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 130.0),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AppConstants.maxContentWidth,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: _FnlSpace.md, vertical: _FnlSpace.md),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildHeader(titleSize),
+                        const SizedBox(height: _FnlSpace.sm),
+                        _buildProgressSection(),
+                        const SizedBox(height: _FnlSpace.md),
+                        _buildContent(),
+                      ],
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -434,232 +527,221 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
-  Widget _decorativeCircle(double diameter, Color color) {
-    return Container(
-      width: diameter,
-      height: diameter,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+  Widget _buildHeader(double titleSize) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'FUNCY · TU RUTA DE 21 DÍAS',
+          style: _FnlText.label(size: 12, letterSpacing: 1.2),
+        ),
+        const SizedBox(height: 6),
+        Text('Mi Plan Diario', style: _FnlText.h1(titleSize)),
+      ],
     );
   }
 
-  Widget _buildHeader() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'FUNCY · TU RUTA DE 21 DÍAS',
-            style: GoogleFonts.inter(
-              color: Colors.white.withOpacity(0.72),
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Mi Plan Diario',
-            style: GoogleFonts.inter(
-              color: Colors.white,
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressSection(BuildContext context) {
+  Widget _buildProgressSection() {
     if (widget.isLoading || widget.programas.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(_FnlSpace.md),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
+        color: _FnlColors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+        boxShadow: const [
           BoxShadow(
-            color: FuncyColors.primaryDark.withOpacity(0.22),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+            color: _FnlColors.bubbleBorder,
+            offset: Offset(0, 4),
+            blurRadius: 0,
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildProgressHeader(),
-          const SizedBox(height: 14),
-          _buildProgressBar(context),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text('Tu progreso', style: _FnlText.h2(18)),
+              Text(
+                _progressLabel,
+                style: _FnlText.h2(22, color: _FnlColors.violet),
+              ),
+            ],
+          ),
+          const SizedBox(height: _FnlSpace.sm),
+          _buildProgressBar(),
         ],
       ),
     );
   }
 
-  Widget _buildProgressHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          "Tu progreso",
-          style: GoogleFonts.inter(
-            color: AppColors.textPrimary,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        Text(
-          "${_progressPercentage}%",
-          style: GoogleFonts.inter(
-            color: AppColors.primary,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _buildProgressBar() {
+    final target = (_progressPercentage / 100).clamp(0.0, 1.0);
 
-  Widget _buildProgressBar(BuildContext context) {
     return Container(
       width: double.infinity,
       height: AppConstants.progressBarHeight,
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: AppColors.progressBackground,
+        color: _FnlColors.lavenderDeep,
+        borderRadius: BorderRadius.circular(999),
       ),
-      child: Stack(
-        children: [
-          FractionallySizedBox(
-            widthFactor: (_progressPercentage / 100).clamp(0.0, 1.0),
-            child: Container(
-              height: AppConstants.progressBarHeight,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                gradient: const LinearGradient(
-                  colors: [
-                    AppColors.progressGradientStart,
-                    AppColors.progressGradientEnd,
-                  ],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
+      alignment: Alignment.centerLeft,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: target),
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutBack,
+        builder: (context, value, _) => FractionallySizedBox(
+          widthFactor: value.clamp(0.0, 1.0),
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [_FnlColors.gradientStart, _FnlColors.violetSecondary],
               ),
+              borderRadius: BorderRadius.all(Radius.circular(999)),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildContent(BuildContext context) {
+  Widget _buildContent() {
     if (widget.isLoading) {
       return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24.0),
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+        padding: EdgeInsets.symmetric(vertical: _FnlSpace.md),
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 3,
+            color: _FnlColors.violet,
+          ),
         ),
       );
     }
 
     if (widget.programas.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20.0),
-        child: Text(
-          'No hay programas disponibles',
-          style: GoogleFonts.inter(
-            fontSize: 16.0,
-            fontWeight: FontWeight.w500,
-            color: Colors.white.withOpacity(0.85),
-          ),
+        padding: const EdgeInsets.symmetric(vertical: _FnlSpace.md),
+        child: Column(
+          children: [
+            SizedBox(height: 120, child: _buildMascot(_funcyUrl, 120)),
+            const SizedBox(height: _FnlSpace.sm),
+            Text(
+              'No hay programas disponibles',
+              textAlign: TextAlign.center,
+              style: _FnlText.h2(18),
+            ),
+          ],
         ),
       );
     }
 
-    return _buildProgramsList(context);
+    return _buildProgramsList();
   }
 
-  Widget _buildProgramsList(BuildContext context) {
+  Widget _buildProgramsList() {
     final parsedProgramas = _parsedProgramas;
 
     return Column(
-      children: parsedProgramas
-          .map((programa) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: _buildProgramCard(programa, context),
-              ))
-          .toList(),
+      children: [
+        for (final programa in parsedProgramas)
+          Padding(
+            padding: const EdgeInsets.only(bottom: _FnlSpace.sm),
+            child: _buildProgramCard(programa),
+          ),
+      ],
     );
   }
 
-  Widget _buildProgramCard(Programa programa, BuildContext context) {
+  Widget _buildProgramCard(Programa programa) {
+    return programa.isUnlocked
+        ? _buildUnlockedCard(programa)
+        : _buildLockedCard(programa);
+  }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: programa.isUnlocked
-          ? _buildUnlockedCard(programa, context)
-          : _buildLockedCard(programa, context),
+  BoxDecoration _buildCardDecoration({bool completed = false}) {
+    return BoxDecoration(
+      color: _FnlColors.white,
+      borderRadius: BorderRadius.circular(AppConstants.cardBorderRadius),
+      border: Border.all(
+        color: completed ? _FnlColors.violet : _FnlColors.border,
+        width: 2,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: completed
+              ? _FnlColors.violet.withOpacity(0.35)
+              : _FnlColors.border,
+          offset: Offset(0, completed ? 2 : 4),
+          blurRadius: 0,
+        ),
+      ],
     );
   }
 
-  Widget _buildUnlockedCard(Programa programa, BuildContext context) {
-    return GestureDetector(
-      onTap: () => _navigateToStepScreen(programa, context),
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.symmetric(vertical: 3.0),
-        decoration: _buildCardDecoration(),
+  Widget _buildUnlockedCard(Programa programa) {
+    return Semantics(
+      button: true,
+      label: 'Día ${programa.dia}: ${programa.nombreTecnica}',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _navigateToStepScreen(programa),
+        child: Container(
+          width: double.infinity,
+          decoration: _buildCardDecoration(completed: programa.isCompleted),
+          child: ClipRRect(
+            borderRadius:
+                BorderRadius.circular(AppConstants.cardBorderRadius - 2),
+            child: Stack(
+              children: [
+                Column(
+                  children: [
+                    _buildCardImage(programa, true),
+                    _buildCardContent(programa, true),
+                  ],
+                ),
+                _buildDayBadge(programa),
+                if (programa.isCompleted) _buildCompletedCheck(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLockedCard(Programa programa) {
+    return Container(
+      width: double.infinity,
+      decoration: _buildCardDecoration(),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppConstants.cardBorderRadius - 2),
         child: Stack(
           children: [
             Column(
               children: [
-                _buildCardImage(programa, true),
-                _buildCardContent(programa, true),
+                _buildCardImage(programa, false),
+                _buildCardContent(programa, false),
               ],
             ),
-            _buildDayBadge(programa),
+            _buildLockChip(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildLockedCard(Programa programa, BuildContext context) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: 3.0),
-      decoration: _buildCardDecoration(),
-      child: Column(
-        children: [
-          _buildCardImage(programa, false),
-          _buildCardContent(programa, false),
-        ],
-      ),
-    );
-  }
-
-  BoxDecoration _buildCardDecoration() {
-    return BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(AppConstants.cardBorderRadius),
-      boxShadow: [
-        BoxShadow(
-          color: FuncyColors.primaryDark.withOpacity(0.18),
-          blurRadius: 18,
-          offset: const Offset(0, 8),
-        ),
-      ],
-    );
-  }
-
   Widget _buildCardImage(Programa programa, bool isUnlocked) {
     const String lockedImageUrl =
-        'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/imagen_bloqueada.png';
+        'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/recursos_nuevos2/locked.jpg';
 
     // Función para generar URL de imagen por día
     String getImageUrl() {
@@ -672,40 +754,56 @@ class _PlanScreenState extends State<PlanScreen> {
 
       // Mapeo temporal para los 21 días
       if (programa.dia >= 1 && programa.dia <= 21) {
-        return 'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/recursos_nuevos2/DIA${programa.dia}.png';
+        return 'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/recursos_nuevos2/DIA${programa.dia}.jpg';
       }
 
       return '';
     }
 
-    return ClipRRect(
-      borderRadius: const BorderRadius.only(
-        topLeft: Radius.circular(AppConstants.cardBorderRadius),
-        topRight: Radius.circular(AppConstants.cardBorderRadius),
-      ),
-      child: Image.network(
-        getImageUrl(),
-        width: double.infinity,
-        height: AppConstants.cardImageHeight,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
+    return SizedBox(
+      width: double.infinity,
+      height: AppConstants.cardImageHeight,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.network(
+            getImageUrl(),
             width: double.infinity,
             height: AppConstants.cardImageHeight,
-            decoration: BoxDecoration(
-              color: isUnlocked ? Colors.grey[300] : Colors.grey[600],
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(AppConstants.cardBorderRadius),
-                topRight: Radius.circular(AppConstants.cardBorderRadius),
-              ),
-            ),
-            child: Icon(
-              Icons.image_not_supported,
-              color: isUnlocked ? Colors.grey[600] : Colors.grey[400],
-              size: 50,
-            ),
-          );
-        },
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, progress) {
+              if (progress == null) return child;
+              return Container(
+                color: _FnlColors.lavender,
+                child: const Center(
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: _FnlColors.violetSecondary,
+                    ),
+                  ),
+                ),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                color: _FnlColors.lavender,
+                child: Icon(
+                  isUnlocked
+                      ? Icons.image_not_supported_rounded
+                      : Icons.lock_rounded,
+                  color: _FnlColors.violetSecondary,
+                  size: 48,
+                ),
+              );
+            },
+          ),
+          // Sombreado violeta sobre la imagen de los días completados
+          if (isUnlocked && programa.isCompleted)
+            ColoredBox(color: _FnlColors.violet.withOpacity(0.28)),
+        ],
       ),
     );
   }
@@ -713,15 +811,10 @@ class _PlanScreenState extends State<PlanScreen> {
   Widget _buildCardContent(Programa programa, bool isUnlocked) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color:
-            isUnlocked ? AppColors.cardBackground : AppColors.lockedBackground,
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(AppConstants.cardBorderRadius),
-          bottomRight: Radius.circular(AppConstants.cardBorderRadius),
-        ),
-      ),
+      padding: const EdgeInsets.all(_FnlSpace.sm),
+      color: isUnlocked && programa.isCompleted
+          ? _FnlColors.lavender
+          : _FnlColors.white,
       child: isUnlocked
           ? _buildUnlockedContent(programa)
           : _buildLockedContent(programa),
@@ -732,27 +825,13 @@ class _PlanScreenState extends State<PlanScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          programa.nombreTecnica,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 14,
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 8),
+        Text(programa.nombreTecnica, style: _FnlText.h2(16)),
+        const SizedBox(height: 6),
         Text(
           programa.descripcion ?? '',
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 13,
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w400,
-            height: 1.31,
-          ),
+          style: _FnlText.body(size: 14),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         _buildProgramInfo(programa),
       ],
     );
@@ -762,89 +841,58 @@ class _PlanScreenState extends State<PlanScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          programa.nombreTecnica,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 14,
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 8),
+        Text(programa.nombreTecnica, style: _FnlText.h2(16)),
+        const SizedBox(height: 6),
         Text(
           programa.startDate == null
               ? 'Esta lección se desbloqueará al día siguiente de haber completado la anterior.'
               : 'Esta lección se desbloqueará el ${programa.formattedStartDate}',
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 13,
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w400,
-            height: 1.31,
-          ),
+          style: _FnlText.body(size: 14),
         ),
       ],
     );
   }
 
   Widget _buildProgramInfo(Programa programa) {
-    return Row(
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Text(
           traducirTipoTecnica(programa.tipoTecnica),
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 13,
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w400,
-          ),
+          style: _FnlText.label(size: 13),
         ),
-        const SizedBox(width: 8),
         const _DotSeparator(),
-        const SizedBox(width: 8),
-        const Text(
-          '5 - 10 min',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 13,
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w400,
-          ),
-        ),
+        const Icon(Icons.timer_outlined, size: 16, color: _FnlColors.body),
+        Text('5 - 10 min', style: _FnlText.body(size: 13)),
       ],
     );
   }
 
   Widget _buildDayBadge(Programa programa) {
     return Positioned(
-      top: 13,
-      left: 20,
+      top: 12,
+      left: 12,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: const ShapeDecoration(
-          color: AppColors.badgeBackground,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(32)),
-          ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: _FnlColors.lavender,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(
-              Icons.calendar_today,
+              Icons.calendar_today_rounded,
               size: 16,
-              color: AppColors.badgeText,
+              color: _FnlColors.violet,
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 6),
             Text(
               'Día ${programa.dia.toString().padLeft(2, '0')}',
-              style: const TextStyle(
-                color: AppColors.badgeText,
-                fontSize: 14,
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w600,
-              ),
+              style: _FnlText.label(),
             ),
           ],
         ),
@@ -852,7 +900,51 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
-  void _navigateToStepScreen(Programa programa, BuildContext context) {
+  // Check circular en la esquina superior derecha de la imagen
+  Widget _buildCompletedCheck() {
+    return Positioned(
+      top: 12,
+      right: 12,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: _FnlColors.violet,
+          shape: BoxShape.circle,
+          border: Border.all(color: _FnlColors.white, width: 2),
+        ),
+        child: const Icon(
+          Icons.check_rounded,
+          size: 20,
+          color: _FnlColors.white,
+        ),
+      ),
+    );
+  }
+
+  // Candado para las lecciones bloqueadas
+  Widget _buildLockChip() {
+    return Positioned(
+      top: 12,
+      right: 12,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: _FnlColors.white,
+          shape: BoxShape.circle,
+          border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+        ),
+        child: const Icon(
+          Icons.lock_rounded,
+          size: 16,
+          color: _FnlColors.body,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToStepScreen(Programa programa) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -872,18 +964,86 @@ class _PlanScreenState extends State<PlanScreen> {
   }
 }
 
-// Widget helper para el separador de puntos
+class _DecorCircle extends StatelessWidget {
+  final double size;
+  const _DecorCircle({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: _FnlColors.lavenderDeep,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+/// Separador de puntos.
 class _DotSeparator extends StatelessWidget {
   const _DotSeparator();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 8,
-      height: 8,
-      decoration: const ShapeDecoration(
-        color: Color(0xFFC6C6C6),
-        shape: OvalBorder(),
+      width: 6,
+      height: 6,
+      decoration: const BoxDecoration(
+        color: _FnlColors.border,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+class _PrimaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  const _PrimaryButton({
+    required this.label,
+    required this.onTap,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(18);
+
+    return Container(
+      height: 56,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        color: _FnlColors.violet,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: onTap,
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: _FnlText.button(),
+                  ),
+                ),
+                if (icon != null) ...[
+                  const SizedBox(width: 8),
+                  Icon(icon, size: 20, color: _FnlColors.white),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -113,7 +113,7 @@ class _StepScreenState extends State<StepScreen> {
 
   String _getImageUrlByDay() {
     if (widget.dia >= 1 && widget.dia <= 21) {
-      return 'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/recursos_nuevos2/DIA${widget.dia}.png';
+      return 'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/recursos_nuevos2/DIA${widget.dia}.jpg';
     }
     return widget.url_img;
   }

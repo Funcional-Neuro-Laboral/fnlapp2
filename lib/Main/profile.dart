@@ -13,7 +13,76 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fnlapp/Main/certificate_screen.dart';
-import 'package:fnlapp/SplashScreen/welcome_screen.dart' show FuncyColors;
+
+class _FnlColors {
+  static const blue = Color(0xFF0B1457);
+  static const violet = Color(0xFF6428E8);
+  static const violetSecondary = Color(0xFF814CF4);
+  static const lavender = Color(0xFFF4F1FF);
+  static const lavenderDeep = Color(0xFFEAE4FC);
+  static const canvas = Color(0xFFFCFBFF);
+  static const body = Color(0xFF70779C);
+  static const label = Color(0xFF5F668B);
+  static const border = Color(0xFFD9DCEF);
+  static const bubbleBorder = Color(0xFFDCD3FA);
+  static const disabledText = Color(0xFF9AA0C0);
+  static const white = Color(0xFFFFFFFF);
+}
+
+class _FnlSpace {
+  static const double xs = 8;
+  static const double sm = 16;
+  static const double md = 24;
+  static const double lg = 32;
+}
+
+class _FnlText {
+  static TextStyle h1(double size) => GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        color: _FnlColors.blue,
+        height: 1.2,
+      );
+
+  static TextStyle h2(double size, {Color color = _FnlColors.blue}) =>
+      GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        color: color,
+        height: 1.25,
+      );
+
+  static TextStyle body({
+    double size = 16,
+    Color color = _FnlColors.body,
+    FontWeight weight = FontWeight.w400,
+  }) =>
+      GoogleFonts.roboto(
+        fontSize: size,
+        fontWeight: weight,
+        color: color,
+        height: 1.5,
+      );
+
+  static TextStyle label({
+    double size = 14,
+    Color color = _FnlColors.label,
+    double letterSpacing = 0,
+  }) =>
+      GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w700,
+        color: color,
+        letterSpacing: letterSpacing,
+      );
+
+  static TextStyle button({Color color = _FnlColors.white}) =>
+      GoogleFonts.manrope(
+        fontSize: 17,
+        fontWeight: FontWeight.w700,
+        color: color,
+      );
+}
 
 class ProfileScreen extends StatefulWidget {
   final ProfileData? profileData;
@@ -35,20 +104,66 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  static const String _funcyUrl =
+      'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/funcy.png';
+
   File? _selectedImage;
   Uint8List? _selectedImageBytes;
   final ImagePicker _picker = ImagePicker();
   SubscriptionData? _subscriptionData;
   bool _loadingSubscription = true;
+  bool _isUploadingPhoto = false; // bloquea toques repetidos en la foto
+  bool _isLoggingOut = false;
+  bool _imagesPrecached = false;
 
-  // Ancho máximo del contenido (mismo criterio que en PlanScreen): evita
-  // que la tarjeta y el header se estiren de borde a borde en tablet/web.
+  // Ancho máximo del contenido: evita que las tarjetas se estiren de borde
+  // a borde en tablet/web.
   static const double _maxContentWidth = 560.0;
 
   @override
   void initState() {
     super.initState();
     _loadSubscriptionData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_imagesPrecached) {
+      precacheImage(const NetworkImage(_funcyUrl), context);
+      _imagesPrecached = true;
+    }
+  }
+
+  // ========== MENSAJES ==========
+
+  void _showSnack(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: _FnlColors.blue,
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Row(
+          children: [
+            Icon(
+              error ? Icons.error_outline_rounded : Icons.check_circle_rounded,
+              color: _FnlColors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: _FnlText.body(size: 14, color: _FnlColors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // ========== MÉTODOS DE SUSCRIPCIÓN ==========
@@ -72,6 +187,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
+        if (!mounted) return;
         setState(() {
           _subscriptionData = SubscriptionData.fromJson(jsonData);
           _loadingSubscription = false;
@@ -80,7 +196,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         throw Exception('Error al cargar suscripción');
       }
     } catch (e) {
-      print('Error al cargar datos de suscripción: $e');
+      debugPrint('Error al cargar datos de suscripción: $e');
+      if (!mounted) return;
       setState(() {
         _loadingSubscription = false;
       });
@@ -95,6 +212,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
 
+      if (token == null) {
+        throw Exception('No se pudo obtener el token');
+      }
+
       final response = await http.post(
         Uri.parse('${app_config.Config.apiUrl2}/subscriptions/cancel'),
         headers: {
@@ -105,50 +226,205 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (response.statusCode == 200) {
         await _loadSubscriptionData();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Suscripción cancelada exitosamente'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+        _showSnack('Suscripción cancelada exitosamente');
       } else {
         throw Exception('Error al cancelar suscripción');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al cancelar suscripción'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      debugPrint('Error al cancelar suscripción: $e');
+      _showSnack('Error al cancelar suscripción', error: true);
     }
   }
 
-  Future<bool?> _showCancelDialog() {
-    return showDialog<bool>(
+  Future<T?> _showFnlDialog<T>({
+    required String title,
+    required String message,
+    required List<Widget> Function(BuildContext dialogContext) actionsBuilder,
+    bool barrierDismissible = true,
+  }) {
+    const double mascotHeight = 88;
+
+    return showDialog<T>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Cancelar suscripción'),
-          content: Text(
-              '¿Estás seguro de que deseas cancelar tu suscripción Funcy PRO?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text('No'),
+      barrierDismissible: barrierDismissible,
+      barrierColor: _FnlColors.blue.withOpacity(0.55),
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(
+              horizontal: _FnlSpace.md, vertical: _FnlSpace.md),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.85, end: 1.0),
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutBack,
+            builder: (context, scale, child) =>
+                Transform.scale(scale: scale, child: child),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.topCenter,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: mascotHeight / 2),
+                    padding: const EdgeInsets.fromLTRB(
+                        _FnlSpace.md, mascotHeight / 2 + _FnlSpace.sm,
+                        _FnlSpace.md, _FnlSpace.md),
+                    decoration: BoxDecoration(
+                      color: _FnlColors.white,
+                      borderRadius: BorderRadius.circular(28),
+                      border:
+                          Border.all(color: _FnlColors.bubbleBorder, width: 2),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: _FnlColors.bubbleBorder,
+                          offset: Offset(0, 6),
+                          blurRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            title,
+                            textAlign: TextAlign.center,
+                            style: _FnlText.h2(24),
+                          ),
+                          const SizedBox(height: _FnlSpace.xs),
+                          Text(
+                            message,
+                            textAlign: TextAlign.center,
+                            style: _FnlText.body(),
+                          ),
+                          const SizedBox(height: _FnlSpace.md),
+                          ...actionsBuilder(dialogContext),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    height: mascotHeight,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: mascotHeight * 0.7,
+                          height: mascotHeight * 0.7,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: _FnlColors.violetSecondary
+                                    .withOpacity(0.22),
+                                blurRadius: 40,
+                                spreadRadius: 8,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Image.network(
+                          _funcyUrl,
+                          height: mascotHeight,
+                          fit: BoxFit.contain,
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return SizedBox(
+                              height: mascotHeight,
+                              width: mascotHeight,
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: _FnlColors.violetSecondary,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                          errorBuilder: (_, __, ___) => SizedBox(
+                              height: mascotHeight, width: mascotHeight),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: Text('Sí, cancelar'),
-            ),
-          ],
+          ),
         );
       },
+    );
+  }
+
+  Future<bool?> _showCancelDialog() {
+    return _showFnlDialog<bool>(
+      title: 'Cancelar suscripción',
+      message: '¿Estás seguro de que deseas cancelar tu suscripción Funcy PRO?',
+      actionsBuilder: (ctx) => [
+        _PrimaryButton(
+          label: 'No',
+          onTap: () => Navigator.of(ctx).pop(false),
+        ),
+        const SizedBox(height: _FnlSpace.xs),
+        _TextAction(
+          label: 'Sí, cancelar',
+          onTap: () => Navigator.of(ctx).pop(true),
+        ),
+      ],
+    );
+  }
+
+  Future<ImageSource?> _showImageSourceDialog() {
+    return _showFnlDialog<ImageSource>(
+      title: 'Seleccionar imagen',
+      message: '¿De dónde quieres obtener la imagen?',
+      actionsBuilder: (ctx) => [
+        _PrimaryButton(
+          label: 'Cámara',
+          icon: Icons.photo_camera_rounded,
+          onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+        ),
+        const SizedBox(height: 12),
+        _SecondaryButton(
+          label: 'Galería',
+          icon: Icons.photo_library_rounded,
+          onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+        ),
+        const SizedBox(height: _FnlSpace.xs),
+        _TextAction(
+          label: 'Cancelar',
+          onTap: () => Navigator.of(ctx).pop(),
+        ),
+      ],
+    );
+  }
+
+  Future<bool?> _showLogoutDialog() {
+    return _showFnlDialog<bool>(
+      title: 'Cerrar sesión',
+      message: '¿Deseas cerrar sesión en todos tus dispositivos?',
+      actionsBuilder: (ctx) => [
+        _PrimaryButton(
+          label: 'Solo este dispositivo',
+          onTap: () => Navigator.of(ctx).pop(false),
+        ),
+        const SizedBox(height: 12),
+        _SecondaryButton(
+          label: 'Todos los dispositivos',
+          onTap: () => Navigator.of(ctx).pop(true),
+        ),
+        const SizedBox(height: _FnlSpace.xs),
+        _TextAction(
+          label: 'Cancelar',
+          onTap: () => Navigator.of(ctx).pop(),
+        ),
+      ],
     );
   }
 
@@ -159,6 +435,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
+    if (mounted) setState(() => _isUploadingPhoto = true);
+
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       final userId = prefs.getInt('userId');
@@ -168,7 +446,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         throw Exception('No se pudo obtener el ID del usuario');
       }
 
-      final uri = Uri.parse('${app_config.Config.apiUrl2}/users/upload-photo/$userId');
+      final uri =
+          Uri.parse('${app_config.Config.apiUrl2}/users/upload-photo/$userId');
       final request = http.MultipartRequest('PUT', uri);
 
       if (token != null) {
@@ -234,35 +513,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
           widget.onProfileImageUpdated!(newImageUrl);
         }
 
-        setState(() {
-          _selectedImage = null;
-          _selectedImageBytes = null;
-        });
-
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Imagen de perfil actualizada exitosamente'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
+          setState(() {
+            _selectedImage = null;
+            _selectedImageBytes = null;
+          });
         }
+
+        _showSnack('Imagen de perfil actualizada exitosamente');
       } else {
         final errorResponse = json.decode(responseBody);
         throw Exception(
             'Error del servidor: ${response.statusCode} - ${errorResponse['error']['message']}');
       }
     } catch (e) {
+      debugPrint('Error al subir imagen de perfil: $e');
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al actualizar imagen de perfil'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        setState(() {
+          _selectedImage = null;
+          _selectedImageBytes = null;
+        });
       }
+      _showSnack('Error al actualizar imagen de perfil', error: true);
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
     }
   }
 
@@ -291,6 +566,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         var profileJson = json.decode(response.body);
         var updatedProfile = ProfileData.fromJson(profileJson);
 
+        if (!mounted) return;
         setState(() {
           if (widget.profileData != null) {
             widget.profileData!.profileImage = updatedProfile.profileImage;
@@ -298,11 +574,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     } catch (e) {
-      print('Error al recargar perfil desde servidor: $e');
+      debugPrint('Error al recargar perfil desde servidor: $e');
     }
   }
 
   Future<void> _pickImage() async {
+    if (_isUploadingPhoto) return;
+
     try {
       final ImageSource? source = await _showImageSourceDialog();
       if (source == null) return;
@@ -319,16 +597,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (!fileName.endsWith('.jpg') &&
             !fileName.endsWith('.jpeg') &&
             !fileName.endsWith('.png')) {
+          _showSnack('Solo se permiten imágenes JPG o PNG', error: true);
           return;
         }
 
         if (kIsWeb) {
           final bytes = await image.readAsBytes();
+          if (!mounted) return;
           setState(() {
             _selectedImageBytes = bytes;
             _selectedImage = null;
           });
         } else {
+          if (!mounted) return;
           setState(() {
             _selectedImage = File(image.path);
             _selectedImageBytes = null;
@@ -342,34 +623,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         await _uploadProfileImage();
       }
     } catch (e) {
-      print('Error al seleccionar imagen: $e');
+      debugPrint('Error al seleccionar imagen: $e');
+      _showSnack('No se pudo seleccionar la imagen', error: true);
     }
-  }
-
-  Future<ImageSource?> _showImageSourceDialog() async {
-    return showDialog<ImageSource>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Seleccionar imagen'),
-          content: const Text('¿De dónde quieres obtener la imagen?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(ImageSource.camera),
-              child: const Text('Cámara'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(ImageSource.gallery),
-              child: const Text('Galería'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   ImageProvider? _getImageProvider() {
@@ -390,72 +646,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return null;
   }
 
-  // ========== DIÁLOGO DE LOGOUT ==========
-
-  Future<bool?> _showLogoutDialog() async {
-    return showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Cerrar sesión'),
-          content: Text('¿Deseas cerrar sesión en todos tus dispositivos?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Solo este dispositivo'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text('Todos los dispositivos'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   // ========== BUILD PRINCIPAL ==========
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+    final hPad = isTablet ? _FnlSpace.lg : _FnlSpace.md;
 
     return Scaffold(
+      backgroundColor: _FnlColors.canvas,
       body: Stack(
         children: [
-          // Mismo lenguaje visual del login, bienvenida y "Mi Plan Diario":
-          // degradado de marca con formas suaves de profundidad.
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  FuncyColors.primaryDark,
-                  FuncyColors.primary,
-                  FuncyColors.primaryLight,
-                ],
-                stops: [0.0, 0.4, 1.0],
-              ),
-            ),
-          ),
-          Positioned(
-            top: -90,
+          // Círculos decorativos
+          const Positioned(
+            top: -70,
             right: -70,
-            child: _decorativeCircle(220, Colors.white.withOpacity(0.06)),
+            child: IgnorePointer(child: _DecorCircle(size: 220)),
           ),
-          Positioned(
-            top: 220,
-            left: -80,
-            child: _decorativeCircle(170, Colors.white.withOpacity(0.05)),
+          const Positioned(
+            bottom: -90,
+            left: -90,
+            child: IgnorePointer(child: _DecorCircle(size: 240)),
           ),
-
           SafeArea(
             child: SingleChildScrollView(
+              // El espacio inferior deja libre la barra de navegación
               padding: const EdgeInsets.only(bottom: 110),
               child: Center(
                 child: ConstrainedBox(
@@ -463,13 +679,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     maxWidth: _maxContentWidth,
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20.0, vertical: 20.0),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: hPad, vertical: _FnlSpace.md),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _buildHeader(size),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: _FnlSpace.md),
                         _buildProfileCard(size),
+                        const SizedBox(height: _FnlSpace.sm),
+                        _buildInfoCard(),
+                        const SizedBox(height: _FnlSpace.md),
+                        ..._buildActions(size),
                       ],
                     ),
                   ),
@@ -482,160 +703,148 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _decorativeCircle(double diameter, Color color) {
-    return Container(
-      width: diameter,
-      height: diameter,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-    );
-  }
-
-  // Header con el mismo estilo "kicker + título" de PlanScreen, más la
-  // mascota Funcy dando la bienvenida al usuario en su perfil.
   Widget _buildHeader(Size size) {
-    final mascotSize = size.width < 400 ? 64.0 : 80.0;
+    final titleFontSize = size.width < 400 ? 28.0 : 34.0;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'FUNCY · TU PERFIL',
-                style: GoogleFonts.inter(
-                  color: Colors.white.withOpacity(0.72),
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Mi Perfil',
-                style: GoogleFonts.inter(
-                  color: Colors.white,
-                  fontSize: size.width < 400 ? 26.0 : 30.0,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
+        Text(
+          'FUNCY · DETALLES',
+          style: _FnlText.label(
+            size: 12,
+            color: _FnlColors.violet,
+            letterSpacing: 1.3,
           ),
         ),
-        const SizedBox(width: 12),
-        Image.asset(
-          'assets/images/happy_mascot.png',
-          height: mascotSize,
-          width: mascotSize,
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) =>
-              const SizedBox.shrink(),
-        ),
+        const SizedBox(height: 6),
+        Text('Mi Perfil', style: _FnlText.h1(titleFontSize)),
       ],
     );
   }
 
-  // Tarjeta blanca flotante (mismo criterio que la tarjeta de progreso en
-  // PlanScreen), con el avatar superpuesto sobre el borde superior.
   Widget _buildProfileCard(Size size) {
-    final avatarSize = size.width < 400
-        ? 125.0
-        : size.width < 600
-            ? 140.0
-            : 160.0;
-
-    return Stack(
-      clipBehavior: Clip.none,
-      alignment: Alignment.topCenter,
-      children: [
-        Container(
-          width: double.infinity,
-          margin: EdgeInsets.only(top: avatarSize / 2),
-          padding: EdgeInsets.fromLTRB(20, avatarSize / 2 + 16, 20, 24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: FuncyColors.primaryDark.withOpacity(0.22),
-                blurRadius: 24,
-                offset: const Offset(0, 12),
-              ),
-            ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+          horizontal: _FnlSpace.md, vertical: _FnlSpace.md),
+      decoration: BoxDecoration(
+        color: _FnlColors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: _FnlColors.bubbleBorder,
+            offset: Offset(0, 4),
+            blurRadius: 0,
           ),
-          child: Column(
-            children: [
-              _buildUserName(size),
-              SizedBox(height: size.height * 0.015),
-              _buildSubscriptionBadge(size),
-              SizedBox(height: size.height * 0.02),
-              _buildInfoSection(),
-              SizedBox(height: size.height * 0.02),
-              _buildSubscriptionButton(size),
-              SizedBox(height: size.height * 0.015),
-              _buildLogoutButton(size),
-              SizedBox(height: size.height * 0.015),
-              // Botón de certificado (visible solo si completó el programa)
-              _buildCertificateButton(size),
-            ],
-          ),
-        ),
-        _buildProfileImage(size),
-      ],
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildProfileImage(size),
+          const SizedBox(height: _FnlSpace.sm),
+          _buildUserName(size),
+          _buildSubscriptionBadge(size),
+        ],
+      ),
     );
   }
-
-  // ========== WIDGETS DE UI ==========
 
   Widget _buildProfileImage(Size size) {
     final imageSize = size.width < 400
-        ? 125.0
+        ? 112.0
         : size.width < 600
-            ? 140.0
-            : 160.0;
+            ? 128.0
+            : 144.0;
+    final provider = _getImageProvider();
 
-    return GestureDetector(
-      onTap: _pickImage,
-      child: Container(
-        width: imageSize,
-        height: imageSize,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: const LinearGradient(
-            colors: [Color(0xFF52178F), Color(0xFFA88BC7)],
-            begin: Alignment(1.00, 1.00),
-            end: Alignment(1.00, 0.50),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF8A67C8).withOpacity(0.3),
-              blurRadius: size.width < 600 ? 15 : 25,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Container(
-          margin: const EdgeInsets.all(6),
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-          ),
-          child: CircleAvatar(
-            radius: (imageSize - 12) / 2,
-            backgroundColor: Colors.transparent,
-            backgroundImage: _getImageProvider(),
-            child: _getImageProvider() == null
-                ? Icon(
-                    Icons.person,
-                    size: size.width < 400
-                        ? 40
-                        : size.width < 600
-                            ? 50
-                            : 60,
-                    color: const Color(0xFF4320AD),
-                  )
-                : null,
+    return Semantics(
+      button: true,
+      label: 'Cambiar foto de perfil',
+      child: GestureDetector(
+        onTap: _isUploadingPhoto ? null : _pickImage,
+        child: SizedBox(
+          width: imageSize + 12,
+          height: imageSize + 12,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Halo
+              Container(
+                width: imageSize * 0.85,
+                height: imageSize * 0.85,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: _FnlColors.violetSecondary.withOpacity(0.25),
+                      blurRadius: 40,
+                      spreadRadius: 8,
+                    ),
+                  ],
+                ),
+              ),
+              // Foto
+              Container(
+                width: imageSize,
+                height: imageSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _FnlColors.lavender,
+                  border: Border.all(color: _FnlColors.violet, width: 3),
+                  image: provider != null
+                      ? DecorationImage(image: provider, fit: BoxFit.cover)
+                      : null,
+                ),
+                child: provider == null
+                    ? Icon(
+                        Icons.person_rounded,
+                        size: imageSize * 0.45,
+                        color: _FnlColors.violet,
+                      )
+                    : null,
+              ),
+              // Overlay mientras sube
+              if (_isUploadingPhoto)
+                Container(
+                  width: imageSize,
+                  height: imageSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _FnlColors.white.withOpacity(0.7),
+                  ),
+                  child: const Center(
+                    child: SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: _FnlColors.violet,
+                      ),
+                    ),
+                  ),
+                ),
+              // Insignia de cámara
+              Positioned(
+                right: 0,
+                bottom: 4,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: _FnlColors.violet,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _FnlColors.white, width: 3),
+                  ),
+                  child: const Icon(
+                    Icons.photo_camera_rounded,
+                    size: 18,
+                    color: _FnlColors.white,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -643,19 +852,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildUserName(Size size) {
+    final fontSize = size.width < 400
+        ? 20.0
+        : size.width < 600
+            ? 22.0
+            : 24.0;
+
     return Text(
       widget.profileData?.fullName ??
           "${widget.profileData?.nombres ?? 'Usuario'} ${widget.profileData?.apellidos ?? ''}",
       textAlign: TextAlign.center,
-      style: GoogleFonts.inter(
-        color: const Color(0xFF212121),
-        fontSize: size.width < 400
-            ? 20.0
-            : size.width < 600
-                ? 24.0
-                : 28.0,
-        fontWeight: FontWeight.w600,
-      ),
+      style: _FnlText.h2(fontSize),
     );
   }
 
@@ -665,420 +872,285 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // Si NO es company_id 8, no mostrar el badge
     if (companyId != 8) {
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
 
     if (_loadingSubscription) {
-      return SizedBox(
-        height: 30,
-        width: 30,
-        child: CircularProgressIndicator(strokeWidth: 2),
+      return const Padding(
+        padding: EdgeInsets.only(top: _FnlSpace.xs),
+        child: SizedBox(
+          height: 28,
+          width: 28,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: _FnlColors.violet,
+          ),
+        ),
       );
     }
 
     final isPro = _subscriptionData?.isPro ?? false;
 
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: size.width < 400 ? 12 : 16,
-        vertical: size.width < 400 ? 6 : 8,
-      ),
-      decoration: BoxDecoration(
-        gradient: isPro
-            ? LinearGradient(
-                colors: [Color(0xFF52178F), Color(0xFFA88BC7)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
-            : null,
-        color: isPro ? null : Colors.grey.shade300,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: isPro
-            ? [
-                BoxShadow(
-                  color: Color(0xFF8A67C8).withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
-                ),
-              ]
-            : null,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isPro ? Icons.workspace_premium : Icons.account_circle,
-            color: Colors.white,
-            size: size.width < 400 ? 16 : 18,
+    return Padding(
+      padding: const EdgeInsets.only(top: _FnlSpace.xs),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isPro ? _FnlColors.violet : _FnlColors.lavender,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: isPro ? _FnlColors.violet : _FnlColors.bubbleBorder,
+            width: 2,
           ),
-          SizedBox(width: 6),
-          Text(
-            isPro ? 'Funcy PRO' : 'Plan FREE',
-            style: GoogleFonts.inter(
-              color: Colors.white,
-              fontSize: size.width < 400 ? 13 : 15,
-              fontWeight: FontWeight.w600,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isPro
+                  ? Icons.workspace_premium_rounded
+                  : Icons.account_circle_rounded,
+              color: isPro ? _FnlColors.white : _FnlColors.violet,
+              size: 18,
             ),
-          ),
-        ],
+            const SizedBox(width: 6),
+            Text(
+              isPro ? 'Funcy PRO' : 'Plan FREE',
+              style: _FnlText.label(
+                color: isPro ? _FnlColors.white : _FnlColors.violet,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // Sección de información: chips de color individuales en vez de una
-  // grilla rígida de columnas. El número de columnas se decide con
-  // LayoutBuilder, a partir del ANCHO DISPONIBLE real en ese punto del
-  // árbol (nunca del ancho de pantalla), así que no importa cuánto se
-  // estire la ventana: cada chip siempre tiene espacio suficiente y el
-  // texto nunca queda comprimido letra por letra.
-  Widget _buildInfoSection() {
+  // Tarjeta de información con filas icono + etiqueta + valor
+  Widget _buildInfoCard() {
     final items = <_InfoItem>[
       _InfoItem(
-        icon: Icons.email_outlined,
-        title: 'ID',
+        icon: Icons.alternate_email_rounded,
+        title: 'Nombre de Usuario',
         value: widget.profileData?.username ?? 'No disponible',
-        color: const Color(0xFF6D4BD8), // morado de marca
       ),
       _InfoItem(
-        icon: Icons.female,
+        icon: Icons.wc_rounded,
         title: 'Género',
         value: widget.profileData?.gender ?? 'No disponible',
-        color: const Color(0xFF2FB8A6), // teal
       ),
       _InfoItem(
-        icon: Icons.person_outline,
+        icon: Icons.badge_outlined,
         title: 'Puesto',
         value: widget.profileData?.hierarchicalLevel ?? 'No disponible',
-        color: const Color(0xFFEF7D57), // coral
       ),
       _InfoItem(
-        icon: Icons.business_outlined,
+        icon: Icons.business_rounded,
         title: 'Centro',
         value: widget.profileData?.nombreEmpresa ?? 'No disponible',
-        color: const Color(0xFFF2B134), // ámbar
       ),
     ];
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(_FnlSpace.md),
       decoration: BoxDecoration(
-        color: const Color(0xFFF6F3FC),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: FuncyColors.primary.withOpacity(0.10)),
+        color: _FnlColors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _FnlColors.border, width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: _FnlColors.border,
+            offset: Offset(0, 4),
+            blurRadius: 0,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.badge_outlined, color: FuncyColors.primary, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Información',
-                style: GoogleFonts.inter(
-                  color: const Color(0xFF212121),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
+          Text(
+            'INFORMACIÓN',
+            style: _FnlText.label(size: 13, letterSpacing: 1.0),
+          ),
+          const SizedBox(height: _FnlSpace.sm),
+          for (int i = 0; i < items.length; i++) ...[
+            _buildInfoRow(items[i]),
+            if (i != items.length - 1)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Divider(
+                  height: 2,
+                  thickness: 2,
+                  color: _FnlColors.lavender,
                 ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(_InfoItem item) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: const BoxDecoration(
+            color: _FnlColors.lavender,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(item.icon, color: _FnlColors.violet, size: 22),
+        ),
+        const SizedBox(width: _FnlSpace.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                item.title.toUpperCase(),
+                style: _FnlText.label(
+                  size: 12,
+                  color: _FnlColors.body,
+                  letterSpacing: 0.6,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                item.value,
+                style: _FnlText.body(
+                  color: _FnlColors.blue,
+                  weight: FontWeight.w500,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              const spacing = 12.0;
-              // 1 columna si el espacio real es angosto, 2 si alcanza.
-              // Umbral bajo (380) a propósito: dos chips de ~180px cada
-              // uno leen bien, y por debajo de eso una sola columna evita
-              // cualquier compresión de texto.
-              final columns = constraints.maxWidth < 380 ? 1 : 2;
-              final itemWidth = columns == 1
-                  ? constraints.maxWidth
-                  : (constraints.maxWidth - spacing) / 2;
-
-              return Wrap(
-                spacing: spacing,
-                runSpacing: spacing,
-                children: items
-                    .map((item) => SizedBox(
-                          width: itemWidth,
-                          child: _buildInfoChip(item),
-                        ))
-                    .toList(),
-              );
-            },
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildInfoChip(_InfoItem item) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: item.color.withOpacity(0.18)),
-        boxShadow: [
-          BoxShadow(
-            color: item.color.withOpacity(0.12),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: item.color.withOpacity(0.14),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(item.icon, color: item.color, size: 18),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  item.title.toUpperCase(),
-                  style: GoogleFonts.inter(
-                    color: item.color,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.6,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  item.value,
-                  style: GoogleFonts.inter(
-                    color: const Color(0xFF212121),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+  // Botones de acción
+  List<Widget> _buildActions(Size size) {
+    final actions = <Widget?>[
+      _buildCertificateButton(),
+      _buildSubscriptionButton(),
+      _buildLogoutButton(),
+    ].whereType<Widget>().toList();
+
+    final spaced = <Widget>[];
+    for (int i = 0; i < actions.length; i++) {
+      if (i > 0) spaced.add(const SizedBox(height: _FnlSpace.sm));
+      spaced.add(Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: actions[i],
+        ),
+      ));
+    }
+    return spaced;
   }
 
-  Widget _buildSubscriptionButton(Size size) {
+  Widget? _buildSubscriptionButton() {
     // Verificar si el usuario es de company_id 8
     int? companyId = widget.profileData?.idEmpresa;
 
     // Si NO es company_id 8, no mostrar el botón
     if (companyId != 8) {
-      return SizedBox.shrink();
+      return null;
     }
 
     if (_loadingSubscription) {
-      return SizedBox(
-        height: 50,
-        child: Center(child: CircularProgressIndicator()),
+      return const SizedBox(
+        height: 56,
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: _FnlColors.violet,
+          ),
+        ),
       );
     }
 
     final isPro = _subscriptionData?.isPro ?? false;
-    final buttonPadding = size.width < 400
-        ? 14.0
-        : size.width < 600
-            ? 16.0
-            : 18.0;
-    final fontSize = size.width < 400
-        ? 16.0
-        : size.width < 600
-            ? 16.0
-            : 18.0;
 
-    return Container(
-      width: double.infinity,
-      // Ancho fijo (ya no depende de size.width): al vivir dentro de la
-      // tarjeta blanca, que ya está acotada por _maxContentWidth, un
-      // límite fijo evita que el botón se vea desproporcionado.
-      constraints: const BoxConstraints(maxWidth: 400),
-      child: ElevatedButton.icon(
-        onPressed: isPro
-            ? _cancelSubscription
-            : () async {
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => SubscriptionScreen()),
-                );
-                if (result == true) {
-                  await _loadSubscriptionData();
-                }
-              },
-        icon: Icon(
-          isPro ? Icons.cancel : Icons.workspace_premium,
-          size: size.width < 400 ? 18 : 20,
-        ),
-        label: Text(
-          isPro ? 'Cancelar suscripción' : 'Suscríbete a Funcy PRO',
-          style: GoogleFonts.inter(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isPro ? Colors.red : Color(0xFF4320AD),
-          foregroundColor: Colors.white,
-          padding: EdgeInsets.symmetric(
-            horizontal: size.width < 400 ? 24 : 32,
-            vertical: buttonPadding,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(40),
-          ),
-          elevation: 4,
-        ),
-      ),
+    if (isPro) {
+      // Cancelar suscripción: acción secundaria
+      return _SecondaryButton(
+        label: 'Cancelar suscripción',
+        icon: Icons.cancel_outlined,
+        onTap: _cancelSubscription,
+      );
+    }
+
+    // Suscribirse: CTA primario
+    return _PrimaryButton(
+      label: 'Suscríbete a Funcy PRO',
+      icon: Icons.arrow_forward_rounded,
+      onTap: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => SubscriptionScreen()),
+        );
+        if (result == true) {
+          await _loadSubscriptionData();
+        }
+      },
     );
   }
 
-  Widget _buildLogoutButton(Size size) {
-    final buttonPadding = size.width < 400
-        ? 14.0
-        : size.width < 600
-            ? 16.0
-            : 18.0;
-    final fontSize = size.width < 400
-        ? 16.0
-        : size.width < 600
-            ? 16.0
-            : 18.0;
+  Widget _buildLogoutButton() {
+    return _SecondaryButton(
+      label: 'Cerrar sesión',
+      icon: Icons.logout_rounded,
+      loading: _isLoggingOut,
+      onTap: () async {
+        if (_isLoggingOut) return;
+        final result = await _showLogoutDialog();
+        if (result == null) return;
 
-    // Acento rojo/coral (distinto de la familia morada usada en el resto
-    // de la pantalla): así "Cerrar sesión" se lee de inmediato como una
-    // acción distinta —de salida— y no compite visualmente con los CTAs
-    // principales (suscripción, certificado).
-    const logoutColor = Color(0xFFE0564C);
-
-    return Container(
-      width: double.infinity,
-      constraints: const BoxConstraints(maxWidth: 400),
-      child: OutlinedButton.icon(
-        onPressed: () async {
-          final result = await _showLogoutDialog();
-          if (result != null) {
-            await TokenService.instance.logout(logoutAll: result);
-            widget.onLogout();
-          }
-        },
-        icon: Icon(
-          Icons.logout_rounded,
-          color: logoutColor,
-          size: size.width < 400 ? 18 : 20,
-        ),
-        label: Text(
-          'Cerrar sesión',
-          style: GoogleFonts.inter(
-            color: logoutColor,
-            fontSize: fontSize,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        style: OutlinedButton.styleFrom(
-          backgroundColor: logoutColor.withOpacity(0.06),
-          padding: EdgeInsets.symmetric(
-            horizontal: size.width < 400 ? 24 : 32,
-            vertical: buttonPadding,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(40),
-          ),
-          side: BorderSide(
-            color: logoutColor.withOpacity(0.35),
-            width: 1.5,
-          ),
-        ),
-      ),
+        if (mounted) setState(() => _isLoggingOut = true);
+        try {
+          await TokenService.instance.logout(logoutAll: result);
+          widget.onLogout();
+        } catch (e) {
+          debugPrint('Error al cerrar sesión: $e');
+          _showSnack('No se pudo cerrar la sesión', error: true);
+        } finally {
+          if (mounted) setState(() => _isLoggingOut = false);
+        }
+      },
     );
   }
 
   /// Botón para ver el certificado (disponible después de completar el programa)
-  Widget _buildCertificateButton(Size size) {
-    final buttonPadding = size.width < 400
-        ? 14.0
-        : size.width < 600
-            ? 16.0
-            : 18.0;
-    final fontSize = size.width < 400
-        ? 14.0
-        : size.width < 600
-            ? 15.0
-            : 16.0;
-
+  Widget? _buildCertificateButton() {
     // Si no ha completado el exit test, no mostrar el botón del certificado
     if (!widget.isDay21Completed) {
-      return SizedBox.shrink();
+      return null;
     }
 
-    return Container(
-      width: double.infinity,
-      constraints: const BoxConstraints(maxWidth: 400),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF6D4BD8), Color(0xFF5027D0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(40),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0xFF6D4BD8).withOpacity(0.3),
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ElevatedButton.icon(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CertificateScreen(
-                username: widget.profileData?.fullName ?? 'Usuario',
-                completionDate:
-                    '${DateTime.now().day} de ${_getMonthName(DateTime.now().month)} de ${DateTime.now().year}',
-                programName: 'Programa de Manejo de Estrés Laboral - 21 Días',
-              ),
+    return _PrimaryButton(
+      label: 'Ver Mi Certificado',
+      icon: Icons.arrow_forward_rounded,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CertificateScreen(
+              username: widget.profileData?.fullName ?? 'Usuario',
+              completionDate:
+                  '${DateTime.now().day} de ${_getMonthName(DateTime.now().month)} de ${DateTime.now().year}',
+              programName: 'Programa de Manejo de Estrés Laboral - 21 Días',
             ),
-          );
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          foregroundColor: Colors.white,
-          shadowColor: Colors.transparent,
-          padding: EdgeInsets.symmetric(
-            horizontal: size.width < 400 ? 24 : 32,
-            vertical: buttonPadding,
           ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(40),
-          ),
-        ),
-        icon: const Icon(Icons.workspace_premium, size: 22),
-        label: Text(
-          'Ver Mi Certificado',
-          style: GoogleFonts.inter(
-            color: Colors.white,
-            fontSize: fontSize,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1101,17 +1173,193 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-// Pequeño contenedor de datos para cada chip de información del perfil.
+// Pequeño contenedor de datos para cada fila de información del perfil.
 class _InfoItem {
   final IconData icon;
   final String title;
   final String value;
-  final Color color;
 
   _InfoItem({
     required this.icon,
     required this.title,
     required this.value,
-    required this.color,
   });
+}
+
+class _DecorCircle extends StatelessWidget {
+  final double size;
+  const _DecorCircle({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: _FnlColors.lavenderDeep,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+class _PrimaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final bool enabled;
+  final bool loading;
+
+  const _PrimaryButton({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.enabled = true,
+    this.loading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(18);
+    final Color fg = enabled ? _FnlColors.white : _FnlColors.disabledText;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      height: 56,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        color: (enabled || loading) ? _FnlColors.violet : _FnlColors.border,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: enabled && !loading ? onTap : null,
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(_FnlColors.white),
+                    ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          label,
+                          overflow: TextOverflow.ellipsis,
+                          style: _FnlText.button(color: fg),
+                        ),
+                      ),
+                      if (icon != null) ...[
+                        const SizedBox(width: 8),
+                        Icon(icon, size: 20, color: fg),
+                      ],
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SecondaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final bool loading;
+
+  const _SecondaryButton({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.loading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(18);
+
+    return Container(
+      height: 48,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: _FnlColors.lavender,
+        borderRadius: radius,
+        border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: loading ? null : onTap,
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: _FnlColors.violet,
+                    ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (icon != null) ...[
+                        Icon(icon, size: 20, color: _FnlColors.violet),
+                        const SizedBox(width: 8),
+                      ],
+                      Flexible(
+                        child: Text(
+                          label,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.manrope(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: _FnlColors.violet,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TextAction extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _TextAction({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        minimumSize: const Size.fromHeight(44),
+        foregroundColor: _FnlColors.violet,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.manrope(
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+          color: _FnlColors.violet,
+        ),
+      ),
+    );
+  }
 }

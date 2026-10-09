@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart' show GoogleFonts;
 import 'package:fnlapp/Main/prevtestestres.dart';
 import 'package:fnlapp/Politicas%20y%20Terminos/condiciones_uso.dart';
 import 'package:fnlapp/Politicas%20y%20Terminos/politica_privacidad.dart';
@@ -10,6 +11,80 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fnlapp/config.dart';
 import '../Main/widgets/index_summary.dart';
 import '../Util/api_service.dart';
+
+class _FnlColors {
+  static const blue = Color(0xFF0B1457);
+  static const violet = Color(0xFF6428E8);
+  static const violetSecondary = Color(0xFF814CF4);
+  static const gradientStart = Color(0xFF5425E8);
+  static const lavender = Color(0xFFF4F1FF);
+  static const lavenderDeep = Color(0xFFEAE4FC);
+  static const canvas = Color(0xFFFCFBFF);
+  static const body = Color(0xFF70779C);
+  static const label = Color(0xFF5F668B);
+  static const border = Color(0xFFD9DCEF);
+  static const bubbleBorder = Color(0xFFDCD3FA);
+  static const disabledText = Color(0xFF9AA0C0);
+  static const white = Color(0xFFFFFFFF);
+}
+
+class _FnlSpace {
+  static const double xs = 8;
+  static const double sm = 16;
+  static const double md = 24;
+  static const double lg = 32;
+}
+
+class _FnlText {
+  static TextStyle h2(double size) => GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        color: _FnlColors.blue,
+        height: 1.25,
+      );
+
+  static TextStyle body({Color color = _FnlColors.body}) => GoogleFonts.roboto(
+        fontSize: 16,
+        fontWeight: FontWeight.w400,
+        color: color,
+        height: 1.5,
+      );
+
+  static TextStyle consent() => GoogleFonts.roboto(
+        fontSize: 15,
+        fontWeight: FontWeight.w400,
+        color: _FnlColors.blue,
+        height: 1.5,
+      );
+
+  static TextStyle link() => GoogleFonts.manrope(
+        fontSize: 15,
+        fontWeight: FontWeight.w800,
+        color: _FnlColors.violet,
+        height: 1.5,
+      );
+
+  static TextStyle label({Color color = _FnlColors.label}) =>
+      GoogleFonts.manrope(
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        color: color,
+      );
+
+  static TextStyle option({required bool selected}) => GoogleFonts.manrope(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        color: selected ? _FnlColors.violet : _FnlColors.blue,
+        height: 1.35,
+      );
+
+  static TextStyle button({Color color = _FnlColors.white}) =>
+      GoogleFonts.manrope(
+        fontSize: 17,
+        fontWeight: FontWeight.w700,
+        color: color,
+      );
+}
 
 class IndexScreen extends StatefulWidget {
   final String username;
@@ -22,6 +97,30 @@ class IndexScreen extends StatefulWidget {
 }
 
 class _IndexScreenState extends State<IndexScreen> {
+  // Mascota Funcy (imágenes remotas)
+  static const String _thinkingUrl =
+      'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/thinking.png';
+  static const String _happyUrl =
+      'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/happy.png';
+
+  static const int _totalQuestions = 6;
+  static const List<String> _categoryKeys = [
+    'age_range',
+    'gender',
+    'area',
+    'level',
+    'responsability_level',
+    'sede',
+  ];
+  static const List<String> _questionTexts = [
+    '¿Cuál es tu rango de edad?',
+    '¿Cuál es tu género?',
+    '¿Cuál es tu Área?',
+    '¿Cuál es tu posición en la organización?',
+    '¿Cuál es tu nivel de responsabilidad en tu organización?',
+    '¿A que sede perteneces?',
+  ];
+
   Map<String, List<Map<String, dynamic>>> questionCategories = {
     'age_range': [],
     'level': [],
@@ -42,6 +141,11 @@ class _IndexScreenState extends State<IndexScreen> {
   int? selectedAreaId;
   int? userId;
   String? selectedOption;
+  bool _imagesPrecached = false;
+
+  // Recognizers de los enlaces legales (se crean una vez y se liberan en dispose)
+  late final TapGestureRecognizer _privacyTap;
+  late final TapGestureRecognizer _termsTap;
 
   String _getOptionText(Map<String, dynamic> question) {
     return question['age_range']?.toString() ??
@@ -56,24 +160,47 @@ class _IndexScreenState extends State<IndexScreen> {
   @override
   void initState() {
     super.initState();
+    _privacyTap = TapGestureRecognizer()
+      ..onTap = () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => PoliticaPrivacidadScreen()),
+        );
+      };
+    _termsTap = TapGestureRecognizer()
+      ..onTap = () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => CondicionesUsoScreen()),
+        );
+      };
+
     _loadUserData();
     _loadUserProgress();
     fetchData();
-    _precacheImages();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // precacheImage necesita el context ya enlazado: no puede ir en initState
+    if (!_imagesPrecached) {
+      _imagesPrecached = true;
+      _precacheImages();
+    }
+  }
+
+  @override
+  void dispose() {
+    _privacyTap.dispose();
+    _termsTap.dispose();
+    super.dispose();
   }
 
   Future<void> _precacheImages() async {
     await Future.wait([
-      precacheImage(
-        NetworkImage(
-            'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/thinking.png'),
-        context,
-      ),
-      precacheImage(
-        NetworkImage(
-            'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/happy.png'),
-        context,
-      ),
+      precacheImage(const NetworkImage(_thinkingUrl), context),
+      precacheImage(const NetworkImage(_happyUrl), context),
     ]);
   }
 
@@ -106,12 +233,10 @@ class _IndexScreenState extends State<IndexScreen> {
     String? username = await getUsername();
     userId = await getUserId();
     String? email = await getEmail();
-    String? token = await getToken();
 
     print('Username: $username');
     print('User ID: $userId');
     print('Email: $email');
-    print('Token: $token');
   }
 
   Future<void> _updatePermisoPoliticas() async {
@@ -138,11 +263,14 @@ class _IndexScreenState extends State<IndexScreen> {
         body: jsonEncode({'iduser': userId}),
       );
 
+      if (!mounted) return;
+
       if (response.statusCode == 200) {
         print('Campo permisopoliticas actualizado correctamente.');
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setBool('permisopoliticas', true);
 
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Permisos aceptados y actualizados.')),
         );
@@ -154,6 +282,7 @@ class _IndexScreenState extends State<IndexScreen> {
       }
     } catch (e) {
       print('Error: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al conectar con el servidor.')),
       );
@@ -301,12 +430,14 @@ class _IndexScreenState extends State<IndexScreen> {
         }
       }
 
+      if (!mounted) return;
       setState(() {
         loading = false;
       });
 
       print('Las preguntas se cargaron correctamente.');
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         loading = false;
       });
@@ -339,6 +470,12 @@ class _IndexScreenState extends State<IndexScreen> {
     }
   }
 
+  int? _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value == null) return null;
+    return int.tryParse(value.toString());
+  }
+
   Future<void> saveResponses() async {
     print('Selected Answers: $selectedAnswers');
 
@@ -350,22 +487,12 @@ class _IndexScreenState extends State<IndexScreen> {
 
     String? token = await getToken();
 
-    // Convertir todos los valores a int (pueden ser String desde la UI)
-    int? ageRangeId = selectedAnswers[0] is String
-        ? int.tryParse(selectedAnswers[0])
-        : selectedAnswers[0];
-    int? genderId = selectedAnswers[1] is String
-        ? int.tryParse(selectedAnswers[1])
-        : selectedAnswers[1];
-    int? hierarchicalLevelId = selectedAnswers[3] is String
-        ? int.tryParse(selectedAnswers[3])
-        : selectedAnswers[3];
-    int? responsabilityLevelId = selectedAnswers[4] is String
-        ? int.tryParse(selectedAnswers[4])
-        : selectedAnswers[4];
-    int? branchId = selectedAnswers[5] is String
-        ? int.tryParse(selectedAnswers[5])
-        : selectedAnswers[5];
+    // Los valores pueden venir como String desde la UI
+    final int? ageRangeId = _asInt(selectedAnswers[0]);
+    final int? genderId = _asInt(selectedAnswers[1]);
+    final int? hierarchicalLevelId = _asInt(selectedAnswers[3]);
+    final int? responsabilityLevelId = _asInt(selectedAnswers[4]);
+    final int? branchId = _asInt(selectedAnswers[5]);
 
     final Map<String, dynamic> dataToSend = {
       "userId": userId,
@@ -398,6 +525,7 @@ class _IndexScreenState extends State<IndexScreen> {
           print('branch_id guardado en SharedPreferences: $branchId');
         }
 
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Respuestas guardadas exitosamente.')),
         );
@@ -409,763 +537,366 @@ class _IndexScreenState extends State<IndexScreen> {
           ),
         );
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al guardar respuestas.')),
         );
       }
     } catch (e) {
       print('Error al enviar respuestas: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al enviar respuestas.')),
       );
     }
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // UI
+  // ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F6),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : agreedToTerms
-              ? _buildQuestionsScreen()
-              : _buildWelcomeScreen(),
+      backgroundColor: _FnlColors.canvas,
+      body: _FnlBackground(
+        child: loading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: _FnlColors.violet,
+                ),
+              )
+            : agreedToTerms
+                ? _buildQuestionsScreen()
+                : _buildWelcomeScreen(),
+      ),
     );
   }
 
+  // ── Pantalla de privacidad ───────────────────────────────────
   Widget _buildWelcomeScreen() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final screenHeight = MediaQuery.of(context).size.height;
-        final screenWidth = constraints.maxWidth;
+    return SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isTablet = constraints.maxWidth >= 600;
+          final isSmallHeight = constraints.maxHeight < 700;
+          final hPad = isTablet ? _FnlSpace.lg : _FnlSpace.md;
+          final maxContentWidth = isTablet ? 720.0 : double.infinity;
+          final mascotSize = isTablet
+              ? 170.0
+              : isSmallHeight
+                  ? 96.0
+                  : 130.0;
 
-        // Detectar tipo de dispositivo
-        final isTablet = screenWidth >= 600;
-        final isLargeTablet = screenWidth >= 800;
-        final isSmallHeight = screenHeight < 700;
-
-        // Adaptación responsiva de tamaños
-        final titleFontSize = isLargeTablet
-            ? 32.0
-            : isTablet
-                ? 28.0
-                : isSmallHeight
-                    ? 20.0
-                    : 24.0;
-        final textFontSize = isLargeTablet
-            ? 20.0
-            : isTablet
-                ? 18.0
-                : isSmallHeight
-                    ? 16.0
-                    : 18.0;
-        final buttonWidth = isLargeTablet
-            ? 250.0
-            : isTablet
-                ? 220.0
-                : isSmallHeight
-                    ? 280.0
-                    : 310.0;
-        final imageSize = isLargeTablet
-            ? 220.0
-            : isTablet
-                ? 200.0
-                : isSmallHeight
-                    ? 120.0
-                    : 150.0;
-        final contentPadding = isTablet ? 40.0 : 20.0;
-        final maxContentWidth = isLargeTablet
-            ? 900.0
-            : isTablet
-                ? 700.0
-                : double.infinity;
-
-        return Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: maxContentWidth,
-              maxHeight: screenHeight,
-            ),
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                    contentPadding, contentPadding, contentPadding, 12.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Título
-                    Text(
-                      'Tu privacidad nos importa',
-                      style: TextStyle(
-                        fontSize: titleFontSize,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF281368),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(
-                        height: isSmallHeight
-                            ? 15.0
-                            : isTablet
-                                ? 30.0
-                                : 20.0),
-
-                    // Checkboxes
-                    _buildCheckboxRow(
-                      isChecked: acceptedProcessing,
-                      textSpans: [
-                        TextSpan(
-                          text: 'Acepto la ',
-                          style: TextStyle(
-                              fontSize: textFontSize, color: Colors.black),
-                        ),
-                        TextSpan(
-                          text: 'Política de privacidad',
-                          style: TextStyle(
-                            fontSize: textFontSize,
-                            color: Color(0xFF5027D0),
-                            fontWeight: FontWeight.bold,
-                          ),
-                          recognizer: TapGestureRecognizer()
-                            ..onTap = () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => PoliticaPrivacidadScreen()),
-                              );
-                            },
-                        ),
-                        TextSpan(
-                            text: ' y las ',
-                            style: TextStyle(
-                                fontSize: textFontSize, color: Colors.black)),
-                        TextSpan(
-                          text: 'Condiciones de uso',
-                          style: TextStyle(
-                            fontSize: textFontSize,
-                            color: Color(0xFF5027D0),
-                            fontWeight: FontWeight.bold,
-                          ),
-                          recognizer: TapGestureRecognizer()
-                            ..onTap = () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => CondicionesUsoScreen()),
-                              );
-                            },
-                        ),
-                      ],
-                      onChanged: () {
-                        setState(() {
-                          acceptedProcessing = !acceptedProcessing;
-                          _updateAgreedToAll();
-                        });
-                      },
-                      fontSize: textFontSize,
-                    ),
-                    SizedBox(height: isTablet ? 20.0 : 12.0),
-
-                    _buildCheckboxRow(
-                      isChecked: acceptedProcessing1,
-                      textSpans: [
-                        TextSpan(
-                          text:
-                              'Acepto el procesamiento de mis datos personales de salud con el fin de facilitar las funciones de la aplicación. Ver más en la ',
-                          style: TextStyle(
-                              fontSize: textFontSize, color: Colors.black),
-                        ),
-                        TextSpan(
-                          text: 'Política de privacidad',
-                          style: TextStyle(
-                            fontSize: textFontSize,
-                            color: Color(0xFF5027D0),
-                            fontWeight: FontWeight.bold,
-                          ),
-                          recognizer: TapGestureRecognizer()
-                            ..onTap = () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => PoliticaPrivacidadScreen()),
-                              );
-                            },
-                        ),
-                      ],
-                      onChanged: () {
-                        setState(() {
-                          acceptedProcessing1 = !acceptedProcessing1;
-                          _updateAgreedToAll();
-                        });
-                      },
-                      fontSize: textFontSize,
-                    ),
-                    SizedBox(height: isTablet ? 20.0 : 12.0),
-
-                    _buildCheckboxRow(
-                      isChecked: acceptedTracking,
-                      textSpans: [
-                        TextSpan(
-                          text:
-                              'Autorizo a la empresa a recopilar y utilizar información sobre mi actividad en aplicaciones y sitios web relacionados, así como datos necesarios para evaluar mi nivel de estrés y bienestar laboral, conforme a lo establecido en la ',
-                          style: TextStyle(
-                              fontSize: textFontSize, color: Colors.black),
-                        ),
-                        TextSpan(
-                          text: 'Política de privacidad',
-                          style: TextStyle(
-                            fontSize: textFontSize,
-                            color: Color(0xFF5027D0),
-                            fontWeight: FontWeight.bold,
-                          ),
-                          recognizer: TapGestureRecognizer()
-                            ..onTap = () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => PoliticaPrivacidadScreen()),
-                              );
-                            },
-                        ),
-                      ],
-                      onChanged: () {
-                        setState(() {
-                          acceptedTracking = !acceptedTracking;
-                          _updateAgreedToAll();
-                        });
-                      },
-                      fontSize: textFontSize,
-                    ),
-
-                    SizedBox(
-                        height: isSmallHeight
-                            ? 15.0
-                            : isTablet
-                                ? 30.0
-                                : 20.0),
-
-                    // Imagen
-                    Image.network(
-                      'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/thinking.png',
-                      width: imageSize,
-                      height: imageSize + 30,
-                      fit: BoxFit.contain,
-                    ),
-                    SizedBox(
-                        height: isSmallHeight
-                            ? 15.0
-                            : isTablet
-                                ? 30.0
-                                : 20.0),
-
-                    // Botón Aceptar todo
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          acceptedProcessing = true;
-                          acceptedProcessing1 = true;
-                          acceptedTracking = true;
-                          _updateAgreedToAll();
-                        });
-                      },
-                      child: Container(
-                        width: isTablet ? 200.0 : 165.0,
-                        padding: EdgeInsets.symmetric(
-                            horizontal: isTablet ? 40 : 32,
-                            vertical: isTablet ? 12 : 8),
-                        decoration: ShapeDecoration(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Center(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              'Aceptar todo',
-                              style: TextStyle(
-                                color: Color(0xFF6D4BD8),
-                                fontSize: isTablet ? 20 : 18,
-                                fontFamily: 'Inter',
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    SizedBox(height: isTablet ? 20.0 : 10.0),
-
-                    // Botón Continuar
-                    GestureDetector(
-                      onTap: agreedToAll
-                          ? () {
-                              _handleAcceptAll();
-                              setState(() {
-                                agreedToTerms = true;
-                                currentQuestionIndex = 0;
-                              });
-                            }
-                          : null,
-                      child: Container(
-                        width: buttonWidth,
-                        padding: EdgeInsets.symmetric(
-                            horizontal: isTablet ? 40 : 32,
-                            vertical: isTablet ? 16 : 12),
-                        clipBehavior: Clip.antiAlias,
-                        decoration: ShapeDecoration(
-                          color: agreedToAll
-                              ? const Color(0xFF5027D0)
-                              : const Color(0xFFD7D7D7),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(40),
-                          ),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Continuar',
-                            style: TextStyle(
-                              color: agreedToAll
-                                  ? Colors.white
-                                  : const Color(0xFF868686),
-                              fontSize: isTablet ? 24 : 22,
-                              fontFamily: 'Inter',
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCheckboxRow({
-    required bool isChecked,
-    required List<TextSpan> textSpans,
-    required VoidCallback onChanged,
-    required double fontSize,
-  }) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isTablet = constraints.maxWidth >= 600;
-        final checkboxSize = isTablet ? 30.0 : 24.0;
-        final spacing = isTablet ? 16.0 : 12.0;
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            GestureDetector(
-              onTap: onChanged,
-              child: Container(
-                width: checkboxSize,
-                height: checkboxSize,
-                decoration: BoxDecoration(
-                  color: isChecked ? Color(0xFF5027D0) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(
-                    width: isTablet ? 2.0 : 1.78,
-                    color: isChecked ? Color(0xFF5027D0) : Colors.black,
-                  ),
-                ),
-                child: isChecked
-                    ? Icon(
-                        Icons.check,
-                        size: isTablet ? 22 : 18,
-                        color: Colors.white,
-                      )
-                    : null,
-              ),
-            ),
-            SizedBox(width: spacing),
-            Flexible(
-              child: RichText(
-                text: TextSpan(children: textSpans),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildQuestionsScreen() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final screenHeight = MediaQuery.of(context).size.height;
-        final screenWidth = constraints.maxWidth;
-
-        // Detectar tipo de dispositivo
-        final isTablet = screenWidth >= 600;
-        final isLargeTablet = screenWidth >= 800;
-        final isSmallDevice = screenHeight < 650 || screenWidth < 350;
-
-        // Adaptación responsiva
-        final contentWidth = isLargeTablet
-            ? 900.0
-            : isTablet
-                ? 700.0
-                : screenWidth;
-        final horizontalPadding = isTablet ? 40.0 : 20.0;
-        final topPadding = isTablet ? 20.0 : 16.0;
-        final titleFontSize = isLargeTablet
-            ? 32.0
-            : isTablet
-                ? 28.0
-                : 24.0;
-        final questionCounterFontSize = isLargeTablet
-            ? 20.0
-            : isTablet
-                ? 18.0
-                : 18.0;
-        final buttonFontSize = isLargeTablet
-            ? 26.0
-            : isTablet
-                ? 24.0
-                : 22.0;
-        final optionFontSize = isLargeTablet
-            ? 26.0
-            : isTablet
-                ? 24.0
-                : isSmallDevice
-                    ? 20.0
-                    : 22.0;
-        final verticalPadding = isSmallDevice
-            ? 12.0
-            : isTablet
-                ? 24.0
-                : 20.0;
-
-        String currentCategoryKey;
-        switch (currentQuestionIndex) {
-          case 0:
-            currentCategoryKey = 'age_range';
-            break;
-          case 1:
-            currentCategoryKey = 'gender';
-            break;
-          case 2:
-            currentCategoryKey = 'area';
-            break;
-          case 3:
-            currentCategoryKey = 'level';
-            break;
-          case 4:
-            currentCategoryKey = 'responsability_level';
-            break;
-          case 5:
-            currentCategoryKey = 'sede';
-            break;
-          default:
-            currentCategoryKey = 'age_range';
-        }
-
-        var currentCategoryQuestions = questionCategories[currentCategoryKey];
-
-        if (currentCategoryQuestions == null ||
-            currentCategoryQuestions.isEmpty) {
-          return Center(
-            child: Text("No se encontraron preguntas para esta categoría."),
-          );
-        }
-
-        String preguntaTexto = '';
-        switch (currentQuestionIndex) {
-          case 0:
-            preguntaTexto = '¿Cuál es tu rango de edad?';
-            break;
-          case 1:
-            preguntaTexto = '¿Cuál es tu género?';
-            break;
-          case 2:
-            preguntaTexto = '¿Cuál es tu Área?';
-            break;
-          case 3:
-            preguntaTexto = '¿Cuál es tu posición en la organización?';
-            break;
-          case 4:
-            preguntaTexto =
-                '¿Cuál es tu nivel de responsabilidad en tu organización?';
-            break;
-          case 5:
-            preguntaTexto = '¿A que sede perteneces?';
-            break;
-        }
-
-        return SafeArea(
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              width: contentWidth,
-              child: Column(
-                children: [
-                  // Header fijo (barra de progreso + pregunta)
-                  Padding(
-                    padding: EdgeInsets.only(
-                      top: topPadding,
-                      left: horizontalPadding,
-                      right: horizontalPadding,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Barra de progreso con icono de retroceder
-                        Row(
-                          children: [
-                            // Icono de retroceder (solo visible si no es la primera pregunta)
-                            if (currentQuestionIndex > 0)
-                              GestureDetector(
-                                onTap: goToPreviousQuestion,
-                                child: Container(
-                                  padding: EdgeInsets.all(isTablet ? 8.0 : 6.0),
-                                  margin: EdgeInsets.only(
-                                      right: isTablet ? 16.0 : 12.0),
-                                  child: Icon(
-                                    Icons.arrow_back_ios,
-                                    color: Colors.black,
-                                    size: isTablet ? 24.0 : 20.0,
-                                  ),
-                                ),
-                              )
-                            else
-                              SizedBox(width: isTablet ? 48.0 : 38.0),
-
-                            // Barra de progreso expandida
-                            Expanded(
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: List.generate(6, (index) {
-                                  return Expanded(
-                                    child: Container(
-                                      margin: EdgeInsets.symmetric(
-                                          horizontal: isTablet ? 6.0 : 4.0),
-                                      height: isTablet ? 8.0 : 6.0,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(
-                                            isTablet ? 4.0 : 3.0),
-                                        color: index <= currentQuestionIndex
-                                            ? const Color(0xFF6D4BD8)
-                                            : const Color(0xFFE0E0E0),
-                                      ),
-                                    ),
-                                  );
-                                }),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        SizedBox(height: isTablet ? 16.0 : 12.0),
-
-                        // Contador de preguntas
-                        Text(
-                          'Pregunta ${currentQuestionIndex + 1} de 6',
-                          style: TextStyle(
-                            color: Color(0xFF212121),
-                            fontSize: questionCounterFontSize,
-                            fontFamily: 'Inter',
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-
-                        SizedBox(height: isTablet ? 8.0 : 4.0),
-
-                        // Pregunta
-                        Text(
-                          preguntaTexto,
-                          style: TextStyle(
-                            color: Color(0xFF5027D0),
-                            fontSize: titleFontSize,
-                            fontFamily: 'Inter',
-                            fontWeight: FontWeight.w600,
-                          ),
-                          textAlign: TextAlign.start,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  SizedBox(height: isTablet ? 16.0 : 12.0),
-
-                  // Opciones scrolleables (expandido para ocupar el espacio disponible)
-                  Expanded(
+          return Column(
+            children: [
+              Expanded(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth),
                     child: SingleChildScrollView(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: horizontalPadding),
-                      child: _buildQuestionField(
-                        currentCategoryQuestions,
-                        optionFontSize,
-                        verticalPadding,
-                        isTablet,
+                      padding: EdgeInsets.fromLTRB(
+                          hPad, _FnlSpace.md, hPad, _FnlSpace.sm),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _MascotHalo(url: _thinkingUrl, size: mascotSize),
+                          const SizedBox(height: _FnlSpace.sm),
+                          Text(
+                            'Tu privacidad nos importa',
+                            textAlign: TextAlign.center,
+                            style: _FnlText.h2(isTablet ? 32 : 26),
+                          ),
+                          const SizedBox(height: _FnlSpace.md),
+                          _ConsentCard(
+                            checked: acceptedProcessing,
+                            onTap: () {
+                              setState(() {
+                                acceptedProcessing = !acceptedProcessing;
+                                _updateAgreedToAll();
+                              });
+                            },
+                            spans: [
+                              _consentText('Acepto la '),
+                              _privacyLink(),
+                              _consentText(' y las '),
+                              TextSpan(
+                                text: 'Condiciones de uso',
+                                style: _FnlText.link(),
+                                recognizer: _termsTap,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          _ConsentCard(
+                            checked: acceptedProcessing1,
+                            onTap: () {
+                              setState(() {
+                                acceptedProcessing1 = !acceptedProcessing1;
+                                _updateAgreedToAll();
+                              });
+                            },
+                            spans: [
+                              _consentText(
+                                  'Acepto el procesamiento de mis datos personales de salud con el fin de facilitar las funciones de la aplicación. Ver más en la '),
+                              _privacyLink(),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          _ConsentCard(
+                            checked: acceptedTracking,
+                            onTap: () {
+                              setState(() {
+                                acceptedTracking = !acceptedTracking;
+                                _updateAgreedToAll();
+                              });
+                            },
+                            spans: [
+                              _consentText(
+                                  'Autorizo a la empresa a recopilar y utilizar información sobre mi actividad en aplicaciones y sitios web relacionados, así como datos necesarios para evaluar mi nivel de estrés y bienestar laboral, conforme a lo establecido en la '),
+                              _privacyLink(),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),
-
-                  // Botón Siguiente/Finalizar fijo en la parte inferior
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      horizontalPadding,
-                      isTablet ? 20 : 12,
-                      horizontalPadding,
-                      isTablet ? 40 : 30,
-                    ),
-                    child: Builder(
-                      builder: (context) {
-                        final bool isNextEnabled = selectedOption != null ||
-                            selectedAnswers.containsKey(currentQuestionIndex);
-                        final String nextLabel = currentQuestionIndex < 5
-                            ? 'Siguiente'
-                            : 'Continuar';
-
-                        return GestureDetector(
-                          onTap: isNextEnabled
-                              ? () {
-                                  if (currentQuestionIndex < 5) {
-                                    goToNextQuestion();
-                                  } else {
-                                    // Navegar a la pantalla de resumen
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            IndexSummaryScreen(
-                                          onFinalize: saveResponses,
-                                          onBack: () {
-                                            Navigator.pop(
-                                                context); // Retroceder a la pantalla de preguntas
-                                          },
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                }
-                              : null,
-                          child: Container(
-                            width: double.infinity,
-                            padding: EdgeInsets.symmetric(
-                              vertical: verticalPadding,
-                            ),
-                            decoration: ShapeDecoration(
-                              color: isNextEnabled
-                                  ? const Color(0xFF6D4BD8)
-                                  : const Color(0xFFD7D7D7),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                    isTablet ? 40.0 : 40.0),
-                              ),
-                              shadows: isNextEnabled
-                                  ? const [
-                                      BoxShadow(
-                                        color: Color(0x26000000),
-                                        blurRadius: 6,
-                                        offset: Offset(0, 2),
-                                        spreadRadius: 2,
-                                      ),
-                                      BoxShadow(
-                                        color: Color(0x4C000000),
-                                        blurRadius: 2,
-                                        offset: Offset(0, 1),
-                                        spreadRadius: 0,
-                                      ),
-                                    ]
-                                  : const [],
-                            ),
-                            child: Center(
-                              child: Text(
-                                nextLabel,
-                                style: TextStyle(
-                                  color: isNextEnabled
-                                      ? Colors.white
-                                      : const Color(0xFF868686),
-                                  fontSize: buttonFontSize,
-                                  fontFamily: 'Inter',
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildQuestionField(
-    List<Map<String, dynamic>> questions,
-    double fontSize,
-    double verticalPadding,
-    bool isTablet,
-  ) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: isTablet ? 32.0 : 16.0),
-      child: ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: questions.length,
-        itemBuilder: (context, index) {
-          var question = questions[index];
-          return Padding(
-            padding: EdgeInsets.symmetric(vertical: isTablet ? 12.0 : 8.0),
-            child: SizedBox(
-              width:
-                  MediaQuery.of(context).size.width * (isTablet ? 0.9 : 0.85),
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: selectedOption == question['id'].toString()
-                      ? const Color(0x515027D0)
-                      : Colors.transparent,
-                  side: BorderSide(
-                    color: Color(0xFF6D4BD8),
-                    width: isTablet ? 3.0 : 2.0,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(isTablet ? 20.0 : 16.0),
-                  ),
-                  padding: EdgeInsets.symmetric(
-                    vertical: verticalPadding,
-                    horizontal: isTablet ? 48.0 : 32.0,
-                  ),
-                ),
-                onPressed: () {
-                  setState(() {
-                    selectedOption = question['id'].toString();
-                  });
-
-                  if (currentQuestionIndex == 2) {
-                    int areaId = question['id'];
-                    fetchHierarchicalLevel(areaId);
-                  }
-                },
-                child: Text(
-                  _getOptionText(question),
-                  style: TextStyle(
-                    fontSize: fontSize,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF6D4BD8),
-                    fontFamily: 'Inter',
-                  ),
-                  textAlign: TextAlign.center,
                 ),
               ),
-            ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                    hPad, _FnlSpace.xs, hPad, _FnlSpace.md),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _SecondaryButton(
+                          label: 'Aceptar todo',
+                          icon: Icons.done_all_rounded,
+                          onTap: () {
+                            setState(() {
+                              acceptedProcessing = true;
+                              acceptedProcessing1 = true;
+                              acceptedTracking = true;
+                              _updateAgreedToAll();
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _PrimaryButton(
+                          label: 'Continuar',
+                          icon: Icons.arrow_forward_rounded,
+                          enabled: agreedToAll,
+                          onTap: () {
+                            _handleAcceptAll();
+                            setState(() {
+                              agreedToTerms = true;
+                              currentQuestionIndex = 0;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           );
         },
+      ),
+    );
+  }
+
+  TextSpan _consentText(String text) =>
+      TextSpan(text: text, style: _FnlText.consent());
+
+  TextSpan _privacyLink() => TextSpan(
+        text: 'Política de privacidad',
+        style: _FnlText.link(),
+        recognizer: _privacyTap,
+      );
+
+  // ── Preguntas de perfil ──────────────────────────────────────
+  Widget _buildQuestionsScreen() {
+    final lookupIndex = currentQuestionIndex.clamp(0, _totalQuestions - 1);
+    final categoryKey = _categoryKeys[lookupIndex];
+    final questionText = _questionTexts[lookupIndex];
+    final options = questionCategories[categoryKey] ?? [];
+
+    final bool isNextEnabled = selectedOption != null ||
+        selectedAnswers.containsKey(currentQuestionIndex);
+    final bool isLast = currentQuestionIndex >= _totalQuestions - 1;
+
+    return SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isTablet = constraints.maxWidth >= 600;
+          final isSmallHeight = constraints.maxHeight < 650;
+          final hPad = isTablet ? _FnlSpace.lg : _FnlSpace.md;
+          final maxContentWidth = isTablet ? 720.0 : double.infinity;
+          final mascotSize = isTablet
+              ? 120.0
+              : isSmallHeight
+                  ? 72.0
+                  : 96.0;
+
+          return Column(
+            children: [
+              _buildQuestionHeader(hPad, maxContentWidth),
+              Expanded(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(
+                          hPad, _FnlSpace.xs, hPad, _FnlSpace.md),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _MascotHalo(url: _happyUrl, size: mascotSize),
+                          const SizedBox(height: _FnlSpace.xs),
+                          _SpeechBubble(
+                            child: Text(
+                              questionText,
+                              textAlign: TextAlign.center,
+                              style: _FnlText.h2(isTablet ? 24 : 20),
+                            ),
+                          ),
+                          const SizedBox(height: _FnlSpace.md),
+                          if (options.isEmpty)
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 24),
+                              child: Text(
+                                'No se encontraron preguntas para esta categoría.',
+                                textAlign: TextAlign.center,
+                                style: _FnlText.body(),
+                              ),
+                            )
+                          else
+                            ...options.map(_buildOption),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                    hPad, _FnlSpace.sm, hPad, _FnlSpace.md),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                    child: _PrimaryButton(
+                      label: isLast ? 'Continuar' : 'Siguiente',
+                      icon: Icons.arrow_forward_rounded,
+                      enabled: isNextEnabled,
+                      onTap: _onNextPressed,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _onNextPressed() {
+    if (currentQuestionIndex < _totalQuestions - 1) {
+      goToNextQuestion();
+    } else {
+      // Navegar a la pantalla de resumen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => IndexSummaryScreen(
+            onFinalize: saveResponses,
+            onBack: () {
+              Navigator.pop(context); // Retroceder a la pantalla de preguntas
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildOption(Map<String, dynamic> question) {
+    final id = question['id'].toString();
+    final isSelected = selectedOption == id;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: _OptionTile(
+        label: _getOptionText(question),
+        selected: isSelected,
+        onTap: () {
+          setState(() {
+            selectedOption = id;
+          });
+
+          if (currentQuestionIndex == 2) {
+            final areaId = _asInt(question['id']);
+            if (areaId != null) fetchHierarchicalLevel(areaId);
+          }
+        },
+      ),
+    );
+  }
+
+  // Header: retroceso + contador + barra de progreso
+  Widget _buildQuestionHeader(double hPad, double maxContentWidth) {
+    final progress = (currentQuestionIndex + 1) / _totalQuestions;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(hPad, _FnlSpace.sm, hPad, _FnlSpace.xs),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxContentWidth),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: currentQuestionIndex > 0
+                        ? Material(
+                            color: _FnlColors.white,
+                            shape: const CircleBorder(
+                              side: BorderSide(
+                                  color: _FnlColors.bubbleBorder, width: 2),
+                            ),
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: goToPreviousQuestion,
+                              child: const Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                size: 16,
+                                color: _FnlColors.violet,
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        'Pregunta ${currentQuestionIndex + 1} de $_totalQuestions',
+                        style: _FnlText.label(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 40),
+                ],
+              ),
+              const SizedBox(height: _FnlSpace.sm),
+              _ProgressBar(progress: progress),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1175,5 +906,452 @@ class _IndexScreenState extends State<IndexScreen> {
       agreedToAll =
           acceptedProcessing && acceptedTracking && acceptedProcessing1;
     });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Componentes reutilizables
+// ─────────────────────────────────────────────────────────────
+
+/// Fondo con círculos decorativos (mismo lenguaje que bienvenida y test).
+class _FnlBackground extends StatelessWidget {
+  final Widget child;
+  const _FnlBackground({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        const Positioned(
+          top: -70,
+          right: -70,
+          child: IgnorePointer(child: _DecorCircle(size: 220)),
+        ),
+        const Positioned(
+          bottom: -90,
+          left: -90,
+          child: IgnorePointer(child: _DecorCircle(size: 240)),
+        ),
+        Positioned.fill(child: child),
+      ],
+    );
+  }
+}
+
+class _DecorCircle extends StatelessWidget {
+  final double size;
+  const _DecorCircle({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: _FnlColors.lavenderDeep,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+/// Funcy con halo suave.
+class _MascotHalo extends StatelessWidget {
+  final String url;
+  final double size;
+  const _MascotHalo({required this.url, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: size * 0.8,
+            height: size * 0.8,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: _FnlColors.violetSecondary.withOpacity(0.22),
+                  blurRadius: 40,
+                  spreadRadius: 8,
+                ),
+              ],
+            ),
+          ),
+          Image.network(
+            url,
+            height: size,
+            fit: BoxFit.contain,
+            loadingBuilder: (context, child, progress) {
+              if (progress == null) return child;
+              return SizedBox(
+                height: size,
+                width: size,
+                child: const Center(
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: _FnlColors.violetSecondary,
+                    ),
+                  ),
+                ),
+              );
+            },
+            errorBuilder: (_, __, ___) => SizedBox(height: size, width: size),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Globo de diálogo con colita apuntando a Funcy.
+class _SpeechBubble extends StatelessWidget {
+  final Widget child;
+  const _SpeechBubble({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.topCenter,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(_FnlSpace.md),
+            decoration: BoxDecoration(
+              color: _FnlColors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+              boxShadow: const [
+                BoxShadow(
+                  color: _FnlColors.bubbleBorder,
+                  offset: Offset(0, 4),
+                  blurRadius: 0,
+                ),
+              ],
+            ),
+            child: child,
+          ),
+        ),
+        Positioned(
+          top: 2,
+          child: Transform.rotate(
+            angle: 0.785398, // 45°
+            child: Container(
+              width: 16,
+              height: 16,
+              decoration: const BoxDecoration(
+                color: _FnlColors.white,
+                border: Border(
+                  top: BorderSide(color: _FnlColors.bubbleBorder, width: 2),
+                  left: BorderSide(color: _FnlColors.bubbleBorder, width: 2),
+                ),
+                borderRadius: BorderRadius.only(topLeft: Radius.circular(4)),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Barra de progreso gruesa y redondeada.
+class _ProgressBar extends StatelessWidget {
+  final double progress;
+  const _ProgressBar({required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 14,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: _FnlColors.lavenderDeep,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      alignment: Alignment.centerLeft,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: progress),
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutBack,
+        builder: (context, value, _) => FractionallySizedBox(
+          widthFactor: value.clamp(0.0, 1.0),
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  _FnlColors.gradientStart,
+                  _FnlColors.violetSecondary,
+                ],
+              ),
+              borderRadius: BorderRadius.all(Radius.circular(999)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Opción de respuesta: tarjeta "chunky" estilo caricatura.
+class _OptionTile extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _OptionTile({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        width: double.infinity,
+        padding:
+            const EdgeInsets.symmetric(horizontal: _FnlSpace.sm, vertical: 14),
+        decoration: BoxDecoration(
+          color: selected ? _FnlColors.lavender : _FnlColors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            width: 2,
+            color: selected ? _FnlColors.violet : _FnlColors.border,
+          ),
+          // Sombra sólida abajo: efecto botón de juego
+          boxShadow: [
+            BoxShadow(
+              color: selected
+                  ? _FnlColors.violet.withOpacity(0.35)
+                  : _FnlColors.border,
+              offset: Offset(0, selected ? 2 : 4),
+              blurRadius: 0,
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            _SelectionDot(selected: selected),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(label, style: _FnlText.option(selected: selected)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Indicador circular de selección con animación.
+class _SelectionDot extends StatelessWidget {
+  final bool selected;
+  const _SelectionDot({required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: selected ? _FnlColors.violet : _FnlColors.white,
+        border: Border.all(
+          width: selected ? 0 : 2,
+          color: _FnlColors.border,
+        ),
+      ),
+      child: selected
+          ? const Icon(Icons.check_rounded, size: 16, color: _FnlColors.white)
+          : null,
+    );
+  }
+}
+
+/// Tarjeta de consentimiento con casilla cuadrada y texto enriquecido.
+class _ConsentCard extends StatelessWidget {
+  final bool checked;
+  final VoidCallback onTap;
+  final List<TextSpan> spans;
+
+  const _ConsentCard({
+    required this.checked,
+    required this.onTap,
+    required this.spans,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        width: double.infinity,
+        padding: const EdgeInsets.all(_FnlSpace.sm),
+        decoration: BoxDecoration(
+          color: checked ? _FnlColors.lavender : _FnlColors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            width: 2,
+            color: checked ? _FnlColors.violet : _FnlColors.border,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: checked
+                  ? _FnlColors.violet.withOpacity(0.35)
+                  : _FnlColors.border,
+              offset: Offset(0, checked ? 2 : 4),
+              blurRadius: 0,
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              width: 26,
+              height: 26,
+              margin: const EdgeInsets.only(top: 1),
+              decoration: BoxDecoration(
+                color: checked ? _FnlColors.violet : _FnlColors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  width: checked ? 0 : 2,
+                  color: _FnlColors.border,
+                ),
+              ),
+              child: checked
+                  ? const Icon(Icons.check_rounded,
+                      size: 18, color: _FnlColors.white)
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text.rich(TextSpan(children: spans)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Botón primario FNL: 56 px, radio 18, violeta sólido.
+class _PrimaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final bool enabled;
+
+  const _PrimaryButton({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(18);
+    final Color fg = enabled ? _FnlColors.white : _FnlColors.disabledText;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      height: 56,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        color: enabled ? _FnlColors.violet : _FnlColors.border,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: enabled ? onTap : null,
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(label, style: _FnlText.button(color: fg)),
+                if (icon != null) ...[
+                  const SizedBox(width: 8),
+                  Icon(icon, size: 20, color: fg),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Botón secundario: lavanda con borde, texto violeta.
+class _SecondaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  const _SecondaryButton({
+    required this.label,
+    required this.onTap,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(18);
+
+    return Container(
+      height: 48,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: _FnlColors.lavender,
+        borderRadius: radius,
+        border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: onTap,
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 20, color: _FnlColors.violet),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                  label,
+                  style: _FnlText.button(color: _FnlColors.violet)
+                      .copyWith(fontSize: 16),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

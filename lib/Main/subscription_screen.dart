@@ -1,10 +1,63 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../services/google_play_verification_service.dart';
 import '../services/subscription_service.dart';
 import 'dart:async';
+
+class _FnlColors {
+  static const blue = Color(0xFF0B1457);
+  static const violet = Color(0xFF6428E8);
+  static const violetSecondary = Color(0xFF814CF4);
+  static const lavender = Color(0xFFF4F1FF);
+  static const lavenderDeep = Color(0xFFEAE4FC);
+  static const canvas = Color(0xFFFCFBFF);
+  static const body = Color(0xFF70779C);
+  static const border = Color(0xFFD9DCEF);
+  static const bubbleBorder = Color(0xFFDCD3FA);
+  static const disabledText = Color(0xFF9AA0C0);
+  static const white = Color(0xFFFFFFFF);
+}
+
+class _FnlSpace {
+  static const double xs = 8;
+  static const double sm = 16;
+  static const double md = 24;
+  static const double lg = 32;
+}
+
+class _FnlText {
+  static TextStyle h1(double size) => GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        color: _FnlColors.blue,
+        height: 1.2,
+      );
+
+  static TextStyle body({double size = 16, Color color = _FnlColors.body}) =>
+      GoogleFonts.roboto(
+        fontSize: size,
+        fontWeight: FontWeight.w400,
+        color: color,
+        height: 1.5,
+      );
+
+  static TextStyle feature(double size) => GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w700,
+        color: _FnlColors.blue,
+        height: 1.3,
+      );
+
+  static TextStyle button({Color color = _FnlColors.white}) =>
+      GoogleFonts.manrope(
+        fontSize: 17,
+        fontWeight: FontWeight.w700,
+        color: color,
+      );
+}
 
 class SubscriptionScreen extends StatefulWidget {
   final bool showBackButton;
@@ -19,26 +72,46 @@ class SubscriptionScreen extends StatefulWidget {
 }
 
 class _SubscriptionScreenState extends State<SubscriptionScreen> {
+  static const String _funcyUrl =
+      'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/funcy.png';
+
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
-  late StreamSubscription<List<PurchaseDetails>> _subscription;
+  StreamSubscription<List<PurchaseDetails>>? _subscription;
   List<ProductDetails> _products = [];
   bool _isLoading = true;
   bool _available = true;
 
+  String? _storeDebugInfo;
+
+  bool _restoreTried = false;
+
   static const String _productId = 'fnl_monthly_vip';
+
+  void _log(String message) => debugPrint('[IAP] $message');
+
+  String _mask(String value) {
+    if (value.isEmpty) return '(vacío)';
+    if (value.length <= 12) return '***(len ${value.length})';
+    return '${value.substring(0, 6)}…${value.substring(value.length - 4)} (len ${value.length})';
+  }
 
   @override
   void initState() {
     super.initState();
+    _log('initState | kIsWeb=$kIsWeb | productId=$_productId');
 
     if (!kIsWeb) {
       final Stream<List<PurchaseDetails>> purchaseUpdated =
           _inAppPurchase.purchaseStream;
       _subscription = purchaseUpdated.listen((purchaseDetailsList) {
+        _log('purchaseStream emitió ${purchaseDetailsList.length} evento(s)');
         _listenToPurchaseUpdated(purchaseDetailsList);
       }, onDone: () {
-        _subscription.cancel();
+        _log('purchaseStream cerrado (onDone)');
+        _subscription?.cancel();
       }, onError: (error) {
+        _log('purchaseStream ERROR: $error');
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $error')),
         );
@@ -46,6 +119,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       _initStoreInfo();
     } else {
       // En web, marca como no disponible
+      _storeDebugInfo = 'Web: las compras no están disponibles';
       setState(() {
         _available = false;
         _isLoading = false;
@@ -54,88 +128,168 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    precacheImage(const NetworkImage(_funcyUrl), context);
+  }
+
+  @override
   void dispose() {
-    _subscription.cancel();
+    _subscription?.cancel();
     super.dispose();
   }
 
   Future<void> _initStoreInfo() async {
     if (kIsWeb) return;
 
-    final bool available = await _inAppPurchase.isAvailable();
-    if (!available) {
+    try {
+      _log('========== GOOGLE PLAY BILLING ==========');
+      final bool available = await _inAppPurchase.isAvailable();
+      _log('isAvailable = $available');
+
+      if (!mounted) return;
+
+      if (!available) {
+        _log('❌ Billing NO disponible (Play Store ausente/desactualizada, '
+            'emulador sin Google Play, o app no instalada desde Play)');
+        setState(() {
+          _available = false;
+          _products = [];
+          _storeDebugInfo = 'isAvailable() = false';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      const Set<String> kIds = <String>{_productId};
+      _log('Consultando producto: $_productId');
+
+      final ProductDetailsResponse response =
+          await _inAppPurchase.queryProductDetails(kIds);
+
+      _log('productDetails encontrados: ${response.productDetails.length}');
+      for (final p in response.productDetails) {
+        _log('  → id=${p.id} | title=${p.title} | price=${p.price} '
+            '| rawPrice=${p.rawPrice} | currency=${p.currencyCode}');
+      }
+      _log('notFoundIDs: ${response.notFoundIDs}');
+      if (response.error != null) {
+        _log('❌ response.error: code=${response.error!.code} '
+            'message=${response.error!.message} '
+            'details=${response.error!.details}');
+      }
+      _log('==========================================');
+
+      if (!mounted) return;
+
+      if (response.notFoundIDs.isNotEmpty) {
+        _log('❌ Productos no encontrados: ${response.notFoundIDs}');
+      }
+
       setState(() {
-        _available = available;
-        _products = [];
+        _products = response.productDetails;
+        _storeDebugInfo = response.productDetails.isEmpty
+            ? 'notFound=${response.notFoundIDs} | error=${response.error?.message}'
+            : null;
         _isLoading = false;
       });
-      return;
+    } catch (e, st) {
+      // Sin este catch, un fallo aquí dejaba el spinner girando para siempre
+      _log('❌ EXCEPCIÓN en _initStoreInfo: $e');
+      _log('$st');
+      if (!mounted) return;
+      setState(() {
+        _products = [];
+        _storeDebugInfo = 'Excepción: $e';
+        _isLoading = false;
+      });
     }
-
-    const Set<String> kIds = <String>{_productId};
-    final ProductDetailsResponse response =
-        await _inAppPurchase.queryProductDetails(kIds);
-
-    if (response.notFoundIDs.isNotEmpty) {
-      print('Productos no encontrados: ${response.notFoundIDs}');
-    }
-
-    setState(() {
-      _products = response.productDetails;
-      _isLoading = false;
-    });
   }
 
   void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) {
     purchaseDetailsList.forEach((PurchaseDetails purchaseDetails) async {
-      print("🔥🔥🔥 PURCHASE DETECTED 🔥🔥🔥");
-      print("Product ID: ${purchaseDetails.productID}");
-      print("Purchase ID: ${purchaseDetails.purchaseID}");
-      print(
-          "Server Verification Data: ${purchaseDetails.verificationData.serverVerificationData}");
-      print("Source: ${purchaseDetails.verificationData.source}");
-      print("Status: ${purchaseDetails.status}");
+      try {
+        _log('----- PURCHASE EVENT -----');
+        _log('productID=${purchaseDetails.productID}');
+        _log('status=${purchaseDetails.status}');
+        _log('purchaseID (orderId en Android)=${purchaseDetails.purchaseID}');
+        _log('source=${purchaseDetails.verificationData.source}');
+        _log('serverVerificationData (purchaseToken)='
+            '${_mask(purchaseDetails.verificationData.serverVerificationData)}');
+        _log('pendingCompletePurchase=${purchaseDetails.pendingCompletePurchase}');
 
-      if (purchaseDetails.status == PurchaseStatus.pending) {
-        _showPendingUI();
-      } else if (purchaseDetails.status == PurchaseStatus.error) {
-        _handleError(purchaseDetails.error!);
-        // Completar la compra incluso si hay error para limpiar el estado
-        if (purchaseDetails.pendingCompletePurchase) {
-          await _inAppPurchase.completePurchase(purchaseDetails);
+        if (purchaseDetails.status == PurchaseStatus.pending) {
+          _showPendingUI();
+        } else if (purchaseDetails.status == PurchaseStatus.error) {
+          _handleError(purchaseDetails.error!);
+          // Completar la compra incluso si hay error para limpiar el estado
+          if (purchaseDetails.pendingCompletePurchase) {
+            _log('completePurchase (por error)');
+            await _inAppPurchase.completePurchase(purchaseDetails);
+          }
+        } else if (purchaseDetails.status == PurchaseStatus.purchased ||
+            purchaseDetails.status == PurchaseStatus.restored) {
+          await _verifyPurchaseWithBackend(purchaseDetails);
+        } else if (purchaseDetails.status == PurchaseStatus.canceled) {
+          _log('Compra cancelada por el usuario');
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Compra cancelada'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          if (purchaseDetails.pendingCompletePurchase) {
+            await _inAppPurchase.completePurchase(purchaseDetails);
+          }
         }
-      } else if (purchaseDetails.status == PurchaseStatus.purchased ||
-          purchaseDetails.status == PurchaseStatus.restored) {
-        // Compra exitosa - verificar con backend
-        await _verifyPurchaseWithBackend(purchaseDetails);
-      } else if (purchaseDetails.status == PurchaseStatus.canceled) {
-        // Compra cancelada
-        setState(() {
-          _isLoading = false;
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Compra cancelada'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        // Completar la compra cancelada para limpiar el estado
-        if (purchaseDetails.pendingCompletePurchase) {
-          await _inAppPurchase.completePurchase(purchaseDetails);
-        }
+      } catch (e, st) {
+        _log('❌ EXCEPCIÓN procesando evento de compra: $e');
+        _log('$st');
       }
     });
   }
 
   void _showPendingUI() {
+    _log('Compra en estado PENDING');
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Procesando compra...')),
     );
   }
 
   void _handleError(IAPError error) {
+    _log('❌ IAPError | source=${error.source} | code=${error.code} '
+        '| message=${error.message} | details=${error.details}');
+
+    final String raw = '${error.message} ${error.details}'.toLowerCase();
+
+    // El usuario cerró el diálogo de Google Play
+    if (raw.contains('usercanceled')) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Compra cancelada'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (raw.contains('alreadyowned') && !_restoreTried) {
+      _restoreTried = true;
+      _log('ITEM_ALREADY_OWNED → restorePurchases()');
+      _inAppPurchase.restorePurchases().catchError((e) {
+        _log('❌ restorePurchases falló: $e');
+      });
+      return;
+    }
+
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Error en la compra: ${error.message}'),
@@ -145,30 +299,36 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   /// Verifica la compra con el backend usando GooglePlayVerificationService
-  /// Según la documentación, este método debe:
-  /// 1. Obtener purchaseToken y productId de la compra
-  /// 2. Verificar con el backend usando el servicio
-  /// 3. Si es exitoso, completar la compra en Google Play
-  /// 4. Verificar acceso inmediatamente
+  /// Este método:
+  /// 1. Obtiene purchaseToken y productId de la compra
+  /// 2. Verifica con el backend usando el servicio
+  /// 3. Si es exitoso, completa la compra en Google Play
+  /// 4. Verifica el acceso inmediatamente
   Future<void> _verifyPurchaseWithBackend(
       PurchaseDetails purchaseDetails) async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
-      // Obtener purchaseToken y productId
-      // Para Android, el purchaseToken puede venir de:
-      // - purchaseID (recomendado según documentación)
-      // - verificationData.serverVerificationData (alternativa para Android)
-      String purchaseToken = purchaseDetails.purchaseID ?? '';
+      // IMPORTANTE (Android): `purchaseID` es el ORDER ID (GPA.xxxx-xxxx),
+      String purchaseToken =
+          purchaseDetails.verificationData.serverVerificationData;
+      String tokenSource = 'serverVerificationData';
 
-      // Si purchaseID está vacío, intentar con serverVerificationData (para Android)
+      // Respaldo: si viniera vacío, se usa purchaseID
       if (purchaseToken.isEmpty) {
-        purchaseToken = purchaseDetails.verificationData.serverVerificationData;
+        purchaseToken = purchaseDetails.purchaseID ?? '';
+        tokenSource = 'purchaseID';
       }
 
       final String productId = purchaseDetails.productID;
+
+      _log('VERIFICANDO con backend | productId=$productId '
+          '| token=${_mask(purchaseToken)} | origen=$tokenSource '
+          '| orderId=${purchaseDetails.purchaseID}');
 
       // Validar que tenemos un purchaseToken válido
       if (purchaseToken.isEmpty) {
@@ -181,267 +341,265 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         productId: productId,
       );
 
+      _log('Respuesta backend | success=${result['success']} '
+          '| message=${result['message']}');
+
       if (result['success'] == true) {
         // Suscripción activada exitosamente en el backend
         // Ahora completar la compra en Google Play
         if (purchaseDetails.pendingCompletePurchase) {
+          _log('completePurchase (acknowledge en Google Play)');
           await _inAppPurchase.completePurchase(purchaseDetails);
         }
 
+        if (!mounted) return;
         setState(() {
           _isLoading = false;
         });
 
         // Mostrar mensaje de éxito
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ??
-                  '¡Suscripción PRO activada correctamente!'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
-            ),
-          );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ??
+                '¡Suscripción PRO activada correctamente!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
 
-          // Verificar acceso inmediatamente para confirmar
-          final hasAccess = await SubscriptionService.hasAccessToPrograms();
-          if (hasAccess) {
-            // Navegar de vuelta indicando éxito
+        // Verificar acceso inmediatamente para confirmar
+        final hasAccess = await SubscriptionService.hasAccessToPrograms();
+        _log('hasAccessToPrograms (1er intento) = $hasAccess');
+        if (!mounted) return;
+        if (hasAccess) {
+          // Navegar de vuelta indicando éxito
+          Navigator.of(context).pop(true);
+        } else {
+          // Si por alguna razón no tiene acceso aún, esperar y verificar de nuevo
+          await Future.delayed(Duration(seconds: 1));
+          final hasAccessRetry =
+              await SubscriptionService.hasAccessToPrograms();
+          _log('hasAccessToPrograms (reintento) = $hasAccessRetry');
+          if (!mounted) return;
+          if (hasAccessRetry) {
             Navigator.of(context).pop(true);
           } else {
-            // Si por alguna razón no tiene acceso aún, esperar un momento y verificar de nuevo
-            await Future.delayed(Duration(seconds: 1));
-            final hasAccessRetry =
-                await SubscriptionService.hasAccessToPrograms();
-            if (hasAccessRetry) {
-              Navigator.of(context).pop(true);
-            } else {
-              // Mostrar mensaje informativo
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                      'Suscripción activada. Por favor, espera unos segundos...'),
-                  backgroundColor: Colors.blue,
-                ),
-              );
-              Navigator.of(context).pop(true);
-            }
+            // Mostrar mensaje informativo
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                    'Suscripción activada. Por favor, espera unos segundos...'),
+                backgroundColor: Colors.blue,
+              ),
+            );
+            Navigator.of(context).pop(true);
           }
         }
       } else {
         throw Exception(result['message'] ?? 'Error al activar suscripción');
       }
-    } catch (e) {
-      print('Error al verificar compra con backend: $e');
+    } catch (e, st) {
+      _log('❌ Error al verificar compra con backend: $e');
+      _log('$st');
 
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al verificar compra: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 4),
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al verificar compra: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
 
-      // No completar la compra si falla la verificación
-      // Esto permite que el usuario pueda reintentar
+      // No completar la compra si falla la verificación:
+      // esto permite que el usuario pueda reintentar
     }
   }
 
-  void _buyProduct(ProductDetails productDetails) {
+// ignore: unused_element
+  Future<void> _simulateSuccessfulPurchase() async {
+    _log('🧪 SIMULACIÓN: compra exitosa');
+
+    if (!mounted) return;
+
+    Navigator.of(context).pop(true);
+  }
+
+  Future<void> _buyProduct(ProductDetails productDetails) async {
+    _log('Botón Suscribirme | id=${productDetails.id} '
+        '| price=${productDetails.price}');
+
     final PurchaseParam purchaseParam =
         PurchaseParam(productDetails: productDetails);
 
-    if (productDetails.id.contains('monthly') ||
-        productDetails.id.contains('yearly')) {
-      // Es una suscripción
-      _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
-    } else {
-      // Es una compra única
-      _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
+    try {
+      final bool launched =
+          await _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
+      _log('buyNonConsumable → launched=$launched');
+
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No se pudo iniciar la compra. Intenta de nuevo.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } on PlatformException catch (e) {
+      _log('❌ PlatformException al comprar | code=${e.code} '
+          '| message=${e.message} | details=${e.details}');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al iniciar la compra: ${e.message ?? e.code}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e, st) {
+      _log('❌ Excepción al comprar: $e');
+      _log('$st');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al iniciar la compra'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
+  static const List<Map<String, dynamic>> _features = [
+    {'icon': Icons.psychology_rounded, 'text': 'Acceso ilimitado al chat de IA'},
+    {'icon': Icons.insights_rounded, 'text': 'Análisis detallados de estrés'},
+    {
+      'icon': Icons.trending_up_rounded,
+      'text': 'Seguimiento avanzado de progreso'
+    },
+    {
+      'icon': Icons.workspace_premium_rounded,
+      'text': 'Contenido premium exclusivo'
+    },
+    {'icon': Icons.priority_high_rounded, 'text': 'Soporte prioritario'},
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final shortestSide = size.shortestSide;
-
-    // Breakpoints responsivos
-    final isSmallPhone = size.height < 700;
-    final isTablet = shortestSide >= 600;
-    final isDesktop = size.width >= 1200;
-    final isLandscape = size.width > size.height;
-
-    // Padding horizontal adaptativo
-    final horizontalPadding = isDesktop
-        ? size.width * 0.15
-        : isTablet
-            ? size.width * 0.1
-            : size.width * 0.05;
-
     return Scaffold(
-      backgroundColor: const Color(0xFF5027D0),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: widget.showBackButton
-            ? IconButton(
-                icon: Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
-              )
-            : null,
-        automaticallyImplyLeading: widget.showBackButton,
-      ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // Para landscape o desktop, usar layout horizontal
-            if (isLandscape && !isSmallPhone || isDesktop) {
-              return _buildLandscapeLayout(
-                  size, constraints, isDesktop, isTablet);
-            }
-            // Para portrait, usar layout vertical con scroll
-            return _buildPortraitLayout(
-                size, constraints, horizontalPadding, isSmallPhone, isTablet);
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPortraitLayout(Size size, BoxConstraints constraints,
-      double horizontalPadding, bool isSmallPhone, bool isTablet) {
-    return SingleChildScrollView(
-      physics: ClampingScrollPhysics(),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          minHeight: constraints.maxHeight,
-        ),
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              SizedBox(height: isSmallPhone ? 8 : 16),
-              _buildHeader(size, isTablet: isTablet),
-              SizedBox(height: isSmallPhone ? 12 : 20),
-              _buildPriceCard(size, isTablet: isTablet),
-              SizedBox(height: isSmallPhone ? 12 : 20),
-              _buildFeaturesList(size, isTablet: isTablet),
-              SizedBox(height: isSmallPhone ? 16 : 24),
-              _buildSubscribeButton(size, isDesktop: false, isTablet: isTablet),
-              SizedBox(height: isSmallPhone ? 16 : 24),
-            ],
+      backgroundColor: _FnlColors.canvas,
+      body: Stack(
+        children: [
+          const Positioned(
+            top: -70,
+            right: -70,
+            child: IgnorePointer(child: _DecorCircle(size: 220)),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLandscapeLayout(
-      Size size, BoxConstraints constraints, bool isDesktop, bool isTablet) {
-    final maxContentWidth = isDesktop ? 1200.0 : 900.0;
-
-    return SingleChildScrollView(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: maxContentWidth,
-            minHeight: constraints.maxHeight,
+          const Positioned(
+            bottom: -90,
+            left: -90,
+            child: IgnorePointer(child: _DecorCircle(size: 240)),
           ),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: size.width * 0.05,
-              vertical: 16,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Lado izquierdo: Header y precio
-                Expanded(
-                  flex: 4,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildHeader(size, isTablet: isTablet, isLandscape: true),
-                      SizedBox(height: 20),
-                      _buildPriceCard(size, isTablet: isTablet),
-                      SizedBox(height: 20),
-                      _buildSubscribeButton(size,
-                          isDesktop: isDesktop, isTablet: isTablet),
-                    ],
-                  ),
-                ),
-                SizedBox(width: 32),
-                // Lado derecho: Features
-                Expanded(
-                  flex: 5,
-                  child: _buildFeaturesList(size,
-                      isTablet: isTablet, isLandscape: true),
-                ),
-              ],
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth >= 840;
+                final isTablet = constraints.maxWidth > 600;
+                final isSmallHeight = constraints.maxHeight < 700;
+
+                if (isWide) {
+                  return _buildWideLayout(constraints);
+                }
+                return _buildSingleColumn(
+                    constraints, isTablet, isSmallHeight);
+              },
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildHeader(Size size,
-      {bool isTablet = false, bool isLandscape = false}) {
-    // Tamaños adaptativos basados en el dispositivo
-    final baseIconSize = isTablet ? 50.0 : 40.0;
-    final baseTitleSize = isTablet ? 52.0 : 42.0;
-    final baseSubtitleSize = isTablet ? 22.0 : 16.0;
+  // Botón de retroceso circular (solo si showBackButton)
+  Widget _buildBackButton() {
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: widget.showBackButton
+          ? Material(
+              color: _FnlColors.white,
+              shape: const CircleBorder(
+                side: BorderSide(color: _FnlColors.bubbleBorder, width: 2),
+              ),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => Navigator.of(context).pop(),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  size: 16,
+                  color: _FnlColors.violet,
+                ),
+              ),
+            )
+          : null,
+    );
+  }
 
-    final iconSize = isLandscape ? baseIconSize * 0.9 : baseIconSize;
-    final titleSize = isLandscape ? baseTitleSize * 0.9 : baseTitleSize;
-    final subtitleSize =
-        isLandscape ? baseSubtitleSize * 0.9 : baseSubtitleSize;
-    final iconPadding = isTablet ? 20.0 : 16.0;
+  // Móvil y tablet vertical: contenido con scroll + barra inferior fija
+  Widget _buildSingleColumn(
+      BoxConstraints constraints, bool isTablet, bool isSmallHeight) {
+    final hPad = isTablet ? _FnlSpace.lg : _FnlSpace.md;
+    final maxContentWidth = isTablet ? 560.0 : double.infinity;
+    final mascotSize = isTablet
+        ? 200.0
+        : isSmallHeight
+            ? 110.0
+            : 150.0;
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Container(
-          padding: EdgeInsets.all(iconPadding),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-          ),
-          child: Icon(
-            Icons.workspace_premium,
-            size: iconSize,
-            color: Color(0xFF5027D0),
-          ),
-        ),
-        SizedBox(height: isLandscape ? 10 : 14),
-        Text(
-          'Funcy Pro',
-          style: GoogleFonts.inter(
-            fontSize: titleSize,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-          ),
-        ),
-        SizedBox(height: 6),
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'Desbloquea tu mejor versión con Funcy',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              fontSize: subtitleSize,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+          padding: EdgeInsets.fromLTRB(hPad, _FnlSpace.sm, hPad, _FnlSpace.xs),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: _buildBackButton(),
+          ),
+        ),
+        Expanded(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxContentWidth),
+              child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                    hPad, _FnlSpace.xs, hPad, _FnlSpace.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildHeader(mascotSize, isTablet),
+                    const SizedBox(height: _FnlSpace.md),
+                    _buildFeaturesCard(isTablet),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(hPad, _FnlSpace.xs, hPad, _FnlSpace.md),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxContentWidth),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildPriceCard(isTablet),
+                  const SizedBox(height: 12),
+                  _buildSubscribeButton(),
+                ],
+              ),
             ),
           ),
         ),
@@ -449,193 +607,407 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
-  Widget _buildFeaturesList(Size size,
-      {bool isTablet = false, bool isLandscape = false}) {
-    final features = [
-      {'icon': Icons.psychology, 'text': 'Acceso ilimitado al chat de IA'},
-      {'icon': Icons.insights, 'text': 'Análisis detallados de estrés'},
-      {'icon': Icons.trending_up, 'text': 'Seguimiento avanzado de progreso'},
-      {'icon': Icons.workspace_premium, 'text': 'Contenido premium exclusivo'},
-      {'icon': Icons.priority_high, 'text': 'Soporte prioritario'},
-    ];
+  // Tablet horizontal / escritorio: dos columnas
+  Widget _buildWideLayout(BoxConstraints constraints) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              _FnlSpace.lg, _FnlSpace.sm, _FnlSpace.lg, 0),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: _buildBackButton(),
+          ),
+        ),
+        Expanded(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: _FnlSpace.lg, vertical: _FnlSpace.sm),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildHeader(180, true),
+                          const SizedBox(height: _FnlSpace.md),
+                          _buildPriceCard(true),
+                          const SizedBox(height: 12),
+                          _buildSubscribeButton(),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: _FnlSpace.lg),
+                    Expanded(
+                      flex: 5,
+                      child: _buildFeaturesCard(true),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-    // Tamaños adaptativos
-    final fontSize = isTablet ? 16.0 : 14.0;
-    final iconSize = isTablet ? 24.0 : 20.0;
-    final checkSize = isTablet ? 22.0 : 18.0;
-    final containerPadding = isTablet ? 24.0 : 16.0;
-    final itemSpacing = isTablet ? 14.0 : 10.0;
-    final iconContainerPadding = isTablet ? 10.0 : 8.0;
+  // Funcy con halo + título + subtítulo
+  Widget _buildHeader(double mascotSize, bool isTablet) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: mascotSize,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: mascotSize * 0.8,
+                height: mascotSize * 0.8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: _FnlColors.violetSecondary.withOpacity(0.25),
+                      blurRadius: 40,
+                      spreadRadius: 8,
+                    ),
+                  ],
+                ),
+              ),
+              Image.network(
+                _funcyUrl,
+                height: mascotSize,
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return SizedBox(
+                    height: mascotSize,
+                    width: mascotSize,
+                    child: const Center(
+                      child: SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: _FnlColors.violetSecondary,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (_, __, ___) =>
+                    SizedBox(height: mascotSize, width: mascotSize),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: _FnlSpace.sm),
+        // Píldora + título
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: _FnlColors.lavender,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.workspace_premium_rounded,
+                  size: 18, color: _FnlColors.violet),
+              const SizedBox(width: 6),
+              Text(
+                'Suscripción mensual',
+                style: GoogleFonts.manrope(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _FnlColors.violet,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text.rich(
+          TextSpan(children: [
+            TextSpan(text: 'Funcy ', style: _FnlText.h1(isTablet ? 40 : 34)),
+            TextSpan(
+              text: 'Pro',
+              style: _FnlText.h1(isTablet ? 40 : 34)
+                  .copyWith(color: _FnlColors.violet),
+            ),
+          ]),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Desbloquea tu mejor versión con Funcy',
+          textAlign: TextAlign.center,
+          style: _FnlText.body(size: isTablet ? 18 : 16),
+        ),
+      ],
+    );
+  }
+
+  // Beneficios: tarjeta "chunky" con checks
+  Widget _buildFeaturesCard(bool isTablet) {
+    final fontSize = isTablet ? 16.0 : 15.0;
 
     return Container(
-      padding: EdgeInsets.all(containerPadding),
-      constraints: BoxConstraints(
-        maxWidth: isLandscape ? 500 : 450,
-      ),
+      padding: const EdgeInsets.all(_FnlSpace.sm),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
+        color: _FnlColors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _FnlColors.border, width: 2),
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 10,
+            color: _FnlColors.border,
             offset: Offset(0, 4),
+            blurRadius: 0,
           ),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: features.asMap().entries.map((entry) {
-          final index = entry.key;
-          final feature = entry.value;
-          return Padding(
-            padding: EdgeInsets.only(
-              top: index == 0 ? 0 : itemSpacing,
-              bottom: index == features.length - 1 ? 0 : itemSpacing,
-            ),
-            child: Row(
+        children: [
+          for (int i = 0; i < _features.length; i++) ...[
+            if (i > 0) const SizedBox(height: 14),
+            Row(
               children: [
                 Container(
-                  padding: EdgeInsets.all(iconContainerPadding),
-                  decoration: BoxDecoration(
-                    color: Color(0xFF5027D0).withOpacity(0.1),
+                  width: 42,
+                  height: 42,
+                  decoration: const BoxDecoration(
+                    color: _FnlColors.lavender,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    feature['icon'] as IconData,
-                    color: Color(0xFF5027D0),
-                    size: iconSize,
+                    _features[i]['icon'] as IconData,
+                    color: _FnlColors.violet,
+                    size: 22,
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    feature['text'] as String,
-                    style: GoogleFonts.inter(
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF212121),
-                    ),
+                    _features[i]['text'] as String,
+                    style: _FnlText.feature(fontSize),
                   ),
                 ),
-                SizedBox(width: 8),
-                Icon(
-                  Icons.check_circle,
-                  color: Color(0xFF5027D0),
-                  size: checkSize,
+                const SizedBox(width: 8),
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: const BoxDecoration(
+                    color: _FnlColors.violet,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check_rounded,
+                      size: 16, color: _FnlColors.white),
                 ),
               ],
             ),
-          );
-        }).toList(),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _buildPriceCard(Size size, {bool isTablet = false}) {
-    if (_isLoading) {
-      return Center(
-        child: CircularProgressIndicator(color: Colors.white),
-      );
-    }
+  // Precio: tarjeta lavanda con el monto destacado
+  Widget _buildPriceCard(bool isTablet) {
+    Widget content;
 
-    if (!_available || _products.isEmpty) {
-      return Center(
-        child: Text(
-          'Servicio no disponible',
-          style: GoogleFonts.inter(
-            fontSize: isTablet ? 18.0 : 16.0,
-            color: Colors.white,
-          ),
+    if (_isLoading) {
+      content = const SizedBox(
+        width: 28,
+        height: 28,
+        child: CircularProgressIndicator(
+          strokeWidth: 2.5,
+          color: _FnlColors.violet,
         ),
       );
-    }
-
-    final product = _products.first;
-    final priceSize = isTablet ? 48.0 : 38.0;
-    final labelSize = isTablet ? 18.0 : 15.0;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            product.price,
-            style: GoogleFonts.inter(
-              fontSize: priceSize,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-              height: 1,
-              shadows: [
-                Shadow(
-                  color: Colors.black.withOpacity(0.3),
-                  offset: Offset(0, 2),
-                  blurRadius: 8,
-                ),
-              ],
+    } else if (!_available || _products.isEmpty) {
+      content = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Servicio no disponible',
+            textAlign: TextAlign.center,
+            style: _FnlText.body(size: isTablet ? 18 : 16),
+          ),
+          // Solo en modo debug: muestra el motivo para diagnosticar
+          if (kDebugMode && _storeDebugInfo != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              _storeDebugInfo!,
+              textAlign: TextAlign.center,
+              style: _FnlText.body(size: 12),
+            ),
+          ],
+        ],
+      );
+    } else {
+      final product = _products.first;
+      content = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              product.price,
+              style: GoogleFonts.manrope(
+                fontSize: isTablet ? 44 : 36,
+                fontWeight: FontWeight.w800,
+                color: _FnlColors.violet,
+                height: 1.1,
+              ),
             ),
           ),
-        ),
-        SizedBox(height: 4),
-        Text(
-          'por mes',
-          style: GoogleFonts.inter(
-            fontSize: labelSize,
-            fontWeight: FontWeight.w500,
-            color: Colors.white.withOpacity(0.9),
-            letterSpacing: 0.5,
+          const SizedBox(height: 2),
+          Text(
+            'por mes',
+            style: GoogleFonts.manrope(
+              fontSize: isTablet ? 16 : 14,
+              fontWeight: FontWeight.w700,
+              color: _FnlColors.body,
+              letterSpacing: 0.3,
+            ),
           ),
-        ),
-      ],
+        ],
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 88),
+      padding: const EdgeInsets.symmetric(
+          horizontal: _FnlSpace.md, vertical: _FnlSpace.sm),
+      decoration: BoxDecoration(
+        color: _FnlColors.lavender,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: _FnlColors.bubbleBorder,
+            offset: Offset(0, 4),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Center(child: content),
     );
   }
 
-  Widget _buildSubscribeButton(Size size,
-      {bool isDesktop = false, bool isTablet = false}) {
-    final buttonTextSize = isTablet ? 18.0 : 16.0;
-    final buttonPadding = isTablet ? 18.0 : 14.0;
-    final maxWidth = isDesktop ? 400.0 : (isTablet ? 350.0 : 320.0);
-
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: maxWidth,
+  Widget _buildSubscribeButton() {
+    return Column(
+      children: [
+        _PrimaryButton(
+          label: 'Suscríbete a Funcy PRO',
+          icon: Icons.arrow_forward_rounded,
+          loading: _isLoading,
+          enabled: !_isLoading && _products.isNotEmpty,
+          onTap: () => _buyProduct(_products.first),
         ),
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _isLoading || _products.isEmpty
-                ? null
-                : () => _buyProduct(_products.first),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: Color(0xFF5027D0),
-              disabledBackgroundColor: Colors.white.withOpacity(0.6),
-              disabledForegroundColor: Color(0xFF5027D0).withOpacity(0.5),
-              padding: EdgeInsets.symmetric(vertical: buttonPadding),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(40),
-              ),
-              elevation: 4,
-            ),
-            child: _isLoading
-                ? SizedBox(
-                    height: 20,
-                    width: 20,
+
+        // Botón de prueba: descomentar SOLO para desarrollo local.
+        // if (kDebugMode)
+        //   TextButton(
+        //     onPressed: _simulateSuccessfulPurchase,
+        //     child: const Text(
+        //       'TEST',
+        //       style: TextStyle(fontSize: 11),
+        //     ),
+        //   ),
+      ],
+    );
+  }
+}
+
+class _DecorCircle extends StatelessWidget {
+  final double size;
+  const _DecorCircle({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: _FnlColors.lavenderDeep,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+/// Botón primario FNL: 56 px, radio 18, violeta sólido.
+class _PrimaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final bool enabled;
+  final bool loading;
+
+  const _PrimaryButton({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.enabled = true,
+    this.loading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(18);
+    final Color fg = enabled ? _FnlColors.white : _FnlColors.disabledText;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      height: 56,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        color: (enabled || loading) ? _FnlColors.violet : _FnlColors.border,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: enabled ? onTap : null,
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
                     child: CircularProgressIndicator(
-                      strokeWidth: 2,
+                      strokeWidth: 2.5,
                       valueColor:
-                          AlwaysStoppedAnimation<Color>(Color(0xFF5027D0)),
+                          AlwaysStoppedAnimation<Color>(_FnlColors.white),
                     ),
                   )
-                : Text(
-                    'Suscríbete a Funcy PRO',
-                    style: GoogleFonts.inter(
-                      fontSize: buttonTextSize,
-                      fontWeight: FontWeight.w600,
-                    ),
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          label,
+                          overflow: TextOverflow.ellipsis,
+                          style: _FnlText.button(color: fg),
+                        ),
+                      ),
+                      if (icon != null) ...[
+                        const SizedBox(width: 8),
+                        Icon(icon, size: 20, color: fg),
+                      ],
+                    ],
                   ),
           ),
         ),

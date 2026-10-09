@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart' show GoogleFonts;
 import 'package:fnlapp/Main/models/test_notice.dart';
 import 'package:fnlapp/Main/subscription_screen.dart';
 import 'package:fnlapp/Main/widgets/test_completion_screen.dart';
@@ -18,6 +19,67 @@ import '../Util/test_notices_data.dart';
 import '../services/subscription_service.dart';
 import 'package:fnlapp/Main/certificate_screen.dart';
 
+class _FnlColors {
+  static const blue = Color(0xFF0B1457); // Azul FNL (H1 / H2)
+  static const violet = Color(0xFF6428E8); // Violeta principal
+  static const violetSecondary = Color(0xFF814CF4); // Violeta secundario
+  static const gradientStart = Color(0xFF5425E8);
+  static const lavender = Color(0xFFF4F1FF);
+  static const lavenderDeep = Color(0xFFEAE4FC);
+  static const canvas = Color(0xFFFCFBFF);
+  static const body = Color(0xFF70779C);
+  static const label = Color(0xFF5F668B);
+  static const border = Color(0xFFD9DCEF);
+  static const bubbleBorder = Color(0xFFDCD3FA);
+  static const disabledText = Color(0xFF9AA0C0);
+  static const white = Color(0xFFFFFFFF);
+}
+
+class _FnlSpace {
+  static const double xs = 8;
+  static const double sm = 16;
+  static const double md = 24;
+  static const double lg = 32;
+  static const double xl = 40;
+}
+
+class _FnlText {
+  static TextStyle h2(double size) => GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        color: _FnlColors.blue,
+        height: 1.25,
+      );
+
+  static TextStyle body({Color color = _FnlColors.body}) => GoogleFonts.roboto(
+        fontSize: 16,
+        fontWeight: FontWeight.w400,
+        color: color,
+        height: 1.5,
+      );
+
+  static TextStyle label({Color color = _FnlColors.label}) =>
+      GoogleFonts.manrope(
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        color: color,
+      );
+
+  static TextStyle option({required bool selected}) => GoogleFonts.manrope(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        color: selected ? _FnlColors.violet : _FnlColors.blue,
+        height: 1.35,
+      );
+
+  static TextStyle button({Color color = _FnlColors.white}) =>
+      GoogleFonts.manrope(
+        fontSize: 17,
+        fontWeight: FontWeight.w700,
+        color: color,
+      );
+}
+
 class TestEstresQuestionScreen extends StatefulWidget {
   const TestEstresQuestionScreen({Key? key}) : super(key: key);
 
@@ -27,10 +89,14 @@ class TestEstresQuestionScreen extends StatefulWidget {
 }
 
 class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
+  static const String _mascotUrl =
+      'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/meditating.png';
+  static const String _funcyUrl =
+      'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/funcy.png';
+
   bool isSubmitting = false;
   int currentQuestionIndex = 0;
-  List<int> selectedOptions = List<int>.filled(
-      23, 0); // Asigna un valor predeterminado (por ejemplo, 0)
+  List<int> selectedOptions = List<int>.filled(23, 0);
   int? userId;
   bool? isDay21Completed;
   bool showingNotice = false;
@@ -38,32 +104,33 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
   int? previousNoticeIndex;
   bool _imagesPrecached = false;
 
+
+  bool _testSaved = false;
+
   @override
   void initState() {
     super.initState();
-    _loadUserData(); // Cargamos el ID del usuario y estado del día 21
+    _loadUserData();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Precargar las imágenes de los avisos solo una vez.
     if (!_imagesPrecached) {
       _precacheNoticeImages();
       _imagesPrecached = true;
     }
   }
 
-  // Función para precargar las imágenes de los avisos en el caché.
   void _precacheNoticeImages() {
     for (var notice in testNotices) {
       if (notice.imagePath != null && notice.imagePath!.isNotEmpty) {
         precacheImage(NetworkImage(notice.imagePath!), context);
       }
     }
+    precacheImage(const NetworkImage(_funcyUrl), context);
   }
 
-  // Función para cargar el userId y estado del día 21 desde SharedPreferences
   Future<void> _loadUserData() async {
     int? id = await getUserId();
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -83,7 +150,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
     });
   }
 
-  // Función para obtener el perfil del usuario
   Future<Map<String, dynamic>?> _getUserProfile() async {
     try {
       String? token = await getToken();
@@ -109,19 +175,16 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
     }
   }
 
-  // Función para verificar si el usuario es de company 8 usando múltiples métodos
   Future<bool> _isCompany8User() async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // MÉTODO 1: Verificar desde SharedPreferences (guardado en IndexScreen)
       int? branchId = prefs.getInt('branch_id');
       int? companyId = prefs.getInt('company_id');
 
       print(
           'DEBUG: SharedPreferences - company_id = $companyId, branch_id = $branchId');
 
-      // Lista de branch_ids que pertenecen a la empresa ID 8 (General)
       List<int> company8BranchIds = [9];
 
       if (companyId == 8 ||
@@ -131,13 +194,11 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         return true;
       }
 
-      // MÉTODO 2: Verificar desde userProfile usando companyName
       Map<String, dynamic>? userProfile = await _getUserProfile();
       if (userProfile != null) {
         String? companyName = userProfile['companyName'];
         print('DEBUG: companyName desde perfil = $companyName');
 
-        // "General" es el nombre de la empresa ID 8
         if (companyName != null && companyName.toLowerCase() == 'general') {
           print(
               'DEBUG: Usuario identificado como company 8 por companyName="General"');
@@ -153,7 +214,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
     }
   }
 
-  // Función para formatear fecha en español
   String _formatDate(DateTime date) {
     const months = [
       'enero',
@@ -172,7 +232,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
     return '${date.day} de ${months[date.month - 1]} de ${date.year}';
   }
 
-  // Función para mapear el género a ID
   int _getGenderIdFromProfile(String gender) {
     switch (gender.toLowerCase()) {
       case 'masculino':
@@ -186,11 +245,9 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
     }
   }
 
-  // Función para seleccionar una opción
   void selectOption(int optionId) {
     setState(() {
-      selectedOptions[currentQuestionIndex] =
-          optionId; // Guarda la respuesta para la pregunta actual
+      selectedOptions[currentQuestionIndex] = optionId;
     });
   }
 
@@ -240,7 +297,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
     if (currentQuestionIndex > 0) {
       setState(() {
         currentQuestionIndex--;
-        // Verificar si hay un aviso en la pregunta anterior
         TestNotice? notice;
         try {
           notice = testNotices.firstWhere(
@@ -264,12 +320,10 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       showingNotice = false;
       currentNotice = null;
       previousNoticeIndex = null;
-      // No cambiar currentQuestionIndex, solo ocultar el aviso
     });
   }
 
   Future<void> submitTest() async {
-    // Verificar si ya está en proceso de envío
     if (isSubmitting) {
       print("Test ya está siendo enviado");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -279,13 +333,9 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       return;
     }
 
-    // Solo mostrar TestCompletionScreen para test de entrada
-    // Para test de salida, procesar directamente
     if (isDay21Completed == true) {
-      // Test de salida: procesar directamente sin pantalla de completion
       await _processTestSubmission();
     } else {
-      // Test de entrada: mostrar pantalla de finalización
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -299,12 +349,10 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
 
   Future<void> _processTestSubmission() async {
     try {
-      // Activar el bloqueo
       setState(() {
         isSubmitting = true;
       });
 
-      // Validar userId antes de proceder
       if (userId == null) {
         print("Error: userId es null");
         ScaffoldMessenger.of(context).showSnackBar(
@@ -313,7 +361,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         return;
       }
 
-      // Validar si selectedOptions está correctamente poblado
       if (selectedOptions.isEmpty || selectedOptions.length < 23) {
         print("Error: selectedOptions no tiene suficientes datos.");
         return;
@@ -332,62 +379,59 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       final updateEstresUrl =
           Uri.parse('${Config.apiUrl2}/users/$userId/estres-level');
 
-      // Calcular el puntaje total
       int totalScore = selectedOptions.fold(0, (sum, value) => sum + value);
 
-      // Obtener perfil del usuario desde apiUrl2
       Map<String, dynamic>? userProfile = await _getUserProfile();
       if (userProfile == null) {
         print('Error: No se pudo obtener el perfil del usuario');
         return;
       }
 
-      // Obtener gender_id desde el perfil
       int genderId =
           _getGenderIdFromProfile(userProfile['gender'] ?? 'Masculino');
 
-      // Calcular el nivel de estrés y su ID
       final Map<String, dynamic> estresResult =
           _calcularNivelEstres(totalScore, genderId);
       NivelEstres nivelEstres = estresResult['nivel'];
       int estresNivelId = estresResult['id'];
 
-      // Determinar el tipo de test basado en si el día 21 fue completado
       String testType = (isDay21Completed == true) ? 'exit' : 'entry';
 
-      // Preparar datos para la nueva API
-      List<Map<String, dynamic>> testData = [];
-      for (int i = 0; i < selectedOptions.length; i++) {
-        testData.add({
-          'user_id': userId,
-          'question_id': i + 1, // Las preguntas van del 1 al 23
-          'score': selectedOptions[i],
-          'test_type': testType,
-        });
-      }
+      // Solo se guarda una vez: si el usuario tocó "Ahora no" en el pop-up de
+      // suscripción y vuelve a pulsar "Finalizar", no se duplica el test.
+      if (!_testSaved) {
+        List<Map<String, dynamic>> testData = [];
+        for (int i = 0; i < selectedOptions.length; i++) {
+          testData.add({
+            'user_id': userId,
+            'question_id': i + 1,
+            'score': selectedOptions[i],
+            'test_type': testType,
+          });
+        }
 
-      // Guardar el test usando la nueva API
-      final saveResponse = await http.post(
-        saveTestUrl,
-        headers: {
-          "Content-Type": "application/json",
-          'Authorization': 'Bearer $token',
-        },
-        body: json.encode(testData),
-      );
-
-      if (saveResponse.statusCode != 201) {
-        print('Error al guardar el test: ${saveResponse.body}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al guardar el test')),
+        final saveResponse = await http.post(
+          saveTestUrl,
+          headers: {
+            "Content-Type": "application/json",
+            'Authorization': 'Bearer $token',
+          },
+          body: json.encode(testData),
         );
-        return;
-      }
 
-      print('Test guardado correctamente con tipo: $testType');
+        if (saveResponse.statusCode != 201) {
+          print('Error al guardar el test: ${saveResponse.body}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al guardar el test')),
+          );
+          return;
+        }
+
+        _testSaved = true;
+        print('Test guardado correctamente con tipo: $testType');
+      }
 
       if (testType == 'exit') {
-        // Si es un test de salida (día 21 completado), actualizar el nivel de estrés
         final updateData = {
           'estres_level': estresNivelId,
           'type': 'final',
@@ -409,21 +453,17 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
 
         print('Nivel de estrés actualizado correctamente.');
         final SharedPreferences prefs = await SharedPreferences.getInstance();
-        // Ocultar el botón del exit test y activar el botón del certificado
         await prefs.setBool('isDay21Completed', false);
         await prefs.setBool('hasCompletedExitTest', true);
 
         print("Test de salida completado, navegando a CertificateScreen.");
 
-        // Obtener nombre del usuario para el certificado
         String userName = userProfile['fullName'] ??
             userProfile['name'] ??
             '${userProfile['names'] ?? 'Usuario'} ${userProfile['lastnames'] ?? ''}';
 
-        // Formatear fecha actual
         String completionDate = _formatDate(DateTime.now());
 
-        // Navegar a la pantalla de certificado después del test de salida
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -437,7 +477,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
 
         return;
       } else {
-        // Test de entrada
         final updateData = {
           'estres_level': estresNivelId,
           'type': 'initial',
@@ -458,7 +497,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
 
         print('Registro de nivel de estrés creado correctamente.');
 
-        // Verificar si el usuario pertenece a la empresa 8 (General)
         bool isCompany8 = await _isCompany8User();
 
         print('========== SUBSCRIPTION DEBUG ==========');
@@ -468,61 +506,38 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
 
         print('hasAccessToPrograms = $hasAccess');
         print('========================================');
-        
-        // Verificar acceso a programas SOLO si es de company_id 8
+
         if (isCompany8) {
           if (!hasAccess) {
-            // Usuario no tiene acceso, mostrar diálogo de suscripción
             final shouldNavigate = await _showSubscriptionDialog();
+            if (!mounted) return;
 
-            if (shouldNavigate == true) {
-              // Usuario eligió suscribirse, navegar a pantalla de suscripción
-              final result = await Navigator.push(
+            if (shouldNavigate != true) {
+              return;
+            }
+
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SubscriptionScreen(showBackButton: false),
+              ),
+            );
+            if (!mounted) return;
+
+            if (result == true) {
+              await _generateProgram(userProfile, totalScore);
+              await _updateTestEstresBool();
+
+              Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
                   builder: (context) =>
-                      SubscriptionScreen(showBackButton: false),
+                      CargarProgramaScreen(nivelEstres: nivelEstres),
                 ),
               );
-
-              if (result == true) {
-                // Suscripción exitosa, generar programa
-                await _generateProgram(userProfile, totalScore);
-                await _updateTestEstresBool();
-
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        CargarProgramaScreen(nivelEstres: nivelEstres),
-                  ),
-                );
-              } else {
-                // No se completó la suscripción, volver a index
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => IndexScreen(
-                            username: '',
-                            apiServiceWithToken: ApiService(),
-                          )),
-                  (Route<dynamic> route) => false,
-                );
-              }
-            } else {
-              // Usuario canceló, volver a index
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => IndexScreen(
-                          username: '',
-                          apiServiceWithToken: ApiService(),
-                        )),
-                (Route<dynamic> route) => false,
-              );
             }
+            return;
           } else {
-            // Usuario tiene acceso (ya suscrito)
             await _generateProgram(userProfile, totalScore);
             await _updateTestEstresBool();
 
@@ -535,13 +550,11 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
             );
           }
         } else {
-            print('========================================');
-            print('POSIBLE BYPASS DE SUSCRIPCIÓN');
-            print('_isCompany8User() devolvió FALSE');
-            print('Se generará el programa SIN verificar suscripción');
-            print('========================================');          
-          // Usuario NO es de company_id 8 (empresas con suscripción corporativa)
-          // Generar programa directamente sin verificar suscripción individual
+          print('========================================');
+          print('POSIBLE BYPASS DE SUSCRIPCIÓN');
+          print('_isCompany8User() devolvió FALSE');
+          print('Se generará el programa SIN verificar suscripción');
+          print('========================================');
           await _generateProgram(userProfile, totalScore);
           await _updateTestEstresBool();
 
@@ -556,50 +569,201 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       }
     } catch (e) {
       print('Error al procesar el test: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al procesar el test')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al procesar el test')),
+        );
+      }
     } finally {
-      // Desactivar el bloqueo al finalizar, sea éxito o error
-      setState(() {
-        isSubmitting = false;
-      });
+      if (mounted) {
+        setState(() {
+          isSubmitting = false;
+        });
+      }
     }
   }
 
+
   Future<bool?> _showSubscriptionDialog() {
+    const double mascotSize = 140; 
+    const double mascotOverlap = 70; 
+
     return showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.workspace_premium, color: Color(0xFF5027D0)),
-              SizedBox(width: 8),
-              Text('Funcy PRO'),
-            ],
+      // Scrim azul FNL en vez del negro genérico
+      barrierColor: _FnlColors.blue.withOpacity(0.55),
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: _FnlSpace.md,
+            vertical: _FnlSpace.md,
           ),
-          content: Text(
-            'Para obtener tu programa personalizado de 30 dias, debes suscribirte a Funcy PRO.\n\n¿Deseas suscribirte ahora?',
-            style: TextStyle(fontSize: 16),
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF5027D0),
-                foregroundColor: Colors.white,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: SingleChildScrollView(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.85, end: 1.0),
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeOutBack,
+                builder: (context, scale, child) => Opacity(
+                  opacity: ((scale - 0.85) / 0.15).clamp(0.0, 1.0),
+                  child: Transform.scale(scale: scale, child: child),
+                ),
+                child: Stack(
+                  alignment: Alignment.topCenter,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: mascotOverlap),
+                      child: Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.fromLTRB(
+                          _FnlSpace.md,
+                          mascotSize - mascotOverlap + _FnlSpace.xs,
+                          _FnlSpace.md,
+                          _FnlSpace.sm,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _FnlColors.white,
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(
+                              color: _FnlColors.bubbleBorder, width: 2),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: _FnlColors.bubbleBorder,
+                              offset: Offset(0, 6),
+                              blurRadius: 0,
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Píldora PRO
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: _FnlColors.lavender,
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                    color: _FnlColors.bubbleBorder, width: 2),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.workspace_premium_rounded,
+                                      size: 18, color: _FnlColors.violet),
+                                  const SizedBox(width: 6),
+                                  Text('Funcy PRO',
+                                      style: _FnlText.label(
+                                          color: _FnlColors.violet)),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Tu programa personalizado te espera',
+                              textAlign: TextAlign.center,
+                              style: _FnlText.h2(22),
+                            ),
+                            const SizedBox(height: _FnlSpace.xs),
+                            Text(
+                              'Para obtener tu programa personalizado de 30 días, debes suscribirte a Funcy PRO.',
+                              textAlign: TextAlign.center,
+                              style: _FnlText.body(),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              '¿Deseas suscribirte ahora?',
+                              textAlign: TextAlign.center,
+                              style: _FnlText.label(color: _FnlColors.violet)
+                                  .copyWith(fontSize: 16),
+                            ),
+                            const SizedBox(height: _FnlSpace.md),
+                            _GradientButton(
+                              label: 'Suscribirme',
+                              icon: Icons.arrow_forward_rounded,
+                              onTap: () =>
+                                  Navigator.of(dialogContext).pop(true),
+                            ),
+                            const SizedBox(height: 4),
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.of(dialogContext).pop(false),
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size.fromHeight(44),
+                                foregroundColor: _FnlColors.label,
+                              ),
+                              child:
+                                  Text('Ahora no', style: _FnlText.label()),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    SizedBox(
+                      height: mascotSize,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: mascotSize * 0.7,
+                            height: mascotSize * 0.7,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _FnlColors.violetSecondary
+                                      .withOpacity(0.35),
+                                  blurRadius: 40,
+                                  spreadRadius: 6,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Image.network(
+                            _funcyUrl,
+                            height: mascotSize,
+                            fit: BoxFit.contain,
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) return child;
+                              return const SizedBox(
+                                height: mascotSize,
+                                width: mascotSize,
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 28,
+                                    height: 28,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: _FnlColors.violetSecondary,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                            errorBuilder: (_, __, ___) => const SizedBox(
+                              height: mascotSize,
+                              width: mascotSize,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: Text('Suscribirme'),
             ),
-          ],
+          ),
         );
       },
     );
   }
 
-  // Función para calcular el nivel de estrés
   Map<String, dynamic> _calcularNivelEstres(int totalScore, int genderId) {
     NivelEstres nivelEstres = NivelEstres.desconocido;
     int estresNivelId = 0;
@@ -612,7 +776,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         nivelEstres = NivelEstres.moderado;
         estresNivelId = 2;
       } else if (genderId == 2 || genderId == 3) {
-        // Considerando 3 como otro género
         nivelEstres =
             totalScore <= 132 ? NivelEstres.moderado : NivelEstres.severo;
         estresNivelId = totalScore <= 132 ? 2 : 3;
@@ -622,7 +785,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         nivelEstres = NivelEstres.severo;
         estresNivelId = 3;
       } else if (genderId == 2 || genderId == 3) {
-        // Considerando 3 como otro género
         nivelEstres = NivelEstres.severo;
         estresNivelId = 3;
       }
@@ -631,7 +793,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
     return {'nivel': nivelEstres, 'id': estresNivelId};
   }
 
-  // Generar programa usando la nueva API
   Future<void> _generateProgram(
       Map<String, dynamic> userProfile, int totalScore) async {
     try {
@@ -641,15 +802,12 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
         return;
       }
 
-      // Crear resumen de respuestas basado en el puntaje total
       String resumenRespuestas = _createResponseSummary(totalScore);
 
-      // Obtener la fecha actual para startDate
       DateTime now = DateTime.now();
       String startDate =
           "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
-      // Mapear el género para el userContext
       String genderCode = userProfile['gender'] == 'Masculino'
           ? 'M'
           : userProfile['gender'] == 'Femenino'
@@ -703,7 +861,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
     }
   }
 
-  // Crear resumen de respuestas basado en el puntaje total
   String _createResponseSummary(int totalScore) {
     if (totalScore <= 92) {
       return 'Usuario presenta niveles bajos de estrés. Respuestas indican manejo adecuado de situaciones cotidianas.';
@@ -714,7 +871,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
     }
   }
 
-  // Actualizar testestresbool a true en el backend usando apiUrl2
   Future<void> _updateTestEstresBool() async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -736,335 +892,516 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
       );
     }
 
-    // Verificación inicial para asegurarse de que 'questions' no esté vacío y que el índice esté en rango
     if (questions.isEmpty || currentQuestionIndex >= questions.length) {
       return Scaffold(
+        backgroundColor: _FnlColors.canvas,
         body: Center(
-          child: Text(
-              "No hay preguntas disponibles"), // Mensaje de error si no hay preguntas
+          child: Text('No hay preguntas disponibles', style: _FnlText.body()),
         ),
       );
     }
 
-    // Asignar la pregunta actual solo si la lista de preguntas tiene contenido y el índice es válido
     final question = questions[currentQuestionIndex];
 
-    // Obtener el ancho de la pantalla
-    double screenWidth = MediaQuery.of(context).size.width;
-
     return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final screenWidth = constraints.maxWidth;
-          final screenHeight = constraints.maxHeight;
-          final isTablet = screenWidth > 600;
+      backgroundColor: _FnlColors.canvas,
+      body: Stack(
+        children: [
+          const Positioned(
+            top: -70,
+            right: -70,
+            child: IgnorePointer(child: _DecorCircle(size: 220)),
+          ),
+          const Positioned(
+            bottom: -90,
+            left: -90,
+            child: IgnorePointer(child: _DecorCircle(size: 240)),
+          ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isTablet = constraints.maxWidth > 600;
+              final hPad = isTablet ? _FnlSpace.lg : _FnlSpace.md;
+              final maxContentWidth = isTablet ? 720.0 : double.infinity;
 
-          // Tamaños responsivos
-          final headerPadding = isTablet ? 24.0 : 16.0;
-          final iconSize = isTablet ? 28.0 : 24.0;
-          final titleFontSize = isTablet ? 20.0 : 16.0;
-          final questionFontSize = isTablet ? 22.0 : 16.0;
-          final descriptionFontSize = isTablet ? 19.0 : 16.0;
-          final optionFontSize = isTablet ? 24.0 : 22.0;
-          final buttonFontSize = isTablet ? 24.0 : 22.0;
-          final horizontalPadding = isTablet ? 32.0 : 24.0;
-          final maxContentWidth = isTablet ? 800.0 : double.infinity;
-
-          return Container(
-            color: Color(0xFFF6F6F6),
-            child: Column(
-              children: [
-                // Header con icono de retroceso y título (fijo)
-                Container(
-                  margin: EdgeInsets.only(
-                      top: MediaQuery.of(context).padding.top + 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF6F6F6),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0x14000000),
-                        blurRadius: 8,
-                        offset: Offset(0, 4),
-                        spreadRadius: 0,
+              return Column(
+                children: [
+                  _buildHeader(context, hPad, maxContentWidth),
+                  Expanded(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: maxContentWidth),
+                        child: SingleChildScrollView(
+                          padding: EdgeInsets.fromLTRB(
+                              hPad, _FnlSpace.xs, hPad, _FnlSpace.md),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildQuestionCard(question, isTablet),
+                              const SizedBox(height: _FnlSpace.md),
+                              ..._buildOptions(question),
+                            ],
+                          ),
+                        ),
                       ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      vertical: 10.0,
-                      horizontal: headerPadding,
                     ),
-                    child: Row(
-                      children: [
-                        if (currentQuestionIndex > 0)
-                          GestureDetector(
-                            onTap: goToPreviousQuestion,
-                            child: Container(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Icon(
-                                Icons.arrow_back_ios,
-                                color: Color(0xFF4320AD),
-                                size: iconSize,
+                  ),
+                  _buildBottomBar(context, hPad, maxContentWidth),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(
+      BuildContext context, double hPad, double maxContentWidth) {
+    final total = questions.length;
+    final progress = (currentQuestionIndex + 1) / total;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        hPad,
+        MediaQuery.of(context).padding.top + _FnlSpace.sm,
+        hPad,
+        _FnlSpace.xs,
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxContentWidth),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: currentQuestionIndex > 0
+                        ? Material(
+                            color: _FnlColors.white,
+                            elevation: 0,
+                            shape: const CircleBorder(
+                              side: BorderSide(
+                                  color: _FnlColors.bubbleBorder, width: 2),
+                            ),
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: goToPreviousQuestion,
+                              child: const Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                size: 16,
+                                color: _FnlColors.violet,
                               ),
                             ),
                           )
-                        else
-                          SizedBox(width: 40 + (isTablet ? 8 : 0)),
-                        Expanded(
-                          child: Center(
-                            child: Text(
-                              'Pregunta ${currentQuestionIndex + 1} de ${questions.length}',
-                              style: TextStyle(
-                                color: const Color(0xFF4320AD),
-                                fontSize: titleFontSize,
-                                fontFamily: 'Inter',
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 40 + (isTablet ? 8 : 0)),
-                      ],
+                        : null,
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        'Pregunta ${currentQuestionIndex + 1} de $total',
+                        style: _FnlText.label(),
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 40),
+                ],
+              ),
+              const SizedBox(height: _FnlSpace.sm),
+              Container(
+                height: 14,
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: _FnlColors.lavenderDeep,
+                  borderRadius: BorderRadius.circular(999),
                 ),
-
-                SizedBox(height: isTablet ? 30 : 20),
-
-                // Pregunta (fija)
-                Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxContentWidth),
-                    child: Column(
-                      children: [
-                        if (question['question'] != null)
-                          Padding(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: horizontalPadding),
-                            child: Text(
-                              question['question']!,
-                              textAlign: TextAlign.start,
-                              style: TextStyle(
-                                color: const Color(0xFF4320AD),
-                                fontSize: questionFontSize,
-                                fontFamily: 'Inter',
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        if (question['description'] != null) ...[
-                          SizedBox(height: isTablet ? 16 : 12),
-                          Padding(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: horizontalPadding),
-                            child: Text(
-                              question['description']!,
-                              textAlign: TextAlign.start,
-                              style: TextStyle(
-                                fontSize: descriptionFontSize,
-                                fontFamily: 'Inter',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-
-                SizedBox(height: isTablet ? 30 : 20),
-
-                // Opciones scrolleables
-                Expanded(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: maxContentWidth),
-                      child: SingleChildScrollView(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: horizontalPadding),
-                        child: Column(
-                          children: List.generate(8, (index) {
-                            final optionKey = 'option${index + 1}';
-                            final detailKey = 'detail${index + 1}';
-                            final optionText = question[optionKey];
-                            final optionDetail = question[detailKey];
-
-                            if (optionText == null || optionDetail == null) {
-                              return SizedBox.shrink();
-                            }
-
-                            bool isSelected =
-                                selectedOptions[currentQuestionIndex] ==
-                                    (index + 1);
-
-                            return Padding(
-                              padding: EdgeInsets.symmetric(
-                                  vertical: isTablet ? 10.0 : 8.0),
-                              child: GestureDetector(
-                                onTap: () => selectOption(index + 1),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 300),
-                                  width: double.infinity,
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: isTablet ? 16 : 12,
-                                    horizontal: isTablet ? 40 : 32,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? Color(0x8E5027D0)
-                                        : Colors.white,
-                                    border: Border.all(
-                                      width: 2,
-                                      color: Color(0xFF6D4BD8),
-                                    ),
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        optionText,
-                                        style: TextStyle(
-                                          color: isSelected
-                                              ? Colors.white
-                                              : Color(0xFF6D4BD8),
-                                          fontSize: optionFontSize,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      if (isSelected)
-                                        Padding(
-                                          padding: EdgeInsets.only(
-                                              top: isTablet ? 12.0 : 8.0),
-                                          child: Text.rich(
-                                            TextSpan(
-                                              children: [
-                                                TextSpan(
-                                                  text: "Detalle: ",
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize:
-                                                        isTablet ? 16 : 14,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                                TextSpan(
-                                                  text: optionDetail,
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize:
-                                                        isTablet ? 16 : 14,
-                                                    fontWeight: FontWeight.w400,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
+                alignment: Alignment.centerLeft,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: progress),
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOutBack,
+                  builder: (context, value, _) => FractionallySizedBox(
+                    widthFactor: value.clamp(0.0, 1.0),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            _FnlColors.gradientStart,
+                            _FnlColors.violetSecondary,
+                          ],
                         ),
+                        borderRadius: BorderRadius.all(Radius.circular(999)),
                       ),
                     ),
                   ),
                 ),
-
-                // Botón Siguiente/Finalizar (fijo)
-                Container(
-                  padding: EdgeInsets.fromLTRB(
-                    horizontalPadding,
-                    12,
-                    horizontalPadding,
-                    MediaQuery.of(context).padding.bottom +
-                        (isTablet ? 30 : 20),
-                  ),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: maxContentWidth),
-                      child: Builder(
-                        builder: (context) {
-                          final bool isNextEnabled =
-                              selectedOptions[currentQuestionIndex] != 0;
-                          final String nextLabel =
-                              currentQuestionIndex < questions.length - 1
-                                  ? 'Siguiente'
-                                  : 'Continuar';
-
-                          return GestureDetector(
-                            onTap: isNextEnabled && !isSubmitting
-                                ? () {
-                                    if (currentQuestionIndex <
-                                        questions.length - 1) {
-                                      goToNextQuestion();
-                                    } else {
-                                      submitTest();
-                                    }
-                                  }
-                                : null,
-                            child: Container(
-                              width: double.infinity,
-                              padding: EdgeInsets.symmetric(
-                                  vertical: isTablet ? 18 : 16),
-                              decoration: ShapeDecoration(
-                                color: (isNextEnabled && !isSubmitting)
-                                    ? const Color(0xFF6D4BD8)
-                                    : const Color(0xFFD7D7D7),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(40),
-                                ),
-                                shadows: isNextEnabled
-                                    ? const [
-                                        BoxShadow(
-                                          color: Color(0x26000000),
-                                          blurRadius: 6,
-                                          offset: Offset(0, 2),
-                                          spreadRadius: 2,
-                                        ),
-                                      ]
-                                    : const [],
-                              ),
-                              child: Center(
-                                child: isSubmitting
-                                    ? SizedBox(
-                                        width: isTablet ? 24 : 20,
-                                        height: isTablet ? 24 : 20,
-                                        child: CircularProgressIndicator(
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                  Colors.white),
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : Text(
-                                        nextLabel,
-                                        style: TextStyle(
-                                          color:
-                                              (isNextEnabled && !isSubmitting)
-                                                  ? Colors.white
-                                                  : const Color(0xFF868686),
-                                          fontSize: buttonFontSize,
-                                          fontFamily: 'Inter',
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+              ),
+            ],
+          ),
+        ),
       ),
+    );
+  }
+
+  Widget _buildQuestionCard(Map<String, dynamic> question, bool isTablet) {
+    final mascotSize = isTablet ? 140.0 : 108.0;
+
+    return Column(
+      children: [
+        // Mascota con halo suave
+        SizedBox(
+          height: mascotSize,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: mascotSize * 0.8,
+                height: mascotSize * 0.8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: _FnlColors.violetSecondary.withOpacity(0.22),
+                      blurRadius: 40,
+                      spreadRadius: 8,
+                    ),
+                  ],
+                ),
+              ),
+              Image.network(
+                _mascotUrl,
+                height: mascotSize,
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return SizedBox(
+                    height: mascotSize,
+                    width: mascotSize,
+                    child: const Center(
+                      child: SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: _FnlColors.violetSecondary,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (_, __, ___) => SizedBox(
+                  height: mascotSize,
+                  width: mascotSize,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: _FnlSpace.xs),
+        // Globo de diálogo con colita apuntando a Funcy
+        Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.topCenter,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(
+                    _FnlSpace.md, _FnlSpace.md, _FnlSpace.md, _FnlSpace.md),
+                decoration: BoxDecoration(
+                  color: _FnlColors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: _FnlColors.bubbleBorder,
+                      offset: Offset(0, 4),
+                      blurRadius: 0,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    if (question['question'] != null)
+                      Text(
+                        question['question']!,
+                        textAlign: TextAlign.center,
+                        style: _FnlText.h2(isTablet ? 24 : 20),
+                      ),
+                    if (question['description'] != null) ...[
+                      const SizedBox(height: _FnlSpace.xs),
+                      Text(
+                        question['description']!,
+                        textAlign: TextAlign.center,
+                        style: _FnlText.body(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 2,
+              child: Transform.rotate(
+                angle: 0.785398, // 45°
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  decoration: const BoxDecoration(
+                    color: _FnlColors.white,
+                    border: Border(
+                      top: BorderSide(color: _FnlColors.bubbleBorder, width: 2),
+                      left:
+                          BorderSide(color: _FnlColors.bubbleBorder, width: 2),
+                    ),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(4),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _buildOptions(Map<String, dynamic> question) {
+    final widgets = <Widget>[];
+
+    for (int index = 0; index < 8; index++) {
+      final optionText = question['option${index + 1}'];
+      final optionDetail = question['detail${index + 1}'];
+      if (optionText == null || optionDetail == null) continue;
+
+      final isSelected = selectedOptions[currentQuestionIndex] == (index + 1);
+
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => selectOption(index + 1),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOut,
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: _FnlSpace.sm, vertical: 14),
+              decoration: BoxDecoration(
+                color: isSelected ? _FnlColors.lavender : _FnlColors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  width: 2,
+                  color: isSelected ? _FnlColors.violet : _FnlColors.border,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isSelected
+                        ? _FnlColors.violet.withOpacity(0.35)
+                        : _FnlColors.border,
+                    offset: Offset(0, isSelected ? 2 : 4),
+                    blurRadius: 0,
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      _SelectionDot(selected: isSelected),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          optionText,
+                          style: _FnlText.option(selected: isSelected),
+                        ),
+                      ),
+                    ],
+                  ),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOut,
+                    alignment: Alignment.topCenter,
+                    child: isSelected
+                        ? Padding(
+                            padding: const EdgeInsets.only(
+                                top: _FnlSpace.xs, left: 36),
+                            child: Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: 'Detalle: ',
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: _FnlColors.violet,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: optionDetail,
+                                    style: GoogleFonts.roboto(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w400,
+                                      color: _FnlColors.body,
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : const SizedBox(width: double.infinity),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return widgets;
+  }
+
+  Widget _buildBottomBar(
+      BuildContext context, double hPad, double maxContentWidth) {
+    final bool isNextEnabled = selectedOptions[currentQuestionIndex] != 0;
+    final bool isLast = currentQuestionIndex >= questions.length - 1;
+    final String nextLabel = isLast ? 'Continuar' : 'Siguiente';
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        hPad,
+        _FnlSpace.sm,
+        hPad,
+        MediaQuery.of(context).padding.bottom + _FnlSpace.md,
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxContentWidth),
+          child: _GradientButton(
+            label: nextLabel,
+            icon: Icons.arrow_forward_rounded,
+            loading: isSubmitting,
+            enabled: isNextEnabled && !isSubmitting,
+            onTap: () {
+              if (!isLast) {
+                goToNextQuestion();
+              } else {
+                submitTest();
+              }
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DecorCircle extends StatelessWidget {
+  final double size;
+  const _DecorCircle({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: _FnlColors.lavenderDeep,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+class _GradientButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final bool enabled;
+  final bool loading;
+
+  const _GradientButton({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.enabled = true,
+    this.loading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(18);
+    final Color fg = enabled ? _FnlColors.white : _FnlColors.disabledText;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      height: 56,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        color: (enabled || loading) ? _FnlColors.violet : _FnlColors.border,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: enabled ? onTap : null,
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(_FnlColors.white),
+                    ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(label, style: _FnlText.button(color: fg)),
+                      if (icon != null) ...[
+                        const SizedBox(width: 8),
+                        Icon(icon, size: 20, color: fg),
+                      ],
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectionDot extends StatelessWidget {
+  final bool selected;
+  const _SelectionDot({required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: selected ? _FnlColors.violet : _FnlColors.white,
+        border: Border.all(
+          width: selected ? 0 : 2,
+          color: _FnlColors.border,
+        ),
+      ),
+      child: selected
+          ? const Icon(Icons.check_rounded, size: 16, color: _FnlColors.white)
+          : null,
     );
   }
 }

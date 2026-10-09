@@ -1,4 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart' show GoogleFonts;
+
+
+class _FnlColors {
+  static const blue = Color(0xFF0B1457);
+  static const violet = Color(0xFF6428E8);
+  static const body = Color(0xFF70779C);
+  static const border = Color(0xFFD9DCEF);
+  static const bubbleBorder = Color(0xFFDCD3FA);
+  static const disabledText = Color(0xFF9AA0C0);
+  static const white = Color(0xFFFFFFFF);
+}
 
 class ChatBoxFooter extends StatelessWidget {
   final TextEditingController textEditingController;
@@ -9,91 +21,109 @@ class ChatBoxFooter extends StatelessWidget {
     required this.onSendMessage,
   });
 
+  void _send() {
+    final message = textEditingController.text.trim();
+    if (message.isEmpty) return;
+    onSendMessage(message);
+    textEditingController.clear();
+  }
+
+  OutlineInputBorder _border(Color color, double width) {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: color, width: width),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.all(16.0),
-      child: Row(
-        children: [
-          // Campo de texto expandido
-          Expanded(
-            child: Container(
-              constraints: BoxConstraints(
-                minHeight: 50,
-                maxHeight: 120,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: ShapeDecoration(
-                color: const Color(0xFFF8F7FD),
-                shape: RoundedRectangleBorder(
-                  side: BorderSide(width: 1, color: Colors.black),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-              ),
-              child: TextField(
-                controller: textEditingController,
-                style: TextStyle(
-                  color: const Color(0xFF020107),
-                  fontSize: 16,
-                  fontFamily: 'Inter',
-                  fontWeight: FontWeight.w500,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Mensaje...',
-                  hintStyle: TextStyle(
-                    color: const Color(0xFF222222),
+      decoration: const BoxDecoration(
+        color: _FnlColors.white,
+        border: Border(
+          top: BorderSide(color: _FnlColors.bubbleBorder, width: 2),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Campo de texto expandido
+              Expanded(
+                child: TextField(
+                  controller: textEditingController,
+                  style: GoogleFonts.roboto(
+                    color: _FnlColors.blue,
                     fontSize: 16,
-                    fontFamily: 'Inter',
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w400,
+                    height: 1.4,
                   ),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                  isDense: true,
+                  cursorColor: _FnlColors.violet,
+                  decoration: InputDecoration(
+                    hintText: 'Mensaje...',
+                    hintStyle: GoogleFonts.roboto(
+                      color: _FnlColors.body,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    filled: true,
+                    fillColor: _FnlColors.white,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 16),
+                    enabledBorder: _border(_FnlColors.border, 1),
+                    focusedBorder: _border(_FnlColors.violet, 2),
+                    border: _border(_FnlColors.border, 1),
+                  ),
+                  maxLines: 5, // Máximo de líneas visibles
+                  minLines: 1,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
+
+                  onSubmitted: (_) => _send(),
                 ),
-                maxLines: 5, // Máximo de líneas visibles
-                minLines: 1,
-                keyboardType: TextInputType.multiline,
-                textInputAction: TextInputAction.newline,
-                onSubmitted: (message) {
-                  String trimmedMessage = message.trim();
-                  if (trimmedMessage.isNotEmpty) {
-                    onSendMessage(trimmedMessage);
-                    textEditingController.clear();
-                  }
+              ),
+
+              const SizedBox(width: 8),
+
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: textEditingController,
+                builder: (context, value, _) {
+                  final bool enabled = value.text.trim().isNotEmpty;
+                  final radius = BorderRadius.circular(18);
+
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: enabled ? _FnlColors.violet : _FnlColors.border,
+                      borderRadius: radius,
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: radius,
+                        onTap: enabled ? _send : null,
+                        child: Icon(
+                          Icons.arrow_upward_rounded,
+                          size: 24,
+                          semanticLabel: 'Enviar mensaje',
+                          color: enabled
+                              ? _FnlColors.white
+                              : _FnlColors.disabledText,
+                        ),
+                      ),
+                    ),
+                  );
                 },
               ),
-            ),
+            ],
           ),
-
-          SizedBox(width: 8), // Espaciado entre el campo y el botón
-
-          // Botón de enviar
-          Container(
-            width: 44,
-            height: 44,
-            decoration: ShapeDecoration(
-              color: const Color(0xFF6D4BD8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(22),
-              ),
-            ),
-            child: IconButton(
-              icon: Icon(
-                Icons.send,
-                color: Colors.white,
-                size: 20,
-              ),
-              padding: EdgeInsets.zero,
-              onPressed: () {
-                String message = textEditingController.text.trim();
-                if (message.isNotEmpty) {
-                  onSendMessage(message);
-                  textEditingController.clear();
-                }
-              },
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

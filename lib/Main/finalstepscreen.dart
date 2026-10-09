@@ -1,10 +1,56 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
-import 'package:http/http.dart' as http;
+import 'package:google_fonts/google_fonts.dart' show GoogleFonts;
 import 'package:fnlapp/Main/home.dart';
-import 'dart:convert';
-import '../config.dart';
 import '../Util/api_service.dart';
+
+class _FnlColors {
+  static const blue = Color(0xFF0B1457);
+  static const violet = Color(0xFF6428E8);
+  static const violetSecondary = Color(0xFF814CF4);
+  static const lavender = Color(0xFFF4F1FF);
+  static const lavenderDeep = Color(0xFFEAE4FC);
+  static const canvas = Color(0xFFFCFBFF);
+  static const body = Color(0xFF70779C);
+  static const border = Color(0xFFD9DCEF);
+  static const bubbleBorder = Color(0xFFDCD3FA);
+  static const disabledText = Color(0xFF9AA0C0);
+  static const star = Color(0xFFF1D93E); 
+  static const white = Color(0xFFFFFFFF);
+}
+
+class _FnlSpace {
+  static const double xs = 8;
+  static const double sm = 16;
+  static const double md = 24;
+  static const double lg = 32;
+}
+
+class _FnlText {
+  static TextStyle h2(double size) => GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        color: _FnlColors.blue,
+        height: 1.25,
+      );
+
+  static TextStyle body({double size = 16, Color color = _FnlColors.blue}) =>
+      GoogleFonts.roboto(
+        fontSize: size,
+        fontWeight: FontWeight.w400,
+        color: color,
+        height: 1.5,
+      );
+
+  static TextStyle button({Color color = _FnlColors.white}) =>
+      GoogleFonts.manrope(
+        fontSize: 17,
+        fontWeight: FontWeight.w700,
+        color: color,
+      );
+}
 
 class FinalStepScreen extends StatefulWidget {
   final int userId;
@@ -24,101 +70,52 @@ class FinalStepScreen extends StatefulWidget {
 
 class _FinalStepScreenState extends State<FinalStepScreen>
     with SingleTickerProviderStateMixin {
+  static const String _happyUrl =
+      'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/happy.png';
+
   final TextEditingController _commentController = TextEditingController();
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
+  late final AnimationController _animationController;
+  late final List<Animation<double>> _staggered;
 
   double _rating = 3.0;
   MoodLevel _selectedMood = MoodLevel.neutral;
   bool _isLoading = false;
+  bool _submitted = false; // evita un segundo envío mientras se navega
+  bool _imagesPrecached = false;
   String _feedbackMessage = '';
-
-  // Colores del tema
-  static const Color _primaryColor = Color(0xFF4B158D);
-  static const Color _backgroundOverlay = Color(0xFF2D0A4E);
-  static const Color _textColor = Color(0xFFF6F6F6);
-  static const Color _starColor = Color(0xFFF1D93E);
-
-  // Helper method para obtener el tipo de dispositivo
-  DeviceType _getDeviceType(double width) {
-    if (width < 600) return DeviceType.mobile;
-    if (width < 1024) return DeviceType.tablet;
-    return DeviceType.desktop;
-  }
-
-  // Helper method para obtener dimensiones responsivas
-  ResponsiveDimensions _getResponsiveDimensions(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final deviceType = _getDeviceType(size.width);
-
-    switch (deviceType) {
-      case DeviceType.mobile:
-        return ResponsiveDimensions(
-          padding: 20.0,
-          headerFontSize: 18.0,
-          sectionSpacing: 32.0,
-          starSize: 48.0,
-          moodIconSize: 40.0,
-          textFieldHeight: 4,
-          buttonWidth: size.width * 0.8,
-          buttonHeight: 56.0,
-          maxContentWidth: size.width,
-          topSpacing: 60.0,
-          textFieldFontSize: 15.0,
-          moodTextSize: 16.0,
-        );
-      case DeviceType.tablet:
-        return ResponsiveDimensions(
-          padding: 32.0,
-          headerFontSize: 22.0,
-          sectionSpacing: 40.0,
-          starSize: 58.0,
-          moodIconSize: 48.0,
-          textFieldHeight: 5,
-          buttonWidth: 300.0,
-          buttonHeight: 64.0,
-          maxContentWidth: size.width * 0.8,
-          topSpacing: 80.0,
-          textFieldFontSize: 17.0,
-          moodTextSize: 18.0,
-        );
-      case DeviceType.desktop:
-        return ResponsiveDimensions(
-          padding: 40.0,
-          headerFontSize: 24.0,
-          sectionSpacing: 48.0,
-          starSize: 68.0,
-          moodIconSize: 56.0,
-          textFieldHeight: 6,
-          buttonWidth: 320.0,
-          buttonHeight: 72.0,
-          maxContentWidth: 600.0,
-          topSpacing: 100.0,
-          textFieldFontSize: 18.0,
-          moodTextSize: 20.0,
-        );
-    }
-  }
+  bool _feedbackIsError = false;
+  Timer? _navTimer;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
+    _staggered = List.generate(4, (i) {
+      final start = i * 0.14;
+      return CurvedAnimation(
+        parent: _animationController,
+        curve: Interval(start, (start + 0.5).clamp(0.0, 1.0),
+            curve: Curves.easeOut),
+      );
+    });
     _animationController.forward();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_imagesPrecached) {
+      precacheImage(const NetworkImage(_happyUrl), context);
+      _imagesPrecached = true;
+    }
+  }
+
+  @override
   void dispose() {
+    _navTimer?.cancel();
     _commentController.dispose();
     _animationController.dispose();
     super.dispose();
@@ -128,18 +125,23 @@ class _FinalStepScreenState extends State<FinalStepScreen>
       _commentController.text.trim().isNotEmpty && _rating > 0;
 
   Future<void> _submitFeedback() async {
-    if (!_isFormValid || _isLoading) return;
+    if (!_isFormValid || _isLoading || _submitted) return;
 
     setState(() {
       _isLoading = true;
       _feedbackMessage = '';
+      _feedbackIsError = false;
     });
 
     try {
       await _sendFeedbackToServer();
+      if (!mounted) return;
+      _submitted = true;
       _showSuccessAndNavigate();
     } catch (e) {
-      _showErrorMessage('Error de conexión: ${e.toString()}');
+      debugPrint('Error al enviar feedback: $e');
+      _showErrorMessage(
+          'No se pudo enviar tu comentario. Revisa tu conexión e inténtalo de nuevo.');
     } finally {
       if (mounted) {
         setState(() {
@@ -170,323 +172,449 @@ class _FinalStepScreenState extends State<FinalStepScreen>
   void _showSuccessAndNavigate() {
     setState(() {
       _feedbackMessage = 'Comentario enviado exitosamente';
+      _feedbackIsError = false;
     });
 
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => HomeScreen()),
-              (Route<dynamic> route) => false,
-        );
-      }
+    _navTimer = Timer(const Duration(seconds: 1), () {
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+        (Route<dynamic> route) => false,
+      );
     });
   }
 
   void _showErrorMessage(String message) {
+    if (!mounted) return;
     setState(() {
       _feedbackMessage = message;
+      _feedbackIsError = true;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final dimensions = _getResponsiveDimensions(context);
-    final deviceType = _getDeviceType(MediaQuery.of(context).size.width);
-
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: _buildBody(dimensions, deviceType),
-    );
-  }
-
-  Widget _buildBody(ResponsiveDimensions dimensions, DeviceType deviceType) {
-    return Container(
-      decoration: const BoxDecoration(
-        image: DecorationImage(
-          image: NetworkImage(
-              'https://funkyrecursos.s3.us-east-2.amazonaws.com/assets/fondo_rese%C3%B1a.png'
+      backgroundColor: _FnlColors.canvas,
+      body: Stack(
+        children: [
+          const Positioned(
+            top: -70,
+            right: -70,
+            child: IgnorePointer(child: _DecorCircle(size: 220)),
           ),
-          fit: BoxFit.cover,
-        ),
-      ),
-      child: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: deviceType == DeviceType.desktop
-              ? _buildDesktopLayout(dimensions)
-              : _buildMobileTabletLayout(dimensions),
-        ),
+          const Positioned(
+            bottom: -90,
+            left: -90,
+            child: IgnorePointer(child: _DecorCircle(size: 240)),
+          ),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isTablet = constraints.maxWidth > 600;
+                final isSmallHeight = constraints.maxHeight < 700;
+                final hPad = isTablet ? _FnlSpace.lg : _FnlSpace.md;
+                final maxContentWidth = isTablet ? 720.0 : double.infinity;
+                final mascotSize = isTablet
+                    ? 160.0
+                    : isSmallHeight
+                        ? 96.0
+                        : 120.0;
+
+                return Column(
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints:
+                              BoxConstraints(maxWidth: maxContentWidth),
+                          child: SingleChildScrollView(
+                            padding: EdgeInsets.fromLTRB(
+                                hPad, _FnlSpace.md, hPad, _FnlSpace.md),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _stagger(0, _buildHeader(mascotSize, isTablet)),
+                                const SizedBox(height: _FnlSpace.md),
+                                _stagger(1, _buildRatingCard(isTablet)),
+                                const SizedBox(height: _FnlSpace.sm),
+                                _stagger(2, _buildCommentField(isTablet)),
+                                const SizedBox(height: _FnlSpace.sm),
+                                _stagger(3, _buildMoodCard(isTablet)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    _buildBottomBar(hPad, maxContentWidth),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildDesktopLayout(ResponsiveDimensions dimensions) {
-    return Center(
-      child: Container(
-        constraints: BoxConstraints(maxWidth: dimensions.maxContentWidth),
-        padding: EdgeInsets.all(dimensions.padding),
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(height: dimensions.topSpacing),
-                    _buildHeaderText(dimensions),
-                    SizedBox(height: dimensions.sectionSpacing),
-                    _buildRatingSection(dimensions),
-                    SizedBox(height: dimensions.sectionSpacing),
-                    _buildCommentSection(dimensions),
-                    SizedBox(height: dimensions.sectionSpacing),
-                    _buildMoodSection(dimensions),
-                    SizedBox(height: dimensions.sectionSpacing * 0.75),
-                    _buildFeedbackMessage(dimensions),
+  Widget _stagger(int index, Widget child) {
+    final animation = _staggered[index];
+    return FadeTransition(
+      opacity: animation,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.06),
+          end: Offset.zero,
+        ).animate(animation),
+        child: child,
+      ),
+    );
+  }
+
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(
+      color: _FnlColors.white,
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: _FnlColors.border, width: 2),
+      boxShadow: const [
+        BoxShadow(
+          color: _FnlColors.border,
+          offset: Offset(0, 4),
+          blurRadius: 0,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeader(double mascotSize, bool isTablet) {
+    return Column(
+      children: [
+        SizedBox(
+          height: mascotSize,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: mascotSize * 0.8,
+                height: mascotSize * 0.8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: _FnlColors.violetSecondary.withOpacity(0.22),
+                      blurRadius: 40,
+                      spreadRadius: 8,
+                    ),
                   ],
                 ),
               ),
+              Image.network(
+                _happyUrl,
+                height: mascotSize,
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return SizedBox(
+                    height: mascotSize,
+                    width: mascotSize,
+                    child: const Center(
+                      child: SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: _FnlColors.violetSecondary,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (_, __, ___) =>
+                    SizedBox(height: mascotSize, width: mascotSize),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: _FnlSpace.xs),
+        Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.topCenter,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(_FnlSpace.md),
+                decoration: BoxDecoration(
+                  color: _FnlColors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: _FnlColors.bubbleBorder,
+                      offset: Offset(0, 4),
+                      blurRadius: 0,
+                    ),
+                  ],
+                ),
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(
+                      text: 'Califica tu experiencia con la técnica de '
+                          'relajación de hoy que te ofreció ',
+                      style: _FnlText.h2(isTablet ? 24 : 20),
+                    ),
+                    TextSpan(
+                      text: 'Funcy',
+                      style: _FnlText.h2(isTablet ? 24 : 20)
+                          .copyWith(color: _FnlColors.violet),
+                    ),
+                  ]),
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ),
-            _buildSubmitButton(dimensions),
+            Positioned(
+              top: 2,
+              child: Transform.rotate(
+                angle: 0.785398, // 45°
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  decoration: const BoxDecoration(
+                    color: _FnlColors.white,
+                    border: Border(
+                      top: BorderSide(color: _FnlColors.bubbleBorder, width: 2),
+                      left:
+                          BorderSide(color: _FnlColors.bubbleBorder, width: 2),
+                    ),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(4),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // Estrellas
+  Widget _buildRatingCard(bool isTablet) {
+    final double maxStar = isTablet ? 56 : 48;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+          vertical: _FnlSpace.md, horizontal: _FnlSpace.sm),
+      decoration: _cardDecoration(),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final double starSize =
+              (constraints.maxWidth / 5 / 1.1).clamp(32.0, maxStar);
+
+          return Center(
+            child: RatingBar.builder(
+              initialRating: _rating,
+              minRating: 1,
+              direction: Axis.horizontal,
+              allowHalfRating: false,
+              itemCount: 5,
+              itemSize: starSize,
+              itemPadding: EdgeInsets.symmetric(horizontal: starSize * 0.05),
+              glowColor: _FnlColors.star.withOpacity(0.3),
+              unratedColor: _FnlColors.border,
+              itemBuilder: (context, index) => const Icon(
+                Icons.star_rounded,
+                color: _FnlColors.star,
+              ),
+              onRatingUpdate: (rating) {
+                setState(() {
+                  _rating = rating;
+                });
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // Comentario
+  Widget _buildCommentField(bool isTablet) {
+    OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: color, width: width),
+        );
+
+    return TextField(
+      controller: _commentController,
+      minLines: 3,
+      maxLines: isTablet ? 6 : 5,
+      textCapitalization: TextCapitalization.sentences,
+      keyboardType: TextInputType.multiline,
+      cursorColor: _FnlColors.violet,
+      style: _FnlText.body(),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: _FnlColors.white,
+        hintText: 'Deja un comentario sobre la técnica',
+        hintStyle: _FnlText.body(color: _FnlColors.body),
+        contentPadding: const EdgeInsets.all(_FnlSpace.sm),
+        enabledBorder: border(_FnlColors.border, 1),
+        focusedBorder: border(_FnlColors.violet, 2),
+        border: border(_FnlColors.border, 1),
+      ),
+    );
+  }
+
+  // Estado de ánimo
+  Widget _buildMoodCard(bool isTablet) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(_FnlSpace.md),
+      decoration: _cardDecoration(),
+      child: Column(
+        children: [
+          Text(
+            '¿Qué tan aliviado te sientes luego de la sesión de hoy?',
+            textAlign: TextAlign.center,
+            style: _FnlText.h2(isTablet ? 20 : 18),
+          ),
+          const SizedBox(height: _FnlSpace.md),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: MoodLevel.values
+                .map((mood) => _buildMoodButton(mood, isTablet))
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMoodButton(MoodLevel mood, bool isTablet) {
+    final bool isSelected = _selectedMood == mood;
+    final double boxSize = isTablet ? 88 : 72;
+
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: mood.label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          setState(() {
+            _selectedMood = mood;
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          width: boxSize,
+          height: boxSize,
+          decoration: BoxDecoration(
+            color: isSelected ? _FnlColors.lavender : _FnlColors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              width: 2,
+              color: isSelected ? _FnlColors.violet : _FnlColors.border,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isSelected
+                    ? _FnlColors.violet.withOpacity(0.35)
+                    : _FnlColors.border,
+                offset: Offset(0, isSelected ? 2 : 4),
+                blurRadius: 0,
+              ),
+            ],
+          ),
+          child: Icon(
+            mood.icon,
+            size: isTablet ? 48 : 40,
+            color: isSelected ? _FnlColors.violet : _FnlColors.disabledText,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Mensaje de éxito / error
+  Widget _buildFeedbackMessage() {
+    if (_feedbackMessage.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: _FnlSpace.sm),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+            horizontal: _FnlSpace.sm, vertical: 12),
+        decoration: BoxDecoration(
+          color: _FnlColors.lavender,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _feedbackIsError
+                  ? Icons.error_outline_rounded
+                  : Icons.check_circle_rounded,
+              size: 20,
+              color: _FnlColors.violet,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _feedbackMessage,
+                style: _FnlText.body(size: 14)
+                    .copyWith(fontWeight: FontWeight.w500),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMobileTabletLayout(ResponsiveDimensions dimensions) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: dimensions.maxContentWidth),
-        child: Padding(
-          padding: EdgeInsets.all(dimensions.padding),
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SizedBox(height: dimensions.topSpacing),
-                      _buildHeaderText(dimensions),
-                      SizedBox(height: dimensions.sectionSpacing),
-                      _buildRatingSection(dimensions),
-                      SizedBox(height: dimensions.sectionSpacing),
-                      _buildCommentSection(dimensions),
-                      SizedBox(height: dimensions.sectionSpacing),
-                      _buildMoodSection(dimensions),
-                      SizedBox(height: dimensions.sectionSpacing * 0.75),
-                      _buildFeedbackMessage(dimensions),
-                    ],
-                  ),
-                ),
-              ),
-              _buildSubmitButton(dimensions),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeaderText(ResponsiveDimensions dimensions) {
-    return Text(
-      "Califica tu experiencia con la técnica de relajación de hoy que te ofreció Funcy",
-      style: TextStyle(
-        color: _textColor,
-        fontSize: dimensions.headerFontSize,
-        fontFamily: 'Inter',
-        fontWeight: FontWeight.w600,
-        height: 1.4,
-      ),
-      textAlign: TextAlign.center,
-    );
-  }
-
-  Widget _buildRatingSection(ResponsiveDimensions dimensions) {
-    return Column(
-      children: [
-        RatingBar.builder(
-          initialRating: _rating,
-          minRating: 1,
-          direction: Axis.horizontal,
-          allowHalfRating: false,
-          itemCount: 5,
-          itemSize: dimensions.starSize,
-          itemPadding: EdgeInsets.symmetric(horizontal: dimensions.starSize * 0.05),
-          glowColor: _starColor.withOpacity(0.3),
-          unratedColor: const Color(0xFFB7B7B7),
-          itemBuilder: (context, index) => Icon(
-            Icons.star_rounded,
-            color: _starColor,
-          ),
-          onRatingUpdate: (rating) {
-            setState(() {
-              _rating = rating;
-            });
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCommentSection(ResponsiveDimensions dimensions) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: _commentController,
-        maxLines: dimensions.textFieldHeight,
-        decoration: InputDecoration(
-          filled: true,
-          fillColor: Colors.white,
-          hintText: "Deja un comentario sobre la técnica",
-          hintStyle: TextStyle(
-            color: const Color(0xFF909090),
-            fontSize: dimensions.textFieldFontSize,
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w400,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: EdgeInsets.all(dimensions.padding * 0.8),
-        ),
-        style: TextStyle(
-          fontSize: dimensions.textFieldFontSize,
-          fontFamily: 'Inter',
-        ),
-        onChanged: (_) => setState(() {}),
-      ),
-    );
-  }
-
-  Widget _buildMoodSection(ResponsiveDimensions dimensions) {
-    return Column(
-      children: [
-        Text(
-          "¿Qué tan aliviado te sientes luego de la sesión de hoy?",
-          style: TextStyle(
-            color: _textColor,
-            fontSize: dimensions.moodTextSize,
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w500,
-            height: 1.4,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        SizedBox(height: dimensions.sectionSpacing * 0.6),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: MoodLevel.values.map((mood) {
-            final isSelected = _selectedMood == mood;
-            return _buildMoodButton(mood, isSelected, dimensions);
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMoodButton(MoodLevel mood, bool isSelected, ResponsiveDimensions dimensions) {
-    final buttonSize = dimensions.moodIconSize + 16;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedMood = mood;
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: buttonSize,
-        height: buttonSize,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? mood.color.withOpacity(0.2)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(buttonSize / 2),
-          border: Border.all(
-            color: isSelected ? mood.color : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Icon(
-          mood.icon,
-          color: isSelected ? mood.color : Colors.white.withOpacity(0.6),
-          size: dimensions.moodIconSize,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFeedbackMessage(ResponsiveDimensions dimensions) {
-    if (_feedbackMessage.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      padding: EdgeInsets.all(dimensions.padding * 0.8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        _feedbackMessage,
-        style: TextStyle(
-          fontSize: dimensions.textFieldFontSize,
-          color: _textColor,
-          fontWeight: FontWeight.w500,
-        ),
-        textAlign: TextAlign.center,
-      ),
-    );
-  }
-
-  Widget _buildSubmitButton(ResponsiveDimensions dimensions) {
+  // Botón principal fijo abajo
+  Widget _buildBottomBar(double hPad, double maxContentWidth) {
     return Padding(
-      padding: EdgeInsets.only(
-        top: dimensions.padding * 0.4,
-        bottom: dimensions.padding * 2.5,
-      ),
-      child: SizedBox(
-        width: dimensions.buttonWidth,
-        height: dimensions.buttonHeight,
-        child: ElevatedButton(
-          onPressed: _isFormValid && !_isLoading ? _submitFeedback : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF6D4BD8),
-            disabledBackgroundColor: const Color(0xFFD7D7D7),
-            foregroundColor: Colors.white,
-            disabledForegroundColor: const Color(0xFF868686),
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(40),
-            ),
-          ),
-          child: _isLoading
-              ? SizedBox(
-            height: dimensions.buttonHeight * 0.4,
-            width: dimensions.buttonHeight * 0.4,
-            child: const CircularProgressIndicator(
-              color: Colors.white,
-              strokeWidth: 2.5,
-            ),
-          )
-              : Text(
-            'Enviar',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: dimensions.headerFontSize + 2,
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w600,
-            ),
+      padding: EdgeInsets.fromLTRB(hPad, _FnlSpace.xs, hPad, _FnlSpace.md),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxContentWidth),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOut,
+                alignment: Alignment.topCenter,
+                child: _buildFeedbackMessage(),
+              ),
+              // El botón se habilita solo con comentario escrito
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _commentController,
+                builder: (context, value, _) {
+                  final bool canSubmit = _isFormValid &&
+                      !_isLoading &&
+                      !_submitted;
+                  return _PrimaryButton(
+                    label: 'Enviar',
+                    icon: Icons.arrow_forward_rounded,
+                    loading: _isLoading || _submitted,
+                    enabled: canSubmit,
+                    onTap: _submitFeedback,
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ),
@@ -495,46 +623,94 @@ class _FinalStepScreenState extends State<FinalStepScreen>
 }
 
 enum MoodLevel {
-  sad(1, Icons.sentiment_very_dissatisfied, Colors.red),
-  neutral(2, Icons.sentiment_neutral, Colors.amber),
-  happy(3, Icons.sentiment_very_satisfied, Colors.green);
+  sad(1, Icons.sentiment_very_dissatisfied, Colors.red, 'Nada aliviado'),
+  neutral(2, Icons.sentiment_neutral, Colors.amber, 'Poco aliviado'),
+  happy(3, Icons.sentiment_very_satisfied, Colors.green, 'Muy aliviado');
 
-  const MoodLevel(this.value, this.icon, this.color);
+  const MoodLevel(this.value, this.icon, this.color, this.label);
 
   final int value;
   final IconData icon;
   final Color color;
+
+  /// Solo para accesibilidad (lectores de pantalla).
+  final String label;
 }
 
-// Enums y clases auxiliares para la responsividad
-enum DeviceType { mobile, tablet, desktop }
+class _DecorCircle extends StatelessWidget {
+  final double size;
+  const _DecorCircle({required this.size});
 
-class ResponsiveDimensions {
-  final double padding;
-  final double headerFontSize;
-  final double sectionSpacing;
-  final double starSize;
-  final double moodIconSize;
-  final int textFieldHeight;
-  final double buttonWidth;
-  final double buttonHeight;
-  final double maxContentWidth;
-  final double topSpacing;
-  final double textFieldFontSize;
-  final double moodTextSize;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: _FnlColors.lavenderDeep,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
 
-  ResponsiveDimensions({
-    required this.padding,
-    required this.headerFontSize,
-    required this.sectionSpacing,
-    required this.starSize,
-    required this.moodIconSize,
-    required this.textFieldHeight,
-    required this.buttonWidth,
-    required this.buttonHeight,
-    required this.maxContentWidth,
-    required this.topSpacing,
-    required this.textFieldFontSize,
-    required this.moodTextSize,
+class _PrimaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final bool enabled;
+  final bool loading;
+
+  const _PrimaryButton({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.enabled = true,
+    this.loading = false,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(18);
+    final Color fg = enabled ? _FnlColors.white : _FnlColors.disabledText;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      height: 56,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        color: (enabled || loading) ? _FnlColors.violet : _FnlColors.border,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: enabled ? onTap : null,
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(_FnlColors.white),
+                    ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(label, style: _FnlText.button(color: fg)),
+                      if (icon != null) ...[
+                        const SizedBox(width: 8),
+                        Icon(icon, size: 20, color: fg),
+                      ],
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -195,11 +195,6 @@ class _LoginScreenState extends State<LoginScreen> {
     // resultante al backend, igual que con Google.
     _showSnackBar(context, 'Inicio de sesión con Apple próximamente');
   }
-
-  // ---------------------------------------------------------------------
-  // UI
-  // ---------------------------------------------------------------------
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -210,8 +205,6 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: FnlColors.background,
       body: Stack(
         children: [
-          // Fondo claro con formas suaves en las esquinas, igual criterio
-          // que el mockup: sin degradado morado a pantalla completa.
           Positioned(
             top: -60,
             right: -60,
@@ -239,8 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                // Logo de marca (mismo activo ya usado en la
-                                // app, sin recuadro ni fondo alrededor).
+                                // Logo de marca
                                 Image.network(
                                   'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/fnl/f24c3b81-229f-4fd8-9e07-99074e44cc88.png',
                                   height: 96,
@@ -373,8 +365,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                                       const SizedBox(height: 26),
 
-                                      // Botón "Iniciar sesión": relleno sólido
-                                      // y flecha, igual que el mockup.
                                       SizedBox(
                                         width: double.infinity,
                                         child: DecoratedBox(
@@ -436,7 +426,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                                       const SizedBox(height: 24),
 
-                                      // Divisor simple (línea + círculo central), igual al mockup.
                                       Row(
                                         children: [
                                           Expanded(
@@ -459,9 +448,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                                       const SizedBox(height: 20),
 
-                                      // Botón "Crear una cuenta": contorno,
-                                      // igual que el mockup, justo después
-                                      // del divisor.
                                       SizedBox(
                                         width: double.infinity,
                                         child: OutlinedButton(
@@ -490,35 +476,33 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ),
                                       ),
 
-                                      const SizedBox(height: 24),
-
-                                      // Botones de inicio de sesión social
-                                      // (extra, no presente en el mockup,
-                                      // agregado a pedido).
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: _buildSocialButton(
-                                              label: 'Google',
-                                              icon: _googleIcon(),
-                                              onTap: () => _loginWithGoogle(context),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 14),
-                                          Expanded(
-                                            child: _buildSocialButton(
-                                              label: 'Apple',
-                                              icon: const Icon(Icons.apple,
-                                                  color: Colors.black, size: 22),
-                                              onTap: () => _loginWithApple(context),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                                      // ---------------------------------------------------
+                                      // Botones de inicio de sesión social (Google / Apple).
+                                      // ---------------------------------------------------
+                                      // const SizedBox(height: 24),
+                                      // Row(
+                                      //   children: [
+                                      //     Expanded(
+                                      //       child: _buildSocialButton(
+                                      //         label: 'Google',
+                                      //         icon: _googleIcon(),
+                                      //         onTap: () => _loginWithGoogle(context),
+                                      //       ),
+                                      //     ),
+                                      //     const SizedBox(width: 14),
+                                      //     Expanded(
+                                      //       child: _buildSocialButton(
+                                      //         label: 'Apple',
+                                      //         icon: const Icon(Icons.apple,
+                                      //             color: Colors.black, size: 22),
+                                      //         onTap: () => _loginWithApple(context),
+                                      //       ),
+                                      //     ),
+                                      //   ],
+                                      // ),
 
                                       const SizedBox(height: 28),
 
-                                      // Leyenda inferior con acento subrayado.
                                       Center(
                                         child: Column(
                                           children: [
@@ -580,8 +564,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // Ícono de Google aproximado con los cuatro colores de la marca, sin
-  // depender de un paquete de íconos adicional.
   Widget _googleIcon() {
     return const SizedBox(
       width: 20,

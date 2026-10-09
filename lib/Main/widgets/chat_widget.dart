@@ -1,18 +1,56 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:fnlapp/config.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:fnlapp/Funcy/screens/splash_screen.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:fnlapp/SharedPreferences/sharedpreference.dart';
 import 'dart:math' as math;
 import '../../Funcy/screens/chat_screen.dart';
-import 'package:intl/intl.dart';
-import 'package:fnlapp/SplashScreen/welcome_screen.dart' show FuncyColors;
 
-class ChatWidget extends StatelessWidget {
+class _FnlColors {
+  static const blue = Color(0xFF0B1457);
+  static const violet = Color(0xFF6428E8);
+  static const violetSecondary = Color(0xFF814CF4);
+  static const lavenderDeep = Color(0xFFEAE4FC);
+  static const canvas = Color(0xFFFCFBFF);
+  static const body = Color(0xFF70779C);
+  static const white = Color(0xFFFFFFFF);
+}
+
+class _FnlSpace {
+  static const double xs = 8;
+  static const double sm = 16;
+  static const double md = 24;
+  static const double lg = 32;
+}
+
+class _FnlText {
+  static TextStyle h1(double size) => GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        color: _FnlColors.blue,
+        height: 1.2,
+      );
+
+  static TextStyle body({double size = 16}) => GoogleFonts.roboto(
+        fontSize: size,
+        fontWeight: FontWeight.w400,
+        color: _FnlColors.body,
+        height: 1.5,
+      );
+
+  static TextStyle label({double size = 12, double letterSpacing = 1.3}) =>
+      GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w700,
+        color: _FnlColors.violet,
+        letterSpacing: letterSpacing,
+      );
+
+  static TextStyle button() => GoogleFonts.manrope(
+        fontSize: 17,
+        fontWeight: FontWeight.w700,
+        color: _FnlColors.white,
+      );
+}
+
+class ChatWidget extends StatefulWidget {
   final int userId;
   final String username;
   final Function(bool) onChatToggle;
@@ -23,204 +61,130 @@ class ChatWidget extends StatelessWidget {
       required this.onChatToggle});
 
   @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width >= 600 && size.width < 1200;
-    final isDesktop = size.width >= 1200;
-    final imageSize = math.min(
-      size.width < 400 ? 220.0 : size.width < 600 ? 270.0 : 320.0,
-      size.height * 0.3,
-    ).toDouble();
-    final horizontalPadding = isDesktop ? 200.0 : isTablet ? 80.0 : 16.0;
+  State<ChatWidget> createState() => _ChatWidgetState();
+}
 
+class _ChatWidgetState extends State<ChatWidget> {
+  static const String _funcyUrl =
+      'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/enthusiastic.png';
+
+  bool _imagesPrecached = false;
+  bool _isOpeningChat = false; 
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_imagesPrecached) {
+      precacheImage(const NetworkImage(_funcyUrl), context);
+      _imagesPrecached = true;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _FnlColors.canvas,
       body: Stack(
         children: [
-          // Mismo lenguaje visual del login y de "Mi test": degradado de
-          // marca con capas suaves de profundidad, sin fotografías de por
-          // medio.
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  FuncyColors.primaryDark,
-                  FuncyColors.primary,
-                  FuncyColors.primaryLight,
-                ],
-                stops: [0.0, 0.55, 1.0],
-              ),
-            ),
-          ),
-          Positioned(
-            top: -90,
+          // Círculos decorativos
+          const Positioned(
+            top: -70,
             right: -70,
-            child: _decorativeCircle(240, Colors.white.withOpacity(0.06)),
+            child: IgnorePointer(child: _DecorCircle(size: 220)),
           ),
-          Positioned(
-            top: 160,
-            left: -80,
-            child: _decorativeCircle(170, Colors.white.withOpacity(0.05)),
+          const Positioned(
+            bottom: -90,
+            left: -90,
+            child: IgnorePointer(child: _DecorCircle(size: 240)),
           ),
-          Positioned(
-            bottom: -110,
-            right: -50,
-            child: _decorativeCircle(280, Colors.black.withOpacity(0.06)),
-          ),
-
           SafeArea(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    SizedBox(height: size.height * 0.09),
 
-                    // Etiqueta editorial + título, en vez del contorno
-                    // manual sobre fondo blanco.
-                    Text(
-                      'ASISTENTE VIRTUAL',
-                      style: GoogleFonts.inter(
-                        color: Colors.white.withOpacity(0.72),
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.3,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '¡Conversa con Funcy!',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        fontSize: size.width < 400 ? 30 : size.width < 600 ? 36 : 40,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                // Si la altura no está acotada, se usa la de la pantalla
+                final height = constraints.maxHeight.isFinite
+                    ? constraints.maxHeight
+                    : MediaQuery.of(context).size.height;
 
-                    const SizedBox(height: 10),
+                final isTablet = width > 600;
+                final hPad = isTablet ? _FnlSpace.lg : _FnlSpace.md;
+                final maxContentWidth = isTablet ? 560.0 : 480.0;
 
-                    Text(
-                      'Tu consejero virtual',
-                      style: GoogleFonts.inter(
-                        fontSize: size.width < 400 ? 16 : size.width < 600 ? 18 : 20,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white.withOpacity(0.85),
-                      ),
-                    ),
+                final imageSize = math.min(
+                  width < 400
+                      ? 220.0
+                      : width < 600
+                          ? 260.0
+                          : 300.0,
+                  height * 0.32,
+                ).clamp(120.0, 300.0).toDouble();
 
-                    SizedBox(height: size.height * 0.04),
+                final titleSize = width < 400
+                    ? 28.0
+                    : width < 600
+                        ? 32.0
+                        : 36.0;
 
-                    // Mascota con halo, igual criterio visual que en el
-                    // resto de la app.
-                    SizedBox(
-                      width: double.infinity,
-                      height: imageSize + 40,
-                      child: Center(
-                        child: Stack(
-                          alignment: Alignment.center,
+                return Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                    child: SingleChildScrollView(
+                      physics: const ClampingScrollPhysics(),
+                      padding:
+                          EdgeInsets.fromLTRB(hPad, _FnlSpace.md, hPad, 110),
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: 1),
+                        duration: const Duration(milliseconds: 500),
+                        curve: Curves.easeOut,
+                        builder: (context, t, child) => Opacity(
+                          opacity: t,
+                          child: Transform.translate(
+                            offset: Offset(0, (1 - t) * 16),
+                            child: child,
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Container(
-                              width: imageSize * 1.05,
-                              height: imageSize * 1.05,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: RadialGradient(
-                                  colors: [
-                                    Colors.white.withOpacity(0.18),
-                                    Colors.white.withOpacity(0.0),
-                                  ],
-                                ),
-                              ),
+                            Text(
+                              'ASISTENTE VIRTUAL',
+                              textAlign: TextAlign.center,
+                              style: _FnlText.label(),
                             ),
-                            Positioned(
-                              bottom: imageSize * 0.02,
-                              left: imageSize * 0.279,
-                              child: Container(
-                                width: imageSize * 0.42,
-                                height: imageSize * 0.055,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(100),
-                                  color: Colors.black.withOpacity(0.14),
-                                ),
-                              ),
+                            const SizedBox(height: _FnlSpace.xs),
+                            Text(
+                              '¡Conversa con Funcy!',
+                              textAlign: TextAlign.center,
+                              style: _FnlText.h1(titleSize),
                             ),
-                            Image.network(
-                              'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/enthusiastic.png',
-                              height: imageSize,
-                              width: imageSize,
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Icon(
-                                  Icons.emoji_emotions_rounded,
-                                  size: imageSize * 0.6,
-                                  color: Colors.white,
-                                );
-                              },
+                            const SizedBox(height: _FnlSpace.xs),
+                            Text(
+                              'Tu consejero virtual',
+                              textAlign: TextAlign.center,
+                              style: _FnlText.body(size: isTablet ? 20 : 18),
+                            ),
+                            const SizedBox(height: _FnlSpace.lg),
+                            _buildMascot(imageSize),
+                            const SizedBox(height: _FnlSpace.lg),
+                            Center(
+                              child: _PrimaryButton(
+                                label: 'Ir al chat',
+                                icon: Icons.arrow_forward_rounded,
+                                loading: _isOpeningChat,
+                                expand: false,
+                                width: 150,
+                                onTap: () => _startChat(context),
+                              ),
                             ),
                           ],
                         ),
                       ),
                     ),
-
-                    SizedBox(height: size.height * 0.03),
-
-                    // Botón con relleno de marca en vez del contorno sobre
-                    // fondo blanco; ahora compacto y centrado en lugar de
-                    // ocupar todo el ancho.
-                    Center(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(40),
-                          color: Colors.white,
-                          boxShadow: [
-                            BoxShadow(
-                              color: FuncyColors.primaryDark.withOpacity(0.3),
-                              blurRadius: 16,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: OutlinedButton(
-                          onPressed: () async {
-                            await _startChat(context);
-                          },
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            side: BorderSide.none,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(40),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 28, vertical: 20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Empezar',
-                                style: GoogleFonts.inter(
-                                  fontSize: size.width < 400 ? 18 : 20,
-                                  fontWeight: FontWeight.w700,
-                                  color: FuncyColors.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              const Icon(Icons.arrow_forward_rounded,
-                                  size: 18, color: FuncyColors.primary),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    SizedBox(height: size.height * 0.04),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -228,27 +192,180 @@ class ChatWidget extends StatelessWidget {
     );
   }
 
-  Widget _decorativeCircle(double diameter, Color color) {
-    return Container(
-      width: diameter,
-      height: diameter,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+  // Mascota con halo
+  Widget _buildMascot(double imageSize) {
+    return SizedBox(
+      height: imageSize,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: imageSize * 0.8,
+            height: imageSize * 0.8,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: _FnlColors.violetSecondary.withOpacity(0.25),
+                  blurRadius: 40,
+                  spreadRadius: 8,
+                ),
+              ],
+            ),
+          ),
+          Image.network(
+            _funcyUrl,
+            height: imageSize,
+            width: imageSize,
+            fit: BoxFit.contain,
+            loadingBuilder: (context, child, progress) {
+              if (progress == null) return child;
+              return SizedBox(
+                height: imageSize,
+                width: imageSize,
+                child: const Center(
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: _FnlColors.violetSecondary,
+                    ),
+                  ),
+                ),
+              );
+            },
+            errorBuilder: (_, __, ___) =>
+                SizedBox(height: imageSize, width: imageSize),
+          ),
+        ],
+      ),
     );
   }
 
   Future<void> _startChat(BuildContext context) async {
-    if (userId != null) {
-      Navigator.push(
+    if (_isOpeningChat) return;
+    setState(() => _isOpeningChat = true);
+
+    try {
+      await Navigator.push(
         context,
         MaterialPageRoute(
-            builder: (context) => ChatScreen(
-              userId: userId,
-              username: username,
-            )
+          builder: (context) => ChatScreen(
+            userId: widget.userId,
+            username: widget.username,
+          ),
         ),
       );
-    } else {
-      print("Error: userId no definido");
+    } finally {
+      if (mounted) setState(() => _isOpeningChat = false);
     }
+  }
+}
+
+class _DecorCircle extends StatelessWidget {
+  final double size;
+  const _DecorCircle({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: _FnlColors.lavenderDeep,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+class _PrimaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final bool loading;
+  final bool expand;
+
+  final double? width;
+
+  const _PrimaryButton({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.loading = false,
+    this.expand = true,
+    this.width,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(18);
+
+    final content = loading
+        ? const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation<Color>(_FnlColors.violet),
+            ),
+          )
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: _FnlText.button().copyWith(color: _FnlColors.violet),
+              ),
+              if (icon != null) ...[
+                const SizedBox(width: 7),
+                Icon(
+                  icon,
+                  size: 18,
+                  color: _FnlColors.violet,
+                ),
+              ],
+            ],
+          );
+
+    final button = Material(
+      color: _FnlColors.violet.withOpacity(0.12),
+      borderRadius: radius,
+      child: InkWell(
+        borderRadius: radius,
+        onTap: loading ? null : onTap,
+        splashColor: _FnlColors.violet.withOpacity(0.12),
+        highlightColor: _FnlColors.violet.withOpacity(0.06),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(
+              color: _FnlColors.violet.withOpacity(0.28),
+              width: 1.3,
+            ),
+          ),
+          child: content,
+        ),
+      ),
+    );
+
+    if (expand) {
+      return SizedBox(
+        width: double.infinity,
+        height: 56,
+        child: button,
+      );
+    }
+
+
+    return SizedBox(
+      width: width ?? 150,
+      height: 56,
+      child: button,
+    );
   }
 }
