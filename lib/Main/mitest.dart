@@ -69,9 +69,10 @@ class MiTestScreen extends StatefulWidget {
 }
 
 class _MiTestScreenState extends State<MiTestScreen> {
+  static const double _bottomNavSpace = 120.0;
+
   bool _imagesPrecached = false;
 
-  // ---- helpers de mapeo (solo UI, no cambian tu lógica) ----
   String _tituloLead(NivelEstres n) {
     switch (n) {
       case NivelEstres.leve:
@@ -79,7 +80,7 @@ class _MiTestScreenState extends State<MiTestScreen> {
       case NivelEstres.severo:
         return 'Tu nivel de estrés es ';
       default:
-        return 'Tu nivel de estrés';
+        return 'Aún no tienes un resultado';
     }
   }
 
@@ -99,13 +100,13 @@ class _MiTestScreenState extends State<MiTestScreen> {
   String _mensajeNivel(NivelEstres n) {
     switch (n) {
       case NivelEstres.leve:
-        return '¡Todo en calma! Sigue cuidando tu bienestar';
+        return '¡Todo en calma! Sigue cuidando tu bienestar.';
       case NivelEstres.moderado:
         return 'Tómate un respiro, Funcy está aquí para ayudarte.';
       case NivelEstres.severo:
         return 'Es momento de priorizarte y buscar apoyo.';
       default:
-        return '';
+        return 'Completa el test para conocer tu nivel de estrés.';
     }
   }
 
@@ -144,10 +145,9 @@ class _MiTestScreenState extends State<MiTestScreen> {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // Indicador de nivel: barra segmentada de 3 pasos con etiquetas
-  // ---------------------------------------------------------------------
   Widget _progressTrack(int idx) {
+    const names = ['Leve', 'Moderado', 'Alto'];
+
     Widget segment(int step) {
       final bool filled = step <= idx;
       return Expanded(
@@ -164,11 +164,11 @@ class _MiTestScreenState extends State<MiTestScreen> {
       );
     }
 
-    Widget label(String text, int step) {
+    Widget label(int step) {
       final bool active = step == idx;
       return Expanded(
         child: Text(
-          text,
+          names[step],
           textAlign: step == 0
               ? TextAlign.left
               : step == 2
@@ -183,61 +183,71 @@ class _MiTestScreenState extends State<MiTestScreen> {
       );
     }
 
-    return Column(
-      children: [
-        Row(children: [segment(0), segment(1), segment(2)]),
-        const SizedBox(height: _FnlSpace.xs),
-        Row(
-          children: [
-            label('Leve', 0),
-            label('Moderado', 1),
-            label('Alto', 2),
-          ],
-        ),
-      ],
+    return Semantics(
+      label: idx < 0
+          ? 'Nivel de estrés sin resultado'
+          : 'Nivel de estrés: ${names[idx].toLowerCase()}, ${idx + 1} de 3',
+      excludeSemantics: true,
+      child: Column(
+        children: [
+          Row(children: [segment(0), segment(1), segment(2)]),
+          const SizedBox(height: _FnlSpace.xs),
+          Row(children: [label(0), label(1), label(2)]),
+        ],
+      ),
     );
   }
 
-  Widget _stressLevelCard(bool isTablet) {
+
+  Widget _buildResultCard(double mascotSize, bool isTablet) {
     final n = widget.nivelEstres;
     final idx = _indexNivel(n);
-    final titleSize = isTablet ? 26.0 : 22.0;
     final accent = _tituloAccent(n);
-    final mensaje = _mensajeNivel(n);
+    final titleSize = isTablet ? 26.0 : 22.0;
+    final overlap = mascotSize / 2;
 
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 10),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(_FnlSpace.md),
-            decoration: BoxDecoration(
-              color: _FnlColors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
-              boxShadow: const [
-                BoxShadow(
-                  color: _FnlColors.bubbleBorder,
-                  offset: Offset(0, 4),
-                  blurRadius: 0,
+        Container(
+          width: double.infinity,
+          margin: EdgeInsets.only(top: overlap),
+          padding: EdgeInsets.fromLTRB(
+            _FnlSpace.md,
+            overlap + _FnlSpace.sm,
+            _FnlSpace.md,
+            _FnlSpace.md,
+          ),
+          decoration: BoxDecoration(
+            color: _FnlColors.white,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+            boxShadow: const [
+              BoxShadow(
+                color: _FnlColors.bubbleBorder,
+                offset: Offset(0, 6),
+                blurRadius: 0,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'RESULTADO DEL TEST',
+                textAlign: TextAlign.center,
+                style: _FnlText.label(
+                  size: 12,
+                  color: _FnlColors.body,
+                  letterSpacing: 1.1,
                 ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Text(
-                  'RESULTADO DEL TEST',
-                  style: _FnlText.label(
-                    size: 12,
-                    color: _FnlColors.body,
-                    letterSpacing: 1.1,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text.rich(
+              ),
+              const SizedBox(height: 6),
+              Semantics(
+                header: true,
+                child: Text.rich(
                   TextSpan(children: [
                     TextSpan(
                       text: _tituloLead(n),
@@ -251,51 +261,35 @@ class _MiTestScreenState extends State<MiTestScreen> {
                   ]),
                   textAlign: TextAlign.center,
                 ),
-                if (mensaje.isNotEmpty) ...[
-                  const SizedBox(height: _FnlSpace.xs),
-                  Text(
-                    mensaje,
-                    textAlign: TextAlign.center,
-                    style: _FnlText.body(size: isTablet ? 17 : 15),
-                  ),
-                ],
+              ),
+              const SizedBox(height: _FnlSpace.xs),
+              Text(
+                _mensajeNivel(n),
+                textAlign: TextAlign.center,
+                style: _FnlText.body(size: isTablet ? 17 : 15),
+              ),
+              if (idx >= 0) ...[
                 const SizedBox(height: _FnlSpace.md),
                 _progressTrack(idx),
               ],
-            ),
+            ],
           ),
         ),
-        Positioned(
-          top: 2,
-          child: Transform.rotate(
-            angle: 0.785398, // 45°
-            child: Container(
-              width: 16,
-              height: 16,
-              decoration: const BoxDecoration(
-                color: _FnlColors.white,
-                border: Border(
-                  top: BorderSide(color: _FnlColors.bubbleBorder, width: 2),
-                  left: BorderSide(color: _FnlColors.bubbleBorder, width: 2),
-                ),
-                borderRadius: BorderRadius.only(topLeft: Radius.circular(4)),
-              ),
-            ),
-          ),
-        ),
+        _FloatingMascot(child: _buildMascot(mascotSize)),
       ],
     );
   }
 
-  Widget _buildMascot(double imageSize) {
+  Widget _buildMascot(double size) {
     return SizedBox(
-      height: imageSize,
+      height: size,
+      width: size,
       child: Stack(
         alignment: Alignment.center,
         children: [
           Container(
-            width: imageSize * 0.8,
-            height: imageSize * 0.8,
+            width: size * 0.7,
+            height: size * 0.7,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               boxShadow: [
@@ -309,13 +303,15 @@ class _MiTestScreenState extends State<MiTestScreen> {
           ),
           Image.network(
             _mascotaUrl(widget.nivelEstres),
-            height: imageSize,
+            height: size,
+            width: size,
             fit: BoxFit.contain,
+            excludeFromSemantics: true,
             loadingBuilder: (context, child, progress) {
               if (progress == null) return child;
               return SizedBox(
-                height: imageSize,
-                width: imageSize,
+                height: size,
+                width: size,
                 child: const Center(
                   child: SizedBox(
                     width: 28,
@@ -328,50 +324,76 @@ class _MiTestScreenState extends State<MiTestScreen> {
                 ),
               );
             },
-            errorBuilder: (_, __, ___) =>
-                SizedBox(height: imageSize, width: imageSize),
+            errorBuilder: (_, __, ___) => SizedBox(height: size, width: size),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildHeader(double titleSize) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'FUNCY · BIENESTAR EMOCIONAL',
+          style: _FnlText.label(size: 12, letterSpacing: 1.2),
+        ),
+        const SizedBox(height: 6),
+        Semantics(
+          header: true,
+          child: Text('Mi test', style: _FnlText.h1(titleSize)),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+
     return Scaffold(
       backgroundColor: _FnlColors.canvas,
-      body: Stack(
-        children: [
-          const Positioned(
-            top: -70,
-            right: -70,
-            child: IgnorePointer(child: _DecorCircle(size: 220)),
-          ),
-          const Positioned(
-            bottom: -90,
-            left: -90,
-            child: IgnorePointer(child: _DecorCircle(size: 240)),
-          ),
-          SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isTablet = constraints.maxWidth > 600;
-                final hPad = isTablet ? _FnlSpace.lg : _FnlSpace.md;
-                final titleSize = constraints.maxWidth < 400 ? 28.0 : 34.0;
-                final imageSize = math.min(
-                  isTablet ? 240.0 : 200.0,
-                  constraints.maxHeight * 0.28,
-                ).clamp(120.0, 260.0).toDouble();
+      body: SizedBox.expand(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const Positioned(
+              top: -70,
+              right: -70,
+              child: IgnorePointer(child: _DecorCircle(size: 220)),
+            ),
+            const Positioned(
+              bottom: -90,
+              left: -90,
+              child: IgnorePointer(child: _DecorCircle(size: 240)),
+            ),
+            SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  final height = constraints.maxHeight.isFinite
+                      ? constraints.maxHeight
+                      : MediaQuery.of(context).size.height;
 
-                return Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: isTablet ? 560 : 480),
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(
-                          hPad, _FnlSpace.md, hPad, 110),
+                  final isTablet = width > 600;
+                  final hPad = isTablet ? _FnlSpace.lg : _FnlSpace.md;
+                  final maxContentWidth = isTablet ? 520.0 : 480.0;
+                  final titleSize = width < 400 ? 28.0 : 34.0;
+
+                  final mascotSize = math
+                      .min(170.0, (height - _bottomNavSpace) * 0.22)
+                      .clamp(100.0, 180.0)
+                      .toDouble();
+
+                  return Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: maxContentWidth),
                       child: TweenAnimationBuilder<double>(
                         tween: Tween(begin: 0, end: 1),
-                        duration: const Duration(milliseconds: 500),
+                        duration: reduceMotion
+                            ? Duration.zero
+                            : const Duration(milliseconds: 500),
                         curve: Curves.easeOut,
                         builder: (context, t, child) => Opacity(
                           opacity: t,
@@ -380,33 +402,57 @@ class _MiTestScreenState extends State<MiTestScreen> {
                             child: child,
                           ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Encabezado: etiqueta + título
-                            Text(
-                              'FUNCY · BIENESTAR EMOCIONAL',
-                              style: _FnlText.label(
-                                size: 12,
-                                letterSpacing: 1.3,
+                        child: CustomScrollView(
+                          physics: const ClampingScrollPhysics(),
+                          slivers: [
+                            SliverFillRemaining(
+                              hasScrollBody: false,
+                              child: Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  hPad,
+                                  _FnlSpace.md,
+                                  hPad,
+                                  _bottomNavSpace,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    _buildHeader(titleSize),
+                                    Expanded(
+                                      child: Center(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: _FnlSpace.sm),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              _buildResultCard(
+                                                  mascotSize, isTablet),
+                                              const SizedBox(
+                                                  height: _FnlSpace.sm),
+                                              const _DisclaimerNote(),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            Text('Mi test', style: _FnlText.h1(titleSize)),
-                            const SizedBox(height: _FnlSpace.md),
-                            _buildMascot(imageSize),
-                            const SizedBox(height: _FnlSpace.xs),
-                            _stressLevelCard(isTablet),
                           ],
                         ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -424,6 +470,83 @@ class _DecorCircle extends StatelessWidget {
       decoration: const BoxDecoration(
         color: _FnlColors.lavenderDeep,
         shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+class _DisclaimerNote extends StatelessWidget {
+  const _DisclaimerNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: _FnlSpace.sm),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(
+              Icons.info_outline_rounded,
+              size: 16,
+              color: _FnlColors.body,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              'Este resultado es orientativo y no sustituye una evaluación profesional.',
+              textAlign: TextAlign.center,
+              style: _FnlText.body(size: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FloatingMascot extends StatefulWidget {
+  final Widget child;
+  const _FloatingMascot({required this.child});
+
+  @override
+  State<_FloatingMascot> createState() => _FloatingMascotState();
+}
+
+class _FloatingMascotState extends State<_FloatingMascot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _curve;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    )..repeat(reverse: true);
+    _curve = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.of(context).disableAnimations) return widget.child;
+
+    return AnimatedBuilder(
+      animation: _curve,
+      child: widget.child,
+      builder: (context, child) => Transform.translate(
+        offset: Offset(0, -8 * _curve.value),
+        child: child,
       ),
     );
   }

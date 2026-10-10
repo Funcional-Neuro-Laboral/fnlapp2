@@ -91,13 +91,14 @@ class ProfileScreen extends StatefulWidget {
   final Function(String)? onProfileImageUpdated;
   final bool isDay21Completed;
 
-  ProfileScreen({
+  const ProfileScreen({
+    Key? key,
     required this.profileData,
     required this.onLogout,
     this.onImageSelected,
     this.onProfileImageUpdated,
     this.isDay21Completed = false,
-  });
+  }) : super(key: key);
 
   @override
   _ProfileScreenState createState() => _ProfileScreenState();
@@ -107,6 +108,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const String _funcyUrl =
       'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/funcy.png';
 
+  static const double _bottomNavSpace = 120.0;
+
+  static const double _maxContentWidth = 520.0;
+
   File? _selectedImage;
   Uint8List? _selectedImageBytes;
   final ImagePicker _picker = ImagePicker();
@@ -115,10 +120,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isUploadingPhoto = false; // bloquea toques repetidos en la foto
   bool _isLoggingOut = false;
   bool _imagesPrecached = false;
-
-  // Ancho máximo del contenido: evita que las tarjetas se estiren de borde
-  // a borde en tablet/web.
-  static const double _maxContentWidth = 560.0;
 
   @override
   void initState() {
@@ -135,16 +136,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  String get _displayName {
+    final p = widget.profileData;
+
+    final full = (p?.fullName ?? '').trim();
+    if (full.isNotEmpty && full.toLowerCase() != 'unknown user') {
+      return full;
+    }
+
+    final composed = '${p?.nombres ?? ''} ${p?.apellidos ?? ''}'.trim();
+    if (composed.isNotEmpty) return composed;
+
+    final username = (p?.username ?? '').trim();
+    if (username.isNotEmpty) return username;
+
+    return 'Usuario';
+  }
+
+  String get _username => (widget.profileData?.username ?? '').trim();
+
   // ========== MENSAJES ==========
 
   void _showSnack(String message, {bool error = false}) {
     if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
         backgroundColor: _FnlColors.blue,
         duration: const Duration(seconds: 3),
-        margin: const EdgeInsets.all(16),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, _bottomNavSpace - 10),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         content: Row(
           children: [
@@ -269,8 +290,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Container(
                     margin: const EdgeInsets.only(top: mascotHeight / 2),
                     padding: const EdgeInsets.fromLTRB(
-                        _FnlSpace.md, mascotHeight / 2 + _FnlSpace.sm,
-                        _FnlSpace.md, _FnlSpace.md),
+                        _FnlSpace.md,
+                        mascotHeight / 2 + _FnlSpace.sm,
+                        _FnlSpace.md,
+                        _FnlSpace.md),
                     decoration: BoxDecoration(
                       color: _FnlColors.white,
                       borderRadius: BorderRadius.circular(28),
@@ -330,6 +353,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           _funcyUrl,
                           height: mascotHeight,
                           fit: BoxFit.contain,
+                          excludeFromSemantics: true,
                           loadingBuilder: (context, child, progress) {
                             if (progress == null) return child;
                             return SizedBox(
@@ -628,24 +652,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  ImageProvider? _getImageProvider() {
-    if (kIsWeb && _selectedImageBytes != null) {
-      return MemoryImage(_selectedImageBytes!);
-    } else if (!kIsWeb && _selectedImage != null) {
-      return FileImage(_selectedImage!);
-    } else if (widget.profileData?.profileImage != null) {
-      return NetworkImage(
-        widget.profileData!.profileImage!,
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-        },
-      );
-    }
-    return null;
-  }
-
   // ========== BUILD PRINCIPAL ==========
 
   @override
@@ -653,52 +659,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
     final hPad = isTablet ? _FnlSpace.lg : _FnlSpace.md;
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
 
     return Scaffold(
       backgroundColor: _FnlColors.canvas,
-      body: Stack(
-        children: [
-          // Círculos decorativos
-          const Positioned(
-            top: -70,
-            right: -70,
-            child: IgnorePointer(child: _DecorCircle(size: 220)),
-          ),
-          const Positioned(
-            bottom: -90,
-            left: -90,
-            child: IgnorePointer(child: _DecorCircle(size: 240)),
-          ),
-          SafeArea(
-            child: SingleChildScrollView(
-              // El espacio inferior deja libre la barra de navegación
-              padding: const EdgeInsets.only(bottom: 110),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: _maxContentWidth,
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: hPad, vertical: _FnlSpace.md),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildHeader(size),
-                        const SizedBox(height: _FnlSpace.md),
-                        _buildProfileCard(size),
-                        const SizedBox(height: _FnlSpace.sm),
-                        _buildInfoCard(),
-                        const SizedBox(height: _FnlSpace.md),
-                        ..._buildActions(size),
-                      ],
+      body: SizedBox.expand(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Círculos decorativos
+            const Positioned(
+              top: -70,
+              right: -70,
+              child: IgnorePointer(child: _DecorCircle(size: 220)),
+            ),
+            const Positioned(
+              bottom: -90,
+              left: -90,
+              child: IgnorePointer(child: _DecorCircle(size: 240)),
+            ),
+            SafeArea(
+              child: SingleChildScrollView(
+                // El espacio inferior deja libre la barra de navegación
+                padding: const EdgeInsets.only(bottom: _bottomNavSpace),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: _maxContentWidth,
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: hPad, vertical: _FnlSpace.md),
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: 1),
+                        duration: reduceMotion
+                            ? Duration.zero
+                            : const Duration(milliseconds: 450),
+                        curve: Curves.easeOut,
+                        builder: (context, t, child) => Opacity(
+                          opacity: t,
+                          child: Transform.translate(
+                            offset: Offset(0, (1 - t) * 14),
+                            child: child,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildHeader(size),
+                            const SizedBox(height: _FnlSpace.md),
+                            _buildProfileCard(size),
+                            const SizedBox(height: _FnlSpace.sm),
+                            _buildInfoCard(),
+                            const SizedBox(height: _FnlSpace.md),
+                            ..._buildActions(size),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -714,11 +738,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: _FnlText.label(
             size: 12,
             color: _FnlColors.violet,
-            letterSpacing: 1.3,
+            letterSpacing: 1.2,
           ),
         ),
         const SizedBox(height: 6),
-        Text('Mi Perfil', style: _FnlText.h1(titleFontSize)),
+        Semantics(
+          header: true,
+          child: Text('Mi Perfil', style: _FnlText.h1(titleFontSize)),
+        ),
       ],
     );
   }
@@ -730,12 +757,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           horizontal: _FnlSpace.md, vertical: _FnlSpace.md),
       decoration: BoxDecoration(
         color: _FnlColors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
         boxShadow: const [
           BoxShadow(
             color: _FnlColors.bubbleBorder,
-            offset: Offset(0, 4),
+            offset: Offset(0, 6),
             blurRadius: 0,
           ),
         ],
@@ -745,23 +772,101 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildProfileImage(size),
           const SizedBox(height: _FnlSpace.sm),
           _buildUserName(size),
+          if (_username.isNotEmpty && _username != _displayName) ...[
+            const SizedBox(height: 2),
+            Text(
+              '@$_username',
+              textAlign: TextAlign.center,
+              style: _FnlText.body(size: 14),
+            ),
+          ],
           _buildSubscriptionBadge(size),
         ],
       ),
     );
   }
 
+  Widget _buildAvatarContent(double imageSize) {
+    Widget placeholder() => Container(
+          color: _FnlColors.lavender,
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.person_rounded,
+            size: imageSize * 0.5,
+            color: _FnlColors.violet,
+          ),
+        );
+
+    if (kIsWeb && _selectedImageBytes != null) {
+      return Image.memory(
+        _selectedImageBytes!,
+        fit: BoxFit.cover,
+        width: imageSize,
+        height: imageSize,
+        errorBuilder: (_, __, ___) => placeholder(),
+      );
+    }
+
+    if (!kIsWeb && _selectedImage != null) {
+      return Image.file(
+        _selectedImage!,
+        fit: BoxFit.cover,
+        width: imageSize,
+        height: imageSize,
+        errorBuilder: (_, __, ___) => placeholder(),
+      );
+    }
+
+    final url = widget.profileData?.profileImage;
+    if (url != null && url.trim().isNotEmpty) {
+      return Image.network(
+        url,
+        key: ValueKey(url),
+        fit: BoxFit.cover,
+        width: imageSize,
+        height: imageSize,
+        excludeFromSemantics: true,
+
+        headers: kIsWeb
+            ? null
+            : const {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+              },
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return Container(
+            color: _FnlColors.lavender,
+            alignment: Alignment.center,
+            child: const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: _FnlColors.violetSecondary,
+              ),
+            ),
+          );
+        },
+        errorBuilder: (_, __, ___) => placeholder(),
+      );
+    }
+
+    return placeholder();
+  }
+
   Widget _buildProfileImage(Size size) {
     final imageSize = size.width < 400
-        ? 112.0
+        ? 104.0
         : size.width < 600
-            ? 128.0
-            : 144.0;
-    final provider = _getImageProvider();
+            ? 116.0
+            : 128.0;
 
     return Semantics(
       button: true,
       label: 'Cambiar foto de perfil',
+      excludeSemantics: true,
       child: GestureDetector(
         onTap: _isUploadingPhoto ? null : _pickImage,
         child: SizedBox(
@@ -793,17 +898,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   shape: BoxShape.circle,
                   color: _FnlColors.lavender,
                   border: Border.all(color: _FnlColors.violet, width: 3),
-                  image: provider != null
-                      ? DecorationImage(image: provider, fit: BoxFit.cover)
-                      : null,
                 ),
-                child: provider == null
-                    ? Icon(
-                        Icons.person_rounded,
-                        size: imageSize * 0.45,
-                        color: _FnlColors.violet,
-                      )
-                    : null,
+                child: ClipOval(child: _buildAvatarContent(imageSize)),
               ),
               // Overlay mientras sube
               if (_isUploadingPhoto)
@@ -858,19 +954,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ? 22.0
             : 24.0;
 
-    return Text(
-      widget.profileData?.fullName ??
-          "${widget.profileData?.nombres ?? 'Usuario'} ${widget.profileData?.apellidos ?? ''}",
-      textAlign: TextAlign.center,
-      style: _FnlText.h2(fontSize),
+    return Semantics(
+      header: true,
+      child: Text(
+        _displayName,
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: _FnlText.h2(fontSize),
+      ),
     );
   }
 
   Widget _buildSubscriptionBadge(Size size) {
-    // Verificar si el usuario es de company_id 8
+    // Solo para usuarios de company_id 8
     int? companyId = widget.profileData?.idEmpresa;
-
-    // Si NO es company_id 8, no mostrar el badge
     if (companyId != 8) {
       return const SizedBox.shrink();
     }
@@ -930,11 +1028,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildInfoCard() {
     final items = <_InfoItem>[
       _InfoItem(
-        icon: Icons.alternate_email_rounded,
-        title: 'Nombre de Usuario',
-        value: widget.profileData?.username ?? 'No disponible',
-      ),
-      _InfoItem(
         icon: Icons.wc_rounded,
         title: 'Género',
         value: widget.profileData?.gender ?? 'No disponible',
@@ -992,46 +1085,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildInfoRow(_InfoItem item) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: const BoxDecoration(
-            color: _FnlColors.lavender,
-            shape: BoxShape.circle,
+    return Semantics(
+      label: '${item.title}: ${item.value}',
+      excludeSemantics: true,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              color: _FnlColors.lavender,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(item.icon, color: _FnlColors.violet, size: 22),
           ),
-          child: Icon(item.icon, color: _FnlColors.violet, size: 22),
-        ),
-        const SizedBox(width: _FnlSpace.sm),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                item.title.toUpperCase(),
-                style: _FnlText.label(
-                  size: 12,
-                  color: _FnlColors.body,
-                  letterSpacing: 0.6,
+          const SizedBox(width: _FnlSpace.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  item.title.toUpperCase(),
+                  style: _FnlText.label(
+                    size: 12,
+                    color: _FnlColors.body,
+                    letterSpacing: 0.6,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                item.value,
-                style: _FnlText.body(
-                  color: _FnlColors.blue,
-                  weight: FontWeight.w500,
+                const SizedBox(height: 2),
+                Text(
+                  item.value,
+                  style: _FnlText.body(
+                    color: _FnlColors.blue,
+                    weight: FontWeight.w500,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1057,10 +1154,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget? _buildSubscriptionButton() {
-    // Verificar si el usuario es de company_id 8
+    // Solo para usuarios de company_id 8
     int? companyId = widget.profileData?.idEmpresa;
-
-    // Si NO es company_id 8, no mostrar el botón
     if (companyId != 8) {
       return null;
     }
@@ -1143,7 +1238,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           context,
           MaterialPageRoute(
             builder: (context) => CertificateScreen(
-              username: widget.profileData?.fullName ?? 'Usuario',
+              username: _displayName,
               completionDate:
                   '${DateTime.now().day} de ${_getMonthName(DateTime.now().month)} de ${DateTime.now().year}',
               programName: 'Programa de Manejo de Estrés Laboral - 21 Días',
@@ -1223,46 +1318,52 @@ class _PrimaryButton extends StatelessWidget {
     final radius = BorderRadius.circular(18);
     final Color fg = enabled ? _FnlColors.white : _FnlColors.disabledText;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      height: 56,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        color: (enabled || loading) ? _FnlColors.violet : _FnlColors.border,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return Semantics(
+      button: true,
+      enabled: enabled && !loading,
+      label: label,
+      excludeSemantics: true,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 56,
+        width: double.infinity,
+        decoration: BoxDecoration(
           borderRadius: radius,
-          onTap: enabled && !loading ? onTap : null,
-          child: Center(
-            child: loading
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(_FnlColors.white),
-                    ),
-                  )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          label,
-                          overflow: TextOverflow.ellipsis,
-                          style: _FnlText.button(color: fg),
-                        ),
+          color: (enabled || loading) ? _FnlColors.violet : _FnlColors.border,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: enabled && !loading ? onTap : null,
+            child: Center(
+              child: loading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(_FnlColors.white),
                       ),
-                      if (icon != null) ...[
-                        const SizedBox(width: 8),
-                        Icon(icon, size: 20, color: fg),
+                    )
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            label,
+                            overflow: TextOverflow.ellipsis,
+                            style: _FnlText.button(color: fg),
+                          ),
+                        ),
+                        if (icon != null) ...[
+                          const SizedBox(width: 8),
+                          Icon(icon, size: 20, color: fg),
+                        ],
                       ],
-                    ],
-                  ),
+                    ),
+            ),
           ),
         ),
       ),
@@ -1287,49 +1388,55 @@ class _SecondaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(18);
 
-    return Container(
-      height: 48,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: _FnlColors.lavender,
-        borderRadius: radius,
-        border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return Semantics(
+      button: true,
+      enabled: !loading,
+      label: label,
+      excludeSemantics: true,
+      child: Container(
+        height: 52,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: _FnlColors.lavender,
           borderRadius: radius,
-          onTap: loading ? null : onTap,
-          child: Center(
-            child: loading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: _FnlColors.violet,
-                    ),
-                  )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (icon != null) ...[
-                        Icon(icon, size: 20, color: _FnlColors.violet),
-                        const SizedBox(width: 8),
-                      ],
-                      Flexible(
-                        child: Text(
-                          label,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.manrope(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: _FnlColors.violet,
+          border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: loading ? null : onTap,
+            child: Center(
+              child: loading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: _FnlColors.violet,
+                      ),
+                    )
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (icon != null) ...[
+                          Icon(icon, size: 20, color: _FnlColors.violet),
+                          const SizedBox(width: 8),
+                        ],
+                        Flexible(
+                          child: Text(
+                            label,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.manrope(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: _FnlColors.violet,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+            ),
           ),
         ),
       ),

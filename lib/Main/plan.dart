@@ -219,12 +219,15 @@ class PlanScreen extends StatefulWidget {
   final List<dynamic> programas;
   final bool showExitTestModal;
 
+  final Future<void> Function()? onRefresh;
+
   const PlanScreen({
     Key? key,
     required this.nivelEstres,
     required this.isLoading,
     required this.programas,
     this.showExitTestModal = false,
+    this.onRefresh,
   }) : super(key: key);
 
   @override
@@ -237,8 +240,11 @@ class _PlanScreenState extends State<PlanScreen> {
   static const String _funcyUrl = '${_baseUrl}funcy.png';
   static const String _happyUrl = '${_baseUrl}happy.png';
 
+  static const double _bottomNavSpace = 130.0;
+
   bool _hasShownModal = false;
   bool _imagesPrecached = false;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -274,12 +280,25 @@ class _PlanScreenState extends State<PlanScreen> {
         prefs.getBool('hasShownExitTestModal') ?? false;
 
     if (!hasShownExitTestModal && !_hasShownModal) {
-
       _hasShownModal = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _showExitTestModal();
       });
+    }
+  }
+
+  Future<void> _handleRefresh() async {
+    final onRefresh = widget.onRefresh;
+    if (onRefresh == null || _isRefreshing) return;
+
+    setState(() => _isRefreshing = true);
+    try {
+      await onRefresh();
+    } catch (e) {
+      debugPrint('Error refreshing plan: $e');
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
     }
   }
 
@@ -427,6 +446,7 @@ class _PlanScreenState extends State<PlanScreen> {
           url,
           height: height,
           fit: BoxFit.contain,
+          excludeFromSemantics: true,
           loadingBuilder: (context, child, progress) {
             if (progress == null) return child;
             return SizedBox(
@@ -474,7 +494,9 @@ class _PlanScreenState extends State<PlanScreen> {
 
   String get _progressLabel {
     final v = _progressPercentage;
-    return v == v.roundToDouble() ? '${v.toInt()}%' : '${v.toStringAsFixed(1)}%';
+    return v == v.roundToDouble()
+        ? '${v.toInt()}%'
+        : '${v.toStringAsFixed(1)}%';
   }
 
   @override
@@ -483,43 +505,94 @@ class _PlanScreenState extends State<PlanScreen> {
 
     return Scaffold(
       backgroundColor: _FnlColors.canvas,
-      body: Stack(
-        children: [
-          // Círculos decorativos
-          const Positioned(
-            top: -70,
-            right: -70,
-            child: IgnorePointer(child: _DecorCircle(size: 220)),
-          ),
-          const Positioned(
-            bottom: -90,
-            left: -90,
-            child: IgnorePointer(child: _DecorCircle(size: 240)),
-          ),
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 130.0),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: AppConstants.maxContentWidth,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: _FnlSpace.md, vertical: _FnlSpace.md),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildHeader(titleSize),
-                        const SizedBox(height: _FnlSpace.sm),
-                        _buildProgressSection(),
-                        const SizedBox(height: _FnlSpace.md),
-                        _buildContent(),
-                      ],
+      body: SizedBox.expand(
+        child: Stack(
+          fit: StackFit.expand, 
+          children: [
+            // Círculos decorativos
+            const Positioned(
+              top: -70,
+              right: -70,
+              child: IgnorePointer(child: _DecorCircle(size: 220)),
+            ),
+            const Positioned(
+              bottom: -90,
+              left: -90,
+              child: IgnorePointer(child: _DecorCircle(size: 240)),
+            ),
+            SafeArea(
+              child: LayoutBuilder(
+                builder: (context, viewport) {
+                  final availableHeight = (viewport.maxHeight - _bottomNavSpace)
+                      .clamp(320.0, double.infinity);
+
+                  final scroll = SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(bottom: _bottomNavSpace),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: availableHeight),
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxWidth: AppConstants.maxContentWidth,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: _FnlSpace.md,
+                              vertical: _FnlSpace.md,
+                            ),
+                            child: _buildBody(titleSize, availableHeight),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                  );
+
+                  if (widget.onRefresh == null) return scroll;
+
+                  return RefreshIndicator(
+                    color: _FnlColors.violet,
+                    backgroundColor: _FnlColors.white,
+                    onRefresh: _handleRefresh,
+                    child: scroll,
+                  );
+                },
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody(double titleSize, double availableHeight) {
+    final isListState = !widget.isLoading && widget.programas.isNotEmpty;
+
+    if (isListState) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHeader(titleSize),
+          const SizedBox(height: _FnlSpace.sm),
+          _buildProgressSection(),
+          const SizedBox(height: _FnlSpace.md),
+          _buildProgramsList(),
+        ],
+      );
+    }
+
+    return SizedBox(
+      height: availableHeight - (_FnlSpace.md * 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHeader(titleSize),
+          Expanded(
+            child: Center(
+              child: widget.isLoading
+                  ? _buildLoadingState()
+                  : _buildEmptyState(),
             ),
           ),
         ],
@@ -536,7 +609,10 @@ class _PlanScreenState extends State<PlanScreen> {
           style: _FnlText.label(size: 12, letterSpacing: 1.2),
         ),
         const SizedBox(height: 6),
-        Text('Mi Plan Diario', style: _FnlText.h1(titleSize)),
+        Semantics(
+          header: true,
+          child: Text('Mi Plan Diario', style: _FnlText.h1(titleSize)),
+        ),
       ],
     );
   }
@@ -546,39 +622,43 @@ class _PlanScreenState extends State<PlanScreen> {
       return const SizedBox.shrink();
     }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(_FnlSpace.md),
-      decoration: BoxDecoration(
-        color: _FnlColors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
-        boxShadow: const [
-          BoxShadow(
-            color: _FnlColors.bubbleBorder,
-            offset: Offset(0, 4),
-            blurRadius: 0,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text('Tu progreso', style: _FnlText.h2(18)),
-              Text(
-                _progressLabel,
-                style: _FnlText.h2(22, color: _FnlColors.violet),
-              ),
-            ],
-          ),
-          const SizedBox(height: _FnlSpace.sm),
-          _buildProgressBar(),
-        ],
+    return Semantics(
+      label: 'Tu progreso: $_progressLabel',
+      excludeSemantics: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(_FnlSpace.md),
+        decoration: BoxDecoration(
+          color: _FnlColors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+          boxShadow: const [
+            BoxShadow(
+              color: _FnlColors.bubbleBorder,
+              offset: Offset(0, 4),
+              blurRadius: 0,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text('Tu progreso', style: _FnlText.h2(18)),
+                Text(
+                  _progressLabel,
+                  style: _FnlText.h2(22, color: _FnlColors.violet),
+                ),
+              ],
+            ),
+            const SizedBox(height: _FnlSpace.sm),
+            _buildProgressBar(),
+          ],
+        ),
       ),
     );
   }
@@ -614,37 +694,63 @@ class _PlanScreenState extends State<PlanScreen> {
     );
   }
 
-  Widget _buildContent() {
-    if (widget.isLoading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: _FnlSpace.md),
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 3,
-            color: _FnlColors.violet,
-          ),
+  Widget _buildLoadingState() {
+    return Semantics(
+      label: 'Cargando tu plan',
+      child: const SizedBox(
+        width: 40,
+        height: 40,
+        child: CircularProgressIndicator(
+          strokeWidth: 3,
+          color: _FnlColors.violet,
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    if (widget.programas.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: _FnlSpace.md),
-        child: Column(
-          children: [
-            SizedBox(height: 120, child: _buildMascot(_funcyUrl, 120)),
-            const SizedBox(height: _FnlSpace.sm),
-            Text(
-              'No hay programas disponibles',
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: _FnlSpace.sm),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _FloatingMascot(
+            child: SizedBox(
+              height: 140,
+              child: _buildMascot(_funcyUrl, 140),
+            ),
+          ),
+          const SizedBox(height: _FnlSpace.md),
+          Semantics(
+            header: true,
+            child: Text(
+              'Aún no tienes programas',
               textAlign: TextAlign.center,
-              style: _FnlText.h2(18),
+              style: _FnlText.h2(20),
+            ),
+          ),
+          const SizedBox(height: _FnlSpace.xs),
+          Text(
+            widget.onRefresh != null
+                ? 'Tu ruta de 21 días aparecerá aquí en cuanto esté lista. Desliza hacia abajo o toca actualizar para revisar de nuevo.'
+                : 'Tu ruta de 21 días aparecerá aquí en cuanto esté lista.',
+            textAlign: TextAlign.center,
+            style: _FnlText.body(size: 15),
+          ),
+          if (widget.onRefresh != null) ...[
+            const SizedBox(height: _FnlSpace.md),
+            SizedBox(
+              width: 220,
+              child: _PrimaryButton(
+                label: _isRefreshing ? 'Actualizando...' : 'Actualizar',
+                icon: _isRefreshing ? null : Icons.refresh_rounded,
+                onTap: _isRefreshing ? null : _handleRefresh,
+              ),
             ),
           ],
-        ),
-      );
-    }
-
-    return _buildProgramsList();
+        ],
+      ),
+    );
   }
 
   Widget _buildProgramsList() {
@@ -747,7 +853,7 @@ class _PlanScreenState extends State<PlanScreen> {
     String getImageUrl() {
       if (!isUnlocked) return lockedImageUrl;
 
-      /*// Si ya tiene una URL específica en la base de datos, usarla
+      /*// Si ya se tiene una URL específica en la base de datos, usarla
       if (programa.urlImg != null && programa.urlImg!.isNotEmpty) {
         return programa.urlImg!;
       }*/
@@ -771,6 +877,7 @@ class _PlanScreenState extends State<PlanScreen> {
             width: double.infinity,
             height: AppConstants.cardImageHeight,
             fit: BoxFit.cover,
+            excludeFromSemantics: true,
             loadingBuilder: (context, child, progress) {
               if (progress == null) return child;
               return Container(
@@ -981,6 +1088,50 @@ class _DecorCircle extends StatelessWidget {
   }
 }
 
+class _FloatingMascot extends StatefulWidget {
+  final Widget child;
+  const _FloatingMascot({required this.child});
+
+  @override
+  State<_FloatingMascot> createState() => _FloatingMascotState();
+}
+
+class _FloatingMascotState extends State<_FloatingMascot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _curve;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    )..repeat(reverse: true);
+    _curve = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.of(context).disableAnimations) return widget.child;
+
+    return AnimatedBuilder(
+      animation: _curve,
+      child: widget.child,
+      builder: (context, child) => Transform.translate(
+        offset: Offset(0, -8 * _curve.value),
+        child: child,
+      ),
+    );
+  }
+}
+
 /// Separador de puntos.
 class _DotSeparator extends StatelessWidget {
   const _DotSeparator();
@@ -1000,7 +1151,7 @@ class _DotSeparator extends StatelessWidget {
 
 class _PrimaryButton extends StatelessWidget {
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final IconData? icon;
 
   const _PrimaryButton({
@@ -1012,35 +1163,44 @@ class _PrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(18);
+    final enabled = onTap != null;
 
-    return Container(
-      height: 56,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        color: _FnlColors.violet,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: label,
+      excludeSemantics: true,
+      child: Container(
+        height: 56,
+        width: double.infinity,
+        decoration: BoxDecoration(
           borderRadius: radius,
-          onTap: onTap,
-          child: Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: Text(
-                    label,
-                    overflow: TextOverflow.ellipsis,
-                    style: _FnlText.button(),
+          color: enabled
+              ? _FnlColors.violet
+              : _FnlColors.violet.withOpacity(0.55),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: onTap,
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                      style: _FnlText.button(),
+                    ),
                   ),
-                ),
-                if (icon != null) ...[
-                  const SizedBox(width: 8),
-                  Icon(icon, size: 20, color: _FnlColors.white),
+                  if (icon != null) ...[
+                    const SizedBox(width: 8),
+                    Icon(icon, size: 20, color: _FnlColors.white),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
