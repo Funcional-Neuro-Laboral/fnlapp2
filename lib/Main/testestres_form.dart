@@ -495,6 +495,7 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
           return;
         }
 
+        await _updateTestEstresBool();
         print('Registro de nivel de estrés creado correctamente.');
 
         bool isCompany8 = await _isCompany8User();
@@ -526,7 +527,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
 
             if (result == true) {
               await _generateProgram(userProfile, totalScore);
-              await _updateTestEstresBool();
 
               Navigator.pushReplacement(
                 context,
@@ -539,7 +539,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
             return;
           } else {
             await _generateProgram(userProfile, totalScore);
-            await _updateTestEstresBool();
 
             Navigator.pushReplacement(
               context,
@@ -556,7 +555,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
           print('Se generará el programa SIN verificar suscripción');
           print('========================================');
           await _generateProgram(userProfile, totalScore);
-          await _updateTestEstresBool();
 
           Navigator.pushReplacement(
             context,

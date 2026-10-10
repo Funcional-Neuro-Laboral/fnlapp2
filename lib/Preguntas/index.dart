@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart' show GoogleFonts;
@@ -90,11 +91,26 @@ class IndexScreen extends StatefulWidget {
   final String username;
   final ApiService apiServiceWithToken;
 
-  IndexScreen({required this.username, required this.apiServiceWithToken});
+  const IndexScreen({
+    super.key,
+    required this.username,
+    required this.apiServiceWithToken,
+  });
 
   @override
-  _IndexScreenState createState() => _IndexScreenState();
+  State<IndexScreen> createState() => _IndexScreenState();
 }
+
+enum _QuestionKey {
+  ageRange,
+  gender,
+  area,
+  hierarchicalLevel,
+  responsabilityLevel,
+  branch,
+}
+
+typedef _QuestionAnswer = ({int value, String label});
 
 class _IndexScreenState extends State<IndexScreen> {
   // Mascota Funcy (imágenes remotas)
@@ -103,58 +119,42 @@ class _IndexScreenState extends State<IndexScreen> {
   static const String _happyUrl =
       'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/happy.png';
 
-  static const int _totalQuestions = 6;
-  static const List<String> _categoryKeys = [
-    'age_range',
-    'gender',
-    'area',
-    'level',
-    'responsability_level',
-    'sede',
-  ];
-  static const List<String> _questionTexts = [
-    '¿Cuál es tu rango de edad?',
-    '¿Cuál es tu género?',
-    '¿Cuál es tu Área?',
-    '¿Cuál es tu posición en la organización?',
-    '¿Cuál es tu nivel de responsabilidad en tu organización?',
-    '¿A que sede perteneces?',
-  ];
-
-  Map<String, List<Map<String, dynamic>>> questionCategories = {
-    'age_range': [],
-    'level': [],
-    'area': [],
-    'sede': [],
-    'responsability_level': [],
-    'gender': []
+  static const Map<_QuestionKey, String> questionByKey = {
+    _QuestionKey.ageRange: '¿Cuál es tu rango de edad?',
+    _QuestionKey.gender: '¿Cuál es tu género?',
+    _QuestionKey.area: '¿Cuál es tu área?',
+    _QuestionKey.hierarchicalLevel: '¿Cuál es tu posición en la organización?',
+    _QuestionKey.responsabilityLevel:
+        '¿Cuál es tu nivel de responsabilidad en tu organización?',
+    _QuestionKey.branch: '¿A que sede perteneces?',
   };
-  Map<int, dynamic> selectedAnswers = {};
 
-  int currentQuestionIndex = 0;
+  Map<_QuestionKey, List<_QuestionAnswer>> answersByKey = {};
+  Map<_QuestionKey, int> selectedAnswerByKey = {};
+  List<_QuestionKey> usedKeys = [];
+  int currentKeyIndex = 0;
+
   bool loading = true;
   bool agreedToTerms = false;
   bool acceptedProcessing = false;
   bool acceptedProcessing1 = false;
   bool acceptedTracking = false;
   bool agreedToAll = false;
-  int? selectedAreaId;
   int? userId;
-  String? selectedOption;
+  int? selectedOption;
   bool _imagesPrecached = false;
+
+  // Carga de niveles jerárquicos (dependen del área elegida)
+  bool _loadingLevels = false;
+  int? _levelsAreaId;
 
   // Recognizers de los enlaces legales (se crean una vez y se liberan en dispose)
   late final TapGestureRecognizer _privacyTap;
   late final TapGestureRecognizer _termsTap;
 
-  String _getOptionText(Map<String, dynamic> question) {
-    return question['age_range']?.toString() ??
-        question['area']?.toString() ??
-        question['level']?.toString() ??
-        question['gender']?.toString() ??
-        question['responsability_level']?.toString() ??
-        question['sede']?.toString() ??
-        'Valor no disponible';
+  /// Logs solo en modo debug (nunca imprimir tokens ni datos sensibles).
+  void _log(Object? message) {
+    if (kDebugMode) debugPrint('$message');
   }
 
   @override
@@ -205,20 +205,15 @@ class _IndexScreenState extends State<IndexScreen> {
   }
 
   Future<void> _loadUserProgress() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-
+    final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
 
-    setState(() {
-      agreedToTerms = prefs.getBool('permisopoliticas') ?? false;
-      bool userresponsebool = prefs.getBool('userresponsebool') ?? false;
-      bool testestresbool = prefs.getBool('testestresbool') ?? false;
+    final terms = prefs.getBool('permisopoliticas') ?? false;
+    final userResponseDone = prefs.getBool('userresponsebool') ?? false;
+    final testEstresDone = prefs.getBool('testestresbool') ?? false;
 
-      if (!agreedToTerms) {
-        currentQuestionIndex = -1;
-      } else if (!userresponsebool) {
-        currentQuestionIndex = 0;
-      } else if (!testestresbool) {
+    if (terms && userResponseDone) {
+      if (!testEstresDone) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => TestEstresScreen()),
@@ -226,30 +221,43 @@ class _IndexScreenState extends State<IndexScreen> {
       } else {
         Navigator.pushReplacementNamed(context, '/home');
       }
+      return;
+    }
+
+    setState(() {
+      agreedToTerms = terms;
+      currentKeyIndex = 0;
     });
   }
 
   Future<void> _loadUserData() async {
-    String? username = await getUsername();
+    final username = await getUsername();
     userId = await getUserId();
-    String? email = await getEmail();
+    final email = await getEmail();
 
-    print('Username: $username');
-    print('User ID: $userId');
-    print('Email: $email');
+    _log('Username: $username');
+    _log('User ID: $userId');
+    _log('Email: $email');
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Future<void> _updatePermisoPoliticas() async {
     try {
+      userId ??= await getUserId();
       if (userId == null) {
-        print('No se encontró el ID del usuario.');
+        _log('No se encontró el ID del usuario.');
         return;
       }
 
-      String? token = await getToken();
-
+      final token = await getToken();
       if (token == null) {
-        print('No se encontró el token de autenticación.');
+        _log('No se encontró el token de autenticación.');
         return;
       }
 
@@ -266,26 +274,17 @@ class _IndexScreenState extends State<IndexScreen> {
       if (!mounted) return;
 
       if (response.statusCode == 200) {
-        print('Campo permisopoliticas actualizado correctamente.');
-        SharedPreferences prefs = await SharedPreferences.getInstance();
+        _log('Campo permisopoliticas actualizado correctamente.');
+        final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('permisopoliticas', true);
-
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Permisos aceptados y actualizados.')),
-        );
+        _showSnack('Permisos aceptados y actualizados.');
       } else {
-        print('Error al actualizar permisopoliticas: ${response.statusCode}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al actualizar permisos.')),
-        );
+        _log('Error al actualizar permisopoliticas: ${response.statusCode}');
+        _showSnack('Error al actualizar permisos.');
       }
     } catch (e) {
-      print('Error: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al conectar con el servidor.')),
-      );
+      _log('Error: $e');
+      _showSnack('Error al conectar con el servidor.');
     }
   }
 
@@ -301,212 +300,198 @@ class _IndexScreenState extends State<IndexScreen> {
   }
 
   Future<void> fetchData() async {
-    try {
-      await fetchQuestions();
-      if (!mounted) return;
-      setState(() {
-        loading = false;
-      });
-    } catch (e) {
-      print('Error al cargar datos: $e');
+    await fetchQuestions();
+    if (!mounted) return;
+    setState(() {
+      loading = false;
+    });
+  }
+
+  /// Reintenta la carga de preguntas desde la pantalla de error.
+  Future<void> _retryLoad() async {
+    setState(() => loading = true);
+    await fetchData();
+  }
+
+  /// Pide una lista de opciones al backend y la convierte a [_QuestionAnswer].
+  Future<List<_QuestionAnswer>> fetchQuestionEndpoint(
+    final String endpoint,
+    final String valueName,
+    final String labelName,
+  ) async {
+    final response = await widget.apiServiceWithToken.get(endpoint);
+    if (response.statusCode != 200) {
+      throw Exception(
+          'Endpoint $endpoint returned HTTP status ${response.statusCode}');
     }
+
+    final data = json.decode(response.body);
+    if (data is! List || data.isEmpty) {
+      throw Exception('Endpoint $endpoint returned empty data');
+    }
+
+    return data.map<_QuestionAnswer>((item) {
+      final value = int.tryParse('${item[valueName]}');
+      if (value == null) {
+        throw FormatException(
+            'Endpoint $endpoint returned an invalid "$valueName": ${item[valueName]}');
+      }
+      return (
+        value: value,
+        label: '${item[labelName] ?? 'Valor no disponible'}',
+      );
+    }).toList();
   }
 
   Future<void> fetchHierarchicalLevel(int areaId) async {
+    _levelsAreaId = areaId;
+    if (mounted) {
+      setState(() {
+        _loadingLevels = true;
+        answersByKey[_QuestionKey.hierarchicalLevel] = [];
+      });
+    }
+
     try {
-      final queryParams = {
-        'areaId': areaId.toString(),
-      };
+      final levels = await fetchQuestionEndpoint(
+        'general/hierarchical-levels/by-area?areaId=$areaId',
+        'id',
+        'level',
+      );
 
-      final uri = Uri.parse('general/hierarchical-levels/by-area')
-          .replace(queryParameters: queryParams);
-
-      final response = await widget.apiServiceWithToken.get(uri.toString());
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-
-        if (data.isNotEmpty) {
-          final hierarchicalLevels =
-              data.map((item) => Map<String, dynamic>.from(item)).toList();
-
-          if (!mounted) return;
-          setState(() {
-            questionCategories['level'] = hierarchicalLevels;
-          });
-
-          print(
-              'Niveles jerárquicos cargados correctamente (${hierarchicalLevels.length}).');
-        } else {
-          print('No se encontraron niveles jerárquicos para el área $areaId.');
-        }
-      } else {
-        print('Error al cargar niveles jerárquicos: ${response.statusCode}');
-      }
+      // Si el usuario ya eligió otra área, esta respuesta quedó obsoleta
+      if (!mounted || _levelsAreaId != areaId) return;
+      setState(() {
+        answersByKey[_QuestionKey.hierarchicalLevel] = levels;
+        _loadingLevels = false;
+      });
     } catch (e, stackTrace) {
-      print('Excepción al cargar niveles jerárquicos: $e');
-      print(stackTrace);
+      _log('Excepción al cargar niveles jerárquicos: $e');
+      _log(stackTrace);
+      if (!mounted || _levelsAreaId != areaId) return;
+      setState(() => _loadingLevels = false);
     }
   }
 
   Future<void> fetchQuestions() async {
     try {
-      userId = await getUserId();
+      final prefs = await SharedPreferences.getInstance();
+      // No depender de que _loadUserData haya terminado
+      userId ??= await getUserId();
 
-      final queryParamsSedes = {
-        'iduser': userId.toString(),
-      };
+      final answers = <_QuestionKey, List<_QuestionAnswer>>{};
+      final keys = <_QuestionKey>[];
 
-      final uriSede = Uri.parse('general/branches/by-user')
-          .replace(queryParameters: queryParamsSedes);
+      answers[_QuestionKey.ageRange] =
+          await fetchQuestionEndpoint('general/age-ranges', 'id', 'age_range');
+      answers[_QuestionKey.gender] =
+          await fetchQuestionEndpoint('general/gender/all', 'id', 'gender');
+      keys.add(_QuestionKey.ageRange);
+      keys.add(_QuestionKey.gender);
 
-      final response = await widget.apiServiceWithToken.get(uriSede.toString());
+      // TODO modificar el backend para que el endpoint /users/login devuelva
+      // company_id en .data.user
+      final isNaturalUser = prefs.getInt('company_id') == 8;
 
-      if (response.statusCode == 200) {
-        final List<dynamic> sedesData = json.decode(response.body);
-
-        if (sedesData.isNotEmpty) {
-          if (!mounted) return;
-          setState(() {
-            questionCategories['sede'] = sedesData
-                .map((item) => Map<String, dynamic>.from(item))
-                .toList();
-          });
-          print('Sedes Body: ${response.body}');
-          print('Sedes cargadas correctamente (${sedesData.length}).');
-        } else {
-          print('No se encontraron sedes para el usuario $userId.');
+      if (!isNaturalUser) {
+        if (userId == null) {
+          throw Exception('No se pudo obtener el ID del usuario');
         }
-      } else {
-        print('Error al cargar sedes: ${response.statusCode}');
+        answers[_QuestionKey.area] = await fetchQuestionEndpoint(
+            'general/area/by-user?iduser=$userId', 'id', 'area');
+        // Los niveles jerárquicos se cargan al elegir el área
+        answers[_QuestionKey.hierarchicalLevel] = [];
+        keys.add(_QuestionKey.area);
+        keys.add(_QuestionKey.hierarchicalLevel);
       }
 
-      var queryParams = {
-        'iduser': userId.toString(),
-      };
+      answers[_QuestionKey.responsabilityLevel] = await fetchQuestionEndpoint(
+          'general/responsibility-levels/all', 'id', 'responsability_level');
+      keys.add(_QuestionKey.responsabilityLevel);
 
-      var uriArea = Uri.parse('general/area/by-user')
-          .replace(queryParameters: queryParams);
-      var areasResponse =
-          await widget.apiServiceWithToken.get(uriArea.toString());
-
-      var areasData = json.decode(areasResponse.body);
-      var areas = areasData as List;
-
-      if (areas.isNotEmpty) {
-        if (!mounted) return;
-        setState(() {
-          questionCategories['area'] =
-              areas.map((item) => Map<String, dynamic>.from(item)).toList();
-        });
-
-        print('Áreas cargadas correctamente.');
-      }
-
-      var endpoints = [
-        'general/age-ranges',
-        'general/responsibility-levels/all',
-        'general/gender/all',
-      ];
-
-      var responses = await Future.wait(
-        endpoints.map((endpoint) => widget.apiServiceWithToken.get(endpoint)),
-      );
-
-      for (var i = 0; i < responses.length; i++) {
-        var data = json.decode(responses[i].body);
-
-        if (data != null && data is List) {
-          var category =
-              data.map((item) => Map<String, dynamic>.from(item)).toList();
-
-          if (i == 0) {
-            questionCategories['age_range'] = category;
-          } else if (i == 1) {
-            questionCategories['responsability_level'] = category;
-          } else if (i == 2) {
-            questionCategories['gender'] = category;
-          }
-        }
+      if (!isNaturalUser) {
+        answers[_QuestionKey.branch] = await fetchQuestionEndpoint(
+            'general/branches/by-user?iduser=$userId', 'id', 'sede');
+        keys.add(_QuestionKey.branch);
       }
 
       if (!mounted) return;
       setState(() {
+        answersByKey = answers;
+        usedKeys = keys;
         loading = false;
       });
-
-      print('Las preguntas se cargaron correctamente.');
+      _log('Las preguntas se cargaron correctamente.');
     } catch (e) {
+      _log('Error al cargar preguntas: $e');
       if (!mounted) return;
       setState(() {
         loading = false;
       });
-      print('Error al cargar preguntas: $e');
     }
   }
 
-  void selectOption(String option) {
+  void selectOption(int option) {
     setState(() {
       selectedOption = option;
     });
   }
 
   void goToNextQuestion() {
-    if (selectedOption != null) {
-      selectedAnswers[currentQuestionIndex] = selectedOption;
-      setState(() {
-        selectedOption = null;
-        currentQuestionIndex++;
-      });
-    }
+    final selected = selectedOption;
+    if (selected == null) return;
+    if (currentKeyIndex + 1 >= usedKeys.length) return;
+
+    selectedAnswerByKey[usedKeys[currentKeyIndex]] = selected;
+    final next = currentKeyIndex + 1;
+    setState(() {
+      currentKeyIndex = next;
+      // Si el usuario ya había respondido la siguiente, se restaura
+      selectedOption = selectedAnswerByKey[usedKeys[next]];
+    });
   }
 
   void goToPreviousQuestion() {
-    if (currentQuestionIndex > 0) {
+    if (currentKeyIndex > 0) {
       setState(() {
-        currentQuestionIndex--;
-        selectedOption = selectedAnswers[currentQuestionIndex] ?? null;
+        currentKeyIndex--;
+        selectedOption = selectedAnswerByKey[usedKeys[currentKeyIndex]];
       });
     }
   }
 
-  int? _asInt(dynamic value) {
-    if (value is int) return value;
-    if (value == null) return null;
-    return int.tryParse(value.toString());
-  }
-
   Future<void> saveResponses() async {
-    print('Selected Answers: $selectedAnswers');
+    userId ??= await getUserId();
+    final token = await getToken();
 
-    if (selectedAnswers[5] == null) {
-      if (selectedOption != null) {
-        selectedAnswers[currentQuestionIndex] = selectedOption;
-      }
+    final id = userId;
+    final ageRangeId = selectedAnswerByKey[_QuestionKey.ageRange];
+    final genderId = selectedAnswerByKey[_QuestionKey.gender];
+    final responsabilityLevelId =
+        selectedAnswerByKey[_QuestionKey.responsabilityLevel];
+
+    if (id == null ||
+        ageRangeId == null ||
+        genderId == null ||
+        responsabilityLevelId == null) {
+      _showSnack('Faltan respuestas por completar.');
+      return;
     }
 
-    String? token = await getToken();
-
-    // Los valores pueden venir como String desde la UI
-    final int? ageRangeId = _asInt(selectedAnswers[0]);
-    final int? genderId = _asInt(selectedAnswers[1]);
-    final int? hierarchicalLevelId = _asInt(selectedAnswers[3]);
-    final int? responsabilityLevelId = _asInt(selectedAnswers[4]);
-    final int? branchId = _asInt(selectedAnswers[5]);
-
-    final Map<String, dynamic> dataToSend = {
-      "userId": userId,
-      "age_range_id": ageRangeId,
-      "hierarchical_level_id": hierarchicalLevelId,
-      "responsability_level_id": responsabilityLevelId,
-      "gender_id": genderId,
-      "branch_id": branchId,
+    final Map<String, int?> dataToSend = {
+      'userId': id,
+      'age_range_id': ageRangeId,
+      'gender_id': genderId,
+      'responsability_level_id': responsabilityLevelId,
+      // null si company_id es 8 (General)
+      'hierarchical_level_id':
+          selectedAnswerByKey[_QuestionKey.hierarchicalLevel],
+      'branch_id': selectedAnswerByKey[_QuestionKey.branch],
     };
-
-    print('Data to send: $dataToSend');
+    _log('Data to send: $dataToSend');
 
     try {
-      var response = await http.post(
+      final response = await http.post(
         Uri.parse('${Config.apiUrl2}/users/save-responses'),
         headers: {
           'Content-Type': 'application/json',
@@ -516,19 +501,18 @@ class _IndexScreenState extends State<IndexScreen> {
       );
 
       if (response.statusCode == 200) {
-        SharedPreferences prefs = await SharedPreferences.getInstance();
+        final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('userresponsebool', true);
 
         // Guardar branch_id en SharedPreferences para uso posterior
+        final branchId = selectedAnswerByKey[_QuestionKey.branch];
         if (branchId != null) {
           await prefs.setInt('branch_id', branchId);
-          print('branch_id guardado en SharedPreferences: $branchId');
+          _log('branch_id guardado en SharedPreferences: $branchId');
         }
 
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Respuestas guardadas exitosamente.')),
-        );
+        _showSnack('Respuestas guardadas exitosamente.');
 
         Navigator.pushReplacement(
           context,
@@ -537,17 +521,11 @@ class _IndexScreenState extends State<IndexScreen> {
           ),
         );
       } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al guardar respuestas.')),
-        );
+        _showSnack('Error al guardar respuestas.');
       }
     } catch (e) {
-      print('Error al enviar respuestas: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al enviar respuestas.')),
-      );
+      _log('Error al enviar respuestas: $e');
+      _showSnack('Error al enviar respuestas.');
     }
   }
 
@@ -556,18 +534,60 @@ class _IndexScreenState extends State<IndexScreen> {
   // ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    Widget content;
+    if (loading) {
+      content = const Center(
+        child: CircularProgressIndicator(color: _FnlColors.violet),
+      );
+    } else if (!agreedToTerms) {
+      content = _buildWelcomeScreen();
+    } else if (usedKeys.isEmpty) {
+      content = _buildLoadError();
+    } else {
+      content = _buildQuestionsScreen();
+    }
+
     return Scaffold(
       backgroundColor: _FnlColors.canvas,
-      body: _FnlBackground(
-        child: loading
-            ? const Center(
-                child: CircularProgressIndicator(
-                  color: _FnlColors.violet,
+      body: _FnlBackground(child: content),
+    );
+  }
+
+  // ── Error de carga con reintento ─────────────────────────────
+  Widget _buildLoadError() {
+    return SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(_FnlSpace.md),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _MascotHalo(url: _thinkingUrl, size: 120),
+                const SizedBox(height: _FnlSpace.sm),
+                Text(
+                  'No pudimos cargar tus preguntas',
+                  textAlign: TextAlign.center,
+                  style: _FnlText.h2(22),
                 ),
-              )
-            : agreedToTerms
-                ? _buildQuestionsScreen()
-                : _buildWelcomeScreen(),
+                const SizedBox(height: _FnlSpace.xs),
+                Text(
+                  'Revisa tu conexión e inténtalo de nuevo.',
+                  textAlign: TextAlign.center,
+                  style: _FnlText.body(),
+                ),
+                const SizedBox(height: _FnlSpace.md),
+                _PrimaryButton(
+                  label: 'Reintentar',
+                  icon: Icons.refresh_rounded,
+                  onTap: _retryLoad,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -692,7 +712,7 @@ class _IndexScreenState extends State<IndexScreen> {
                             _handleAcceptAll();
                             setState(() {
                               agreedToTerms = true;
-                              currentQuestionIndex = 0;
+                              currentKeyIndex = 0;
                             });
                           },
                         ),
@@ -719,14 +739,19 @@ class _IndexScreenState extends State<IndexScreen> {
 
   // ── Preguntas de perfil ──────────────────────────────────────
   Widget _buildQuestionsScreen() {
-    final lookupIndex = currentQuestionIndex.clamp(0, _totalQuestions - 1);
-    final categoryKey = _categoryKeys[lookupIndex];
-    final questionText = _questionTexts[lookupIndex];
-    final options = questionCategories[categoryKey] ?? [];
+    final keyIndex = currentKeyIndex < 0
+        ? 0
+        : currentKeyIndex >= usedKeys.length
+            ? usedKeys.length - 1
+            : currentKeyIndex;
+    final currentKey = usedKeys[keyIndex];
+    final questionText = questionByKey[currentKey] ?? '';
+    final options = answersByKey[currentKey] ?? const <_QuestionAnswer>[];
+    final bool isLoadingOptions =
+        currentKey == _QuestionKey.hierarchicalLevel && _loadingLevels;
 
-    final bool isNextEnabled = selectedOption != null ||
-        selectedAnswers.containsKey(currentQuestionIndex);
-    final bool isLast = currentQuestionIndex >= _totalQuestions - 1;
+    final bool isNextEnabled = selectedOption != null;
+    final bool isLast = keyIndex >= usedKeys.length - 1;
 
     return SafeArea(
       child: LayoutBuilder(
@@ -764,7 +789,16 @@ class _IndexScreenState extends State<IndexScreen> {
                             ),
                           ),
                           const SizedBox(height: _FnlSpace.md),
-                          if (options.isEmpty)
+                          if (isLoadingOptions)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 24),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  color: _FnlColors.violet,
+                                ),
+                              ),
+                            )
+                          else if (options.isEmpty)
                             Padding(
                               padding:
                                   const EdgeInsets.symmetric(vertical: 24),
@@ -805,50 +839,71 @@ class _IndexScreenState extends State<IndexScreen> {
   }
 
   void _onNextPressed() {
-    if (currentQuestionIndex < _totalQuestions - 1) {
+    final selected = selectedOption;
+    if (selected == null) return;
+
+    if (currentKeyIndex + 1 < usedKeys.length) {
       goToNextQuestion();
-    } else {
-      // Navegar a la pantalla de resumen
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => IndexSummaryScreen(
-            onFinalize: saveResponses,
-            onBack: () {
-              Navigator.pop(context); // Retroceder a la pantalla de preguntas
-            },
-          ),
-        ),
-      );
+      return;
     }
-  }
 
-  Widget _buildOption(Map<String, dynamic> question) {
-    final id = question['id'].toString();
-    final isSelected = selectedOption == id;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: _OptionTile(
-        label: _getOptionText(question),
-        selected: isSelected,
-        onTap: () {
-          setState(() {
-            selectedOption = id;
-          });
-
-          if (currentQuestionIndex == 2) {
-            final areaId = _asInt(question['id']);
-            if (areaId != null) fetchHierarchicalLevel(areaId);
-          }
-        },
+    // Última pregunta: guardar la respuesta y pasar al resumen
+    selectedAnswerByKey[usedKeys[currentKeyIndex]] = selected;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => IndexSummaryScreen(
+          onFinalize: saveResponses,
+          onBack: () {
+            Navigator.pop(context); // Retroceder a la pantalla de preguntas
+          },
+        ),
       ),
     );
   }
 
+  Widget _buildOption(_QuestionAnswer answer) {
+    final isSelected = selectedOption == answer.value;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: _OptionTile(
+        label: answer.label,
+        selected: isSelected,
+        onTap: () => _onOptionSelected(answer),
+      ),
+    );
+  }
+
+  void _onOptionSelected(_QuestionAnswer answer) {
+    setState(() {
+      selectedOption = answer.value;
+    });
+
+    if (usedKeys[currentKeyIndex] == _QuestionKey.area) {
+      _onAreaSelected(answer.value);
+    }
+  }
+
+  void _onAreaSelected(int areaId) {
+    // Si cambió el área, la posición elegida antes ya no es válida
+    final previousArea = selectedAnswerByKey[_QuestionKey.area];
+    if (previousArea != null && previousArea != areaId) {
+      selectedAnswerByKey.remove(_QuestionKey.hierarchicalLevel);
+    }
+
+    // Evita pedir de nuevo los mismos niveles si ya están cargados
+    final alreadyLoaded = _levelsAreaId == areaId &&
+        (answersByKey[_QuestionKey.hierarchicalLevel]?.isNotEmpty ?? false);
+    if (!alreadyLoaded) {
+      fetchHierarchicalLevel(areaId);
+    }
+  }
+
   // Header: retroceso + contador + barra de progreso
   Widget _buildQuestionHeader(double hPad, double maxContentWidth) {
-    final progress = (currentQuestionIndex + 1) / _totalQuestions;
+    final total = usedKeys.length;
+    final progress = (currentKeyIndex + 1) / total;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(hPad, _FnlSpace.sm, hPad, _FnlSpace.xs),
@@ -862,7 +917,7 @@ class _IndexScreenState extends State<IndexScreen> {
                   SizedBox(
                     width: 40,
                     height: 40,
-                    child: currentQuestionIndex > 0
+                    child: currentKeyIndex > 0
                         ? Material(
                             color: _FnlColors.white,
                             shape: const CircleBorder(
@@ -884,7 +939,7 @@ class _IndexScreenState extends State<IndexScreen> {
                   Expanded(
                     child: Center(
                       child: Text(
-                        'Pregunta ${currentQuestionIndex + 1} de $_totalQuestions',
+                        'Pregunta ${currentKeyIndex + 1} de $total',
                         style: _FnlText.label(),
                       ),
                     ),
@@ -986,6 +1041,7 @@ class _MascotHalo extends StatelessWidget {
             url,
             height: size,
             fit: BoxFit.contain,
+            excludeFromSemantics: true,
             loadingBuilder: (context, child, progress) {
               if (progress == null) return child;
               return SizedBox(
@@ -1117,41 +1173,47 @@ class _OptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        width: double.infinity,
-        padding:
-            const EdgeInsets.symmetric(horizontal: _FnlSpace.sm, vertical: 14),
-        decoration: BoxDecoration(
-          color: selected ? _FnlColors.lavender : _FnlColors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            width: 2,
-            color: selected ? _FnlColors.violet : _FnlColors.border,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+              horizontal: _FnlSpace.sm, vertical: 14),
+          decoration: BoxDecoration(
+            color: selected ? _FnlColors.lavender : _FnlColors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              width: 2,
+              color: selected ? _FnlColors.violet : _FnlColors.border,
+            ),
+            // Sombra sólida abajo: efecto botón de juego
+            boxShadow: [
+              BoxShadow(
+                color: selected
+                    ? _FnlColors.violet.withOpacity(0.35)
+                    : _FnlColors.border,
+                offset: Offset(0, selected ? 2 : 4),
+                blurRadius: 0,
+              ),
+            ],
           ),
-          // Sombra sólida abajo: efecto botón de juego
-          boxShadow: [
-            BoxShadow(
-              color: selected
-                  ? _FnlColors.violet.withOpacity(0.35)
-                  : _FnlColors.border,
-              offset: Offset(0, selected ? 2 : 4),
-              blurRadius: 0,
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            _SelectionDot(selected: selected),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(label, style: _FnlText.option(selected: selected)),
-            ),
-          ],
+          child: Row(
+            children: [
+              _SelectionDot(selected: selected),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(label, style: _FnlText.option(selected: selected)),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1274,29 +1336,35 @@ class _PrimaryButton extends StatelessWidget {
     final radius = BorderRadius.circular(18);
     final Color fg = enabled ? _FnlColors.white : _FnlColors.disabledText;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      height: 56,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        color: enabled ? _FnlColors.violet : _FnlColors.border,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: label,
+      excludeSemantics: true,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 56,
+        width: double.infinity,
+        decoration: BoxDecoration(
           borderRadius: radius,
-          onTap: enabled ? onTap : null,
-          child: Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(label, style: _FnlText.button(color: fg)),
-                if (icon != null) ...[
-                  const SizedBox(width: 8),
-                  Icon(icon, size: 20, color: fg),
+          color: enabled ? _FnlColors.violet : _FnlColors.border,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: enabled ? onTap : null,
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(label, style: _FnlText.button(color: fg)),
+                  if (icon != null) ...[
+                    const SizedBox(width: 8),
+                    Icon(icon, size: 20, color: fg),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -1321,33 +1389,38 @@ class _SecondaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(18);
 
-    return Container(
-      height: 48,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: _FnlColors.lavender,
-        borderRadius: radius,
-        border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: Container(
+        height: 48,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: _FnlColors.lavender,
           borderRadius: radius,
-          onTap: onTap,
-          child: Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (icon != null) ...[
-                  Icon(icon, size: 20, color: _FnlColors.violet),
-                  const SizedBox(width: 8),
+          border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: onTap,
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 20, color: _FnlColors.violet),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    label,
+                    style: _FnlText.button(color: _FnlColors.violet)
+                        .copyWith(fontSize: 16),
+                  ),
                 ],
-                Text(
-                  label,
-                  style: _FnlText.button(color: _FnlColors.violet)
-                      .copyWith(fontSize: 16),
-                ),
-              ],
+              ),
             ),
           ),
         ),
