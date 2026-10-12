@@ -230,11 +230,12 @@ class _IndexScreenState extends State<IndexScreen> {
       usedKeys.add(_QuestionKey.ageRange);
       usedKeys.add(_QuestionKey.gender);
       // TODO modificar el backend para que el endpoint /users/login devuelva company_id en .data.user
-      final isNaturalUser = prefs.getInt('company_id') == 8;
+      final areaData = await
+          fetchQuestionEndpoint('general/area/by-user?iduser=$userId', 'id', 'area');
+      final isNaturalUser = areaData.length == 1 && areaData[0].value == 25;
       if (!isNaturalUser) {
-        answersByKey[_QuestionKey.area] = await
-          fetchQuestionEndpoint('general/area/by-user?iduser=$userId', 'id', 'area');;
-        answersByKey[_QuestionKey.hierarchicalLevel] = [];
+        answersByKey[_QuestionKey.area] = areaData
+         answersByKey[_QuestionKey.hierarchicalLevel] = [];
         usedKeys.add(_QuestionKey.area);
         usedKeys.add(_QuestionKey.hierarchicalLevel);
       }
