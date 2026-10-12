@@ -234,8 +234,8 @@ class _IndexScreenState extends State<IndexScreen> {
           fetchQuestionEndpoint('general/area/by-user?iduser=$userId', 'id', 'area');
       final isNaturalUser = areaData.length == 1 && areaData[0].value == 25;
       if (!isNaturalUser) {
-        answersByKey[_QuestionKey.area] = areaData
-         answersByKey[_QuestionKey.hierarchicalLevel] = [];
+        answersByKey[_QuestionKey.area] = areaData;
+        answersByKey[_QuestionKey.hierarchicalLevel] = [];
         usedKeys.add(_QuestionKey.area);
         usedKeys.add(_QuestionKey.hierarchicalLevel);
       }
