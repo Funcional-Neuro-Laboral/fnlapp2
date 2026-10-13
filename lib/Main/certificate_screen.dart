@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:google_fonts/google_fonts.dart' show GoogleFonts;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:fnlapp/SharedPreferences/sharedpreference.dart';
 import 'package:fnlapp/config.dart';
 import 'package:fnlapp/Main/home.dart';
@@ -10,6 +12,74 @@ import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:cross_file/cross_file.dart';
 import 'utils/pdf_download.dart';
+
+class _FnlColors {
+  static const blue = Color(0xFF0B1457);
+  static const violet = Color(0xFF6428E8);
+  static const violetSecondary = Color(0xFF814CF4);
+  static const lavender = Color(0xFFF4F1FF);
+  static const lavenderDeep = Color(0xFFEAE4FC);
+  static const canvas = Color(0xFFFCFBFF);
+  static const body = Color(0xFF70779C);
+  static const label = Color(0xFF5F668B);
+  static const border = Color(0xFFD9DCEF);
+  static const bubbleBorder = Color(0xFFDCD3FA);
+  static const white = Color(0xFFFFFFFF);
+}
+
+class _FnlSpace {
+  static const double xs = 8;
+  static const double sm = 16;
+  static const double md = 24;
+  static const double lg = 32;
+}
+
+class _FnlText {
+  static TextStyle h1(double size) => GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        color: _FnlColors.blue,
+        height: 1.2,
+      );
+
+  static TextStyle h2(double size) => GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        color: _FnlColors.blue,
+        height: 1.25,
+      );
+
+  static TextStyle body({
+    double size = 16,
+    Color color = _FnlColors.body,
+    FontWeight weight = FontWeight.w400,
+  }) =>
+      GoogleFonts.roboto(
+        fontSize: size,
+        fontWeight: weight,
+        color: color,
+        height: 1.5,
+      );
+
+  static TextStyle label({
+    double size = 14,
+    Color color = _FnlColors.label,
+    double letterSpacing = 0,
+  }) =>
+      GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w700,
+        color: color,
+        letterSpacing: letterSpacing,
+      );
+
+  static TextStyle button({Color color = _FnlColors.white}) =>
+      GoogleFonts.manrope(
+        fontSize: 17,
+        fontWeight: FontWeight.w700,
+        color: color,
+      );
+}
 
 /// Pantalla de certificado que se muestra al completar el programa de 21 días
 /// Permite visualizar y descargar el certificado de finalización
@@ -31,19 +101,40 @@ class CertificateScreen extends StatefulWidget {
 
 class _CertificateScreenState extends State<CertificateScreen>
     with SingleTickerProviderStateMixin {
+  static const String _happyUrl =
+      'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/happy.png';
+  static const String _sadUrl =
+      'https://fnls3app-896680309156-us-east-2-an.s3.us-east-2.amazonaws.com/funcy/sad.png';
+
+  static const double _maxContentWidth = 480.0;
+
   bool isLoading = true;
   Map<String, dynamic>? certificateData;
   String? errorMessage;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  String? _savedPdfPath; // Ruta del PDF guardado
+  String? _savedPdfPath; // Ruta del PDF guardado (solo móvil)
+
+  bool? _isGenerating = false; // bloquea toques repetidos en "Generar"
+  bool? _isSharing = false; // bloquea toques repetidos en "Compartir"
+  bool? _imagesPrecached = false;
 
   @override
   void initState() {
     super.initState();
     _initAnimations();
     _loadCertificateData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_imagesPrecached != true) {
+      precacheImage(const NetworkImage(_happyUrl), context);
+      precacheImage(const NetworkImage(_sadUrl), context);
+      _imagesPrecached = true;
+    }
   }
 
   void _initAnimations() {
@@ -57,7 +148,7 @@ class _CertificateScreenState extends State<CertificateScreen>
     );
 
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
+      begin: const Offset(0, 0.08),
       end: Offset.zero,
     ).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
@@ -68,6 +159,7 @@ class _CertificateScreenState extends State<CertificateScreen>
 
   Future<void> _loadCertificateData() async {
     // Simplemente usar datos proporcionados por el widget
+    if (!mounted) return;
     setState(() {
       certificateData = {
         'username': widget.username ?? 'Usuario',
@@ -98,30 +190,63 @@ class _CertificateScreenState extends State<CertificateScreen>
     return '${date.day} de ${months[date.month - 1]} de ${date.year}';
   }
 
+  String _field(String key, String fallback) {
+    final value = certificateData?[key]?.toString().trim();
+    return (value == null || value.isEmpty) ? fallback : value;
+  }
+
+  String get _userName =>
+      (certificateData?['username'] ?? widget.username ?? 'Usuario')
+          .toString();
+
+  // ========== MENSAJES ==========
+
+  void _showSnack(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: _FnlColors.blue,
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Row(
+          children: [
+            Icon(
+              error ? Icons.error_outline_rounded : Icons.check_circle_rounded,
+              color: _FnlColors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: _FnlText.body(size: 14, color: _FnlColors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ========== DESCARGA Y COMPARTIR ==========
+
   Future<void> _downloadCertificate() async {
+    if (_isGenerating == true) return;
+    setState(() => _isGenerating = true);
+
     try {
       String? token = await getToken();
 
       if (token == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Error: No se encontró token de autenticación'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        _showSnack('Error: No se encontró token de autenticación',
+            error: true);
         return;
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Generando certificado...'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
+      _showSnack('Generando certificado...');
 
       // Generar certificado usando el endpoint del backend
       final generateResponse = await http.post(
@@ -149,37 +274,20 @@ class _CertificateScreenState extends State<CertificateScreen>
           print(
               '📥 PDF recibido directamente (${generateResponse.bodyBytes.length} bytes)');
 
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('¡Certificado generado exitosamente!'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
-
           // Descargar/abrir el PDF según la plataforma
           final pdfBytes = generateResponse.bodyBytes;
-          final userName =
-              certificateData?['username'] ?? widget.username ?? 'Usuario';
+          final userName = _userName;
           final fileName = 'Certificado_${userName.replaceAll(' ', '_')}.pdf';
 
           if (kIsWeb) {
             // En web: Crear blob URL y descargar automáticamente
             try {
-              _downloadPdfWeb(pdfBytes, fileName);
+              await _downloadPdfWeb(pdfBytes, fileName);
               print('✅ PDF descargado en web correctamente');
+              _showSnack('¡Certificado generado exitosamente!');
             } catch (e) {
               print('❌ Error al descargar PDF en web: $e');
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error al descargar el PDF: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
+              _showSnack('Error al descargar el PDF', error: true);
             }
           } else {
             // En móvil: Guardar el PDF
@@ -190,9 +298,11 @@ class _CertificateScreenState extends State<CertificateScreen>
               await tempFile.writeAsBytes(pdfBytes);
 
               // Guardar la ruta para compartir después
-              setState(() {
-                _savedPdfPath = tempFile.path;
-              });
+              if (mounted) {
+                setState(() {
+                  _savedPdfPath = tempFile.path;
+                });
+              }
 
               if (Platform.isIOS) {
                 // En iOS: Usar Share para que el usuario elija dónde guardar
@@ -202,16 +312,8 @@ class _CertificateScreenState extends State<CertificateScreen>
                   subject: 'Certificado $userName',
                 );
 
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                          'Selecciona "Guardar en Archivos" para guardar tu certificado'),
-                      backgroundColor: Colors.green,
-                      duration: Duration(seconds: 3),
-                    ),
-                  );
-                }
+                _showSnack(
+                    'Selecciona "Guardar en Archivos" para guardar tu certificado');
               } else if (Platform.isAndroid) {
                 // En Android, guardar directamente en Downloads
                 Directory? directory =
@@ -224,33 +326,19 @@ class _CertificateScreenState extends State<CertificateScreen>
                   final file = File('${directory.path}/$fileName');
                   await file.writeAsBytes(pdfBytes);
 
-                  setState(() {
-                    _savedPdfPath = file.path;
-                  });
+                  if (mounted) {
+                    setState(() {
+                      _savedPdfPath = file.path;
+                    });
+                  }
 
                   print('📄 PDF guardado en: ${file.path}');
-
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Certificado guardado en Descargas'),
-                        backgroundColor: Colors.green,
-                        duration: Duration(seconds: 3),
-                      ),
-                    );
-                  }
+                  _showSnack('Certificado guardado en Descargas');
                 }
               }
             } catch (e) {
               print('❌ Error al guardar PDF en móvil: $e');
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error al guardar el certificado'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
+              _showSnack('Error al guardar el certificado', error: true);
             }
           }
         } else {
@@ -258,16 +346,8 @@ class _CertificateScreenState extends State<CertificateScreen>
           final responseData = json.decode(generateResponse.body);
 
           if (responseData['success'] == true) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(responseData['message'] ??
-                      '¡Certificado generado exitosamente!'),
-                  backgroundColor: Colors.green,
-                  duration: const Duration(seconds: 3),
-                ),
-              );
-            }
+            _showSnack(responseData['message']?.toString() ??
+                '¡Certificado generado exitosamente!');
 
             // Si hay URL de descarga, mostrarla (opcional - backend retorna PDF directo)
             if (responseData['downloadUrl'] != null) {
@@ -275,7 +355,7 @@ class _CertificateScreenState extends State<CertificateScreen>
             }
 
             // Si hay datos del certificado, actualizar el estado
-            if (responseData['certificate'] != null) {
+            if (responseData['certificate'] != null && mounted) {
               setState(() {
                 certificateData = responseData['certificate'];
               });
@@ -297,15 +377,9 @@ class _CertificateScreenState extends State<CertificateScreen>
       }
     } catch (e) {
       print('❌ Error al generar certificado: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al generar certificado: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
+      _showSnack('No se pudo generar el certificado', error: true);
+    } finally {
+      if (mounted) setState(() => _isGenerating = false);
     }
   }
 
@@ -317,24 +391,17 @@ class _CertificateScreenState extends State<CertificateScreen>
     }
   }
 
-  /// Genera el PDF desde el backend y lo guarda localmente
-  Future<String?> _generateAndSavePdf() async {
+  /// Pide el PDF al backend y devuelve los bytes 
+  Future<Uint8List?> _fetchCertificatePdfBytes() async {
     try {
-      String? token = await getToken();
+      final token = await getToken();
 
       if (token == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Error: No se encontró token de autenticación'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        _showSnack('Error: No se encontró token de autenticación',
+            error: true);
         return null;
       }
 
-      // Generar certificado usando el endpoint del backend
       final generateResponse = await http.post(
         Uri.parse('${Config.apiUrl2}/certificates/generate'),
         headers: {
@@ -347,61 +414,99 @@ class _CertificateScreenState extends State<CertificateScreen>
         }),
       );
 
-      if (generateResponse.statusCode == 200 ||
-          generateResponse.statusCode == 201) {
-        final contentType = generateResponse.headers['content-type'] ?? '';
-
-        if (contentType.contains('application/pdf')) {
-          final pdfBytes = generateResponse.bodyBytes;
-          final fileName =
-              'Certificado_Funcional_${DateTime.now().millisecondsSinceEpoch}.pdf';
-
-          // Guardar en directorio temporal para todas las plataformas móviles
-          // El compartir se encargará de dar opciones al usuario
-          final tempDir = await getTemporaryDirectory();
-          final file = File('${tempDir.path}/$fileName');
-          await file.writeAsBytes(pdfBytes);
-
-          print('📄 PDF guardado temporalmente en: ${file.path}');
-
-          setState(() {
-            _savedPdfPath = file.path;
-          });
-
-          return file.path;
-        }
+      final contentType = generateResponse.headers['content-type'] ?? '';
+      if ((generateResponse.statusCode == 200 ||
+              generateResponse.statusCode == 201) &&
+          contentType.contains('application/pdf')) {
+        return generateResponse.bodyBytes;
       }
 
       throw Exception(
           'Error al generar certificado: ${generateResponse.statusCode}');
     } catch (e) {
       print('❌ Error al generar PDF: $e');
+      _showSnack('Error al generar el certificado', error: true);
+      return null;
+    }
+  }
+
+
+  Future<String?> _generateAndSavePdf() async {
+    final pdfBytes = await _fetchCertificatePdfBytes();
+    if (pdfBytes == null) return null;
+
+    try {
+      final fileName =
+          'Certificado_Funcional_${DateTime.now().millisecondsSinceEpoch}.pdf';
+
+      // Guardar en directorio temporal; el compartir ofrece las opciones
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsBytes(pdfBytes);
+
+      print('📄 PDF guardado temporalmente en: ${file.path}');
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al generar el certificado'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        setState(() {
+          _savedPdfPath = file.path;
+        });
       }
+
+      return file.path;
+    } catch (e) {
+      print('❌ Error al guardar PDF: $e');
+      _showSnack('Error al generar el certificado', error: true);
       return null;
     }
   }
 
   Future<void> _shareCertificate() async {
+    if (_isSharing == true) return;
+    setState(() => _isSharing = true);
+
+    final shareText =
+        '¡He completado el ${widget.programName ?? "programa"} con Funcional Neuro Laboral! 🎓';
+
     try {
-      // Si no hay PDF guardado, generarlo primero
+      if (kIsWeb) {
+        _showSnack('Generando certificado...');
+        final bytes = await _fetchCertificatePdfBytes();
+        if (bytes == null) return;
+
+        final fileName = 'Certificado_${_userName.replaceAll(' ', '_')}.pdf';
+
+        bool shared = false;
+        try {
+          final result = await Share.shareXFiles(
+            [
+              XFile.fromData(
+                bytes,
+                mimeType: 'application/pdf',
+                name: fileName,
+              )
+            ],
+            fileNameOverrides: [fileName],
+            text: shareText,
+            subject: 'Mi Certificado FNL',
+          );
+          shared = result.status != ShareResultStatus.unavailable;
+        } catch (e) {
+          print('⚠️ Web Share no disponible: $e');
+        }
+
+        // Si el navegador no permite compartir archivos, se descarga.
+        if (!shared) {
+          await _downloadPdfWeb(bytes, fileName);
+          _showSnack('Tu navegador no permite compartir; se descargó el PDF');
+        }
+        return;
+      }
+
+      // ---------- MÓVIL ----------
       String? pdfPath = _savedPdfPath;
 
       if (pdfPath == null || !File(pdfPath).existsSync()) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Generando certificado...'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
+        _showSnack('Generando certificado...');
         pdfPath = await _generateAndSavePdf();
       }
 
@@ -409,8 +514,7 @@ class _CertificateScreenState extends State<CertificateScreen>
         // Compartir el PDF junto con el texto
         final result = await Share.shareXFiles(
           [XFile(pdfPath)],
-          text:
-              '¡He completado el ${widget.programName ?? "programa"} con Funcional Neuro Laboral! 🎓',
+          text: shareText,
           subject: 'Mi Certificado FNL',
         );
 
@@ -420,15 +524,18 @@ class _CertificateScreenState extends State<CertificateScreen>
       }
     } catch (e) {
       print('❌ Error al compartir: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al compartir el certificado'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _showSnack('Error al compartir el certificado', error: true);
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
     }
+  }
+
+  void _goHome() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => HomeScreen()),
+      (route) => false,
+    );
   }
 
   @override
@@ -437,47 +544,58 @@ class _CertificateScreenState extends State<CertificateScreen>
     super.dispose();
   }
 
+  // ========== UI ==========
+
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final screenWidth = screenSize.width;
-    final screenHeight = screenSize.height;
-    final isTablet = screenWidth > 600;
-
-    // Padding más inteligente basado en el tamaño de pantalla
-    double padding;
-    if (screenWidth > 1024) {
-      padding = 32.0; // Desktop: padding fijo
-    } else if (screenWidth > 600) {
-      padding = screenWidth * 0.05; // Tablet: 5% del ancho
+    Widget content;
+    if (isLoading) {
+      content = _buildLoadingState();
+    } else if (errorMessage != null) {
+      content = _buildErrorState();
     } else {
-      padding = 20.0; // Móvil: padding fijo
+      content = _buildCertificateContent();
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F6),
-      body: SafeArea(
-        child: isLoading
-            ? _buildLoadingState()
-            : errorMessage != null
-                ? _buildErrorState()
-                : _buildCertificateContent(
-                    context, isTablet, padding, screenHeight),
+      backgroundColor: _FnlColors.canvas,
+      body: SizedBox.expand(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Círculos decorativos
+            const Positioned(
+              top: -70,
+              right: -70,
+              child: IgnorePointer(child: _DecorCircle(size: 220)),
+            ),
+            const Positioned(
+              bottom: -90,
+              left: -90,
+              child: IgnorePointer(child: _DecorCircle(size: 240)),
+            ),
+            SafeArea(child: content),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildLoadingState() {
-    return const Center(
+    return Center(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(color: Color(0xFF6D4BD8)),
-          SizedBox(height: 20),
-          Text(
-            'Generando tu certificado...',
-            style: TextStyle(fontSize: 16, color: Color(0xFF212121)),
+          const SizedBox(
+            width: 40,
+            height: 40,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              color: _FnlColors.violet,
+            ),
           ),
+          const SizedBox(height: _FnlSpace.sm),
+          Text('Preparando tu certificado...', style: _FnlText.body()),
         ],
       ),
     );
@@ -485,246 +603,261 @@ class _CertificateScreenState extends State<CertificateScreen>
 
   Widget _buildErrorState() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
-            const SizedBox(height: 20),
-            Text(
-              errorMessage ?? 'Error desconocido',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 30),
-            ElevatedButton(
-              onPressed: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => HomeScreen()),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(_FnlSpace.md),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(child: _buildMascot(_sadUrl, 120)),
+              const SizedBox(height: _FnlSpace.sm),
+              Text(
+                'No pudimos cargar tu certificado',
+                textAlign: TextAlign.center,
+                style: _FnlText.h2(22),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6D4BD8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              const SizedBox(height: _FnlSpace.xs),
+              Text(
+                errorMessage ?? 'Error desconocido',
+                textAlign: TextAlign.center,
+                style: _FnlText.body(),
               ),
-              child: const Text('Volver al inicio',
-                  style: TextStyle(color: Colors.white)),
-            ),
-          ],
+              const SizedBox(height: _FnlSpace.md),
+              _PrimaryButton(
+                label: 'Volver al inicio',
+                icon: Icons.arrow_forward_rounded,
+                onTap: () => Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => HomeScreen()),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildCertificateContent(BuildContext context, bool isTablet,
-      double padding, double screenHeight) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 1024;
-    final isMediumTablet = screenWidth > 768 && screenWidth <= 1024;
-    final isSmallTablet = screenWidth > 600 && screenWidth <= 768;
+  Widget _buildCertificateContent() {
+    final width = MediaQuery.of(context).size.width;
+    final isTablet = width > 600;
+    final hPad = isTablet ? _FnlSpace.lg : _FnlSpace.md;
+    final titleSize = width < 400 ? 28.0 : 34.0;
+    final mascotSize = isTablet ? 150.0 : 120.0;
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
 
-    // Max width más grande para tablets
-    final maxContentWidth = isDesktop
-        ? 900.0
-        : (isMediumTablet ? 700.0 : (isSmallTablet ? 600.0 : double.infinity));
-
-    // En desktop, usar SingleChildScrollView con mejor altura mínima
-    if (isDesktop) {
-      return FadeTransition(
-        opacity: _fadeAnimation,
-        child: SlideTransition(
-          position: _slideAnimation,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxContentWidth),
-              child: SingleChildScrollView(
-                physics: const ClampingScrollPhysics(),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: screenHeight - 48, // Altura mínima para centrar
-                  ),
-                  child: IntrinsicHeight(
-                    child: Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Spacer(flex: 1),
-                          _buildHeader(context),
-                          SizedBox(height: 48),
-                          _buildActionButtons(context),
-                          Spacer(flex: 1),
-                        ],
-                      ),
-                    ),
+    final body = LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: ConstrainedBox(
+            // El contenido mide al menos el alto visible: se centra cuando cabe
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: _maxContentWidth),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: hPad, vertical: _FnlSpace.md),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHeader(titleSize),
+                      const SizedBox(height: _FnlSpace.md),
+                      _buildHeroCard(mascotSize),
+                      const SizedBox(height: _FnlSpace.md),
+                      _buildActions(),
+                    ],
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      );
-    }
+        );
+      },
+    );
 
-    // Para móvil y tablet, mantener scroll
+    if (reduceMotion) return body;
+
     return FadeTransition(
       opacity: _fadeAnimation,
-      child: SlideTransition(
-        position: _slideAnimation,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxContentWidth),
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isDesktop ? 40 : (isTablet ? padding : padding),
-                  vertical: isDesktop ? 32 : (isTablet ? 28 : 20),
-                ),
-                child: Column(
-                  children: [
-                    SizedBox(height: isTablet ? 32 : 20),
-                    _buildHeader(context),
-                    SizedBox(height: isTablet ? 48 : 32),
-                    _buildActionButtons(context),
-                    SizedBox(height: isTablet ? 32 : 20),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+      child: SlideTransition(position: _slideAnimation, child: body),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 1024;
-    final isMediumTablet = screenWidth > 768 && screenWidth <= 1024;
-    final isSmallTablet = screenWidth > 600 && screenWidth <= 768;
-    final isMobile = screenWidth <= 600;
-
-    // Tamaños responsivos mejorados (tablets más grandes)
-    final iconSize = isDesktop
-        ? 80.0
-        : (isMediumTablet ? 70.0 : (isSmallTablet ? 60.0 : 48.0));
-    final titleSize = isDesktop
-        ? 40.0
-        : (isMediumTablet ? 36.0 : (isSmallTablet ? 30.0 : 24.0));
-    final subtitleSize = isDesktop
-        ? 18.0
-        : (isMediumTablet ? 17.0 : (isSmallTablet ? 16.0 : 14.0));
-    final badgeIconSize = isDesktop
-        ? 26.0
-        : (isMediumTablet ? 24.0 : (isSmallTablet ? 22.0 : 20.0));
-    final badgeTextSize = isDesktop
-        ? 17.0
-        : (isMediumTablet ? 16.0 : (isSmallTablet ? 15.0 : 13.0));
-    final containerPadding = isDesktop
-        ? 56.0
-        : (isMediumTablet ? 48.0 : (isSmallTablet ? 36.0 : 24.0));
-
-    return Container(
-      padding: EdgeInsets.all(containerPadding),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(isDesktop ? 24 : 20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: isDesktop ? 24 : 20,
-            offset: const Offset(0, 4),
+  Widget _buildHeader(double titleSize) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'FUNCY · LOGRO',
+          style: _FnlText.label(
+            size: 12,
+            color: _FnlColors.violet,
+            letterSpacing: 1.2,
           ),
-        ],
-      ),
-      child: Column(
+        ),
+        const SizedBox(height: 6),
+        Semantics(
+          header: true,
+          child: Text('Mi certificado', style: _FnlText.h1(titleSize)),
+        ),
+      ],
+    );
+  }
+
+
+  Widget _buildHeroCard(double mascotSize) {
+    final overlap = mascotSize / 2;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.topCenter,
+      children: [
+        Container(
+          width: double.infinity,
+          margin: EdgeInsets.only(top: overlap),
+          padding: EdgeInsets.fromLTRB(
+            _FnlSpace.md,
+            overlap + _FnlSpace.sm,
+            _FnlSpace.md,
+            _FnlSpace.md,
+          ),
+          decoration: BoxDecoration(
+            color: _FnlColors.white,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+            boxShadow: const [
+              BoxShadow(
+                color: _FnlColors.bubbleBorder,
+                offset: Offset(0, 6),
+                blurRadius: 0,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Píldora de estado
+              Center(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _FnlColors.lavender,
+                    borderRadius: BorderRadius.circular(999),
+                    border:
+                        Border.all(color: _FnlColors.bubbleBorder, width: 2),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.verified_rounded,
+                          size: 18, color: _FnlColors.violet),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Tu certificado está listo',
+                        style: _FnlText.label(color: _FnlColors.violet),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Semantics(
+                header: true,
+                child: Text(
+                  '¡Programa completado!',
+                  textAlign: TextAlign.center,
+                  style: _FnlText.h2(24),
+                ),
+              ),
+              const SizedBox(height: _FnlSpace.xs),
+              Text(
+                'Has finalizado exitosamente el Programa de Bienestar Emocional.',
+                textAlign: TextAlign.center,
+                style: _FnlText.body(size: 15),
+              ),
+              const SizedBox(height: _FnlSpace.md),
+              const Divider(
+                height: 2,
+                thickness: 2,
+                color: _FnlColors.lavender,
+              ),
+              const SizedBox(height: _FnlSpace.sm),
+              _buildInfoRow(
+                icon: Icons.person_rounded,
+                title: 'Otorgado a',
+                value: _field('username', 'Usuario'),
+              ),
+              const SizedBox(height: 12),
+              _buildInfoRow(
+                icon: Icons.school_rounded,
+                title: 'Programa',
+                value: _field(
+                    'programName', 'Programa de Manejo de Estrés Laboral'),
+              ),
+              const SizedBox(height: 12),
+              _buildInfoRow(
+                icon: Icons.event_rounded,
+                title: 'Fecha',
+                value: _field('completionDate', _formatDate(DateTime.now())),
+              ),
+            ],
+          ),
+        ),
+        _FloatingMascot(child: _buildMascot(_happyUrl, mascotSize)),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
+    return Semantics(
+      label: '$title: $value',
+      excludeSemantics: true,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Logo o imagen decorativa
           Container(
-            padding: EdgeInsets.all(isDesktop
-                ? 20
-                : (isMediumTablet ? 18 : (isSmallTablet ? 17 : 16))),
-            decoration: BoxDecoration(
-              color: const Color(0xFF6D4BD8).withOpacity(0.1),
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              color: _FnlColors.lavender,
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              Icons.verified,
-              size: iconSize,
-              color: const Color(0xFF6D4BD8),
-            ),
+            child: Icon(icon, color: _FnlColors.violet, size: 22),
           ),
-          SizedBox(
-              height: isDesktop
-                  ? 32
-                  : (isMediumTablet ? 28 : (isSmallTablet ? 24 : 20))),
-
-          Text(
-            '¡Programa Completado!',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: titleSize,
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFF212121),
-              fontFamily: 'Inter',
-            ),
-          ),
-          SizedBox(height: isDesktop ? 20 : (isMediumTablet ? 16 : 12)),
-          Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isDesktop
-                  ? 50
-                  : (isMediumTablet ? 30 : (isSmallTablet ? 20 : 0)),
-            ),
-            child: Text(
-              'Has finalizado exitosamente el Programa de Bienestar Emocional',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: subtitleSize,
-                color: const Color(0xFF757575),
-                fontFamily: 'Inter',
-                height: 1.6,
-              ),
-            ),
-          ),
-          SizedBox(height: isDesktop ? 32 : (isMediumTablet ? 26 : 20)),
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: isDesktop
-                  ? 24
-                  : (isMediumTablet ? 22 : (isSmallTablet ? 20 : 16)),
-              vertical: isDesktop ? 14 : 12,
-            ),
-            decoration: BoxDecoration(
-              color: const Color(0xFF6D4BD8).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: const Color(0xFF6D4BD8).withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            child: Row(
+          const SizedBox(width: _FnlSpace.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.verified,
-                  size: badgeIconSize,
-                  color: const Color(0xFF6D4BD8),
-                ),
-                SizedBox(width: isDesktop ? 10 : 8),
-                Flexible(
-                  child: Text(
-                    'Tu certificado está listo',
-                    style: TextStyle(
-                      fontSize: badgeTextSize,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF6D4BD8),
-                      fontFamily: 'Inter',
-                    ),
+                Text(
+                  title.toUpperCase(),
+                  style: _FnlText.label(
+                    size: 12,
+                    color: _FnlColors.body,
+                    letterSpacing: 0.6,
                   ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: _FnlText.body(
+                    color: _FnlColors.blue,
+                    weight: FontWeight.w500,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -734,117 +867,319 @@ class _CertificateScreenState extends State<CertificateScreen>
     );
   }
 
-  Widget _buildActionButtons(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 1024;
-    final isMediumTablet = screenWidth > 768 && screenWidth <= 1024;
-    final isSmallTablet = screenWidth > 600 && screenWidth <= 768;
-    final isMobile = screenWidth <= 600;
-
-    // Tamaños responsivos mejorados para tablets
-    final buttonTextSize = isDesktop
-        ? 19.0
-        : (isMediumTablet ? 18.0 : (isSmallTablet ? 17.0 : 15.0));
-    final buttonIconSize = isDesktop
-        ? 26.0
-        : (isMediumTablet ? 24.0 : (isSmallTablet ? 22.0 : 20.0));
-    final buttonPadding = isDesktop
-        ? 24.0
-        : (isMediumTablet ? 22.0 : (isSmallTablet ? 18.0 : 14.0));
-    final buttonSpacing = isDesktop
-        ? 24.0
-        : (isMediumTablet ? 20.0 : (isSmallTablet ? 18.0 : 16.0));
-    final borderRadius = isDesktop
-        ? 16.0
-        : (isMediumTablet ? 14.0 : (isSmallTablet ? 13.0 : 12.0));
-    final textButtonSize = isDesktop
-        ? 17.0
-        : (isMediumTablet ? 16.0 : (isSmallTablet ? 15.0 : 14.0));
-
-    return Column(
-      children: [
-        // Botón de generar certificado
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _downloadCertificate,
-            icon:
-                Icon(Icons.download, color: Colors.white, size: buttonIconSize),
-            label: Text(
-              'Generar Certificado',
-              style: TextStyle(
-                fontSize: buttonTextSize,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-                fontFamily: 'Inter',
-              ),
+  Widget _buildActions() {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _PrimaryButton(
+              label: 'Generar certificado',
+              icon: Icons.download_rounded,
+              loading: _isGenerating == true,
+              onTap: _downloadCertificate,
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6D4BD8),
-              padding: EdgeInsets.symmetric(vertical: buttonPadding),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(borderRadius),
-              ),
-              elevation: isDesktop ? 2 : 4,
-              shadowColor: Colors.black.withOpacity(0.2),
+            const SizedBox(height: 12),
+            _SecondaryButton(
+              label: 'Compartir',
+              icon: Icons.share_rounded,
+              loading: _isSharing == true,
+              onTap: _shareCertificate,
+            ),
+            const SizedBox(height: _FnlSpace.xs),
+            _TextAction(label: 'Volver al inicio', onTap: _goHome),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Mascota con halo
+  Widget _buildMascot(String url, double size) {
+    return SizedBox(
+      height: size,
+      width: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: size * 0.7,
+            height: size * 0.7,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: _FnlColors.violetSecondary.withOpacity(0.25),
+                  blurRadius: 40,
+                  spreadRadius: 8,
+                ),
+              ],
+            ),
+          ),
+          Image.network(
+            url,
+            height: size,
+            width: size,
+            fit: BoxFit.contain,
+            excludeFromSemantics: true,
+            loadingBuilder: (context, child, progress) {
+              if (progress == null) return child;
+              return SizedBox(
+                height: size,
+                width: size,
+                child: const Center(
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: _FnlColors.violetSecondary,
+                    ),
+                  ),
+                ),
+              );
+            },
+            errorBuilder: (_, __, ___) => SizedBox(height: size, width: size),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DecorCircle extends StatelessWidget {
+  final double size;
+  const _DecorCircle({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: _FnlColors.lavenderDeep,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+/// Movimiento vertical suave y continuo para la mascota.
+/// Se desactiva si el usuario pidió reducir animaciones.
+class _FloatingMascot extends StatefulWidget {
+  final Widget child;
+  const _FloatingMascot({required this.child});
+
+  @override
+  State<_FloatingMascot> createState() => _FloatingMascotState();
+}
+
+class _FloatingMascotState extends State<_FloatingMascot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _curve;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    )..repeat(reverse: true);
+    _curve = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.of(context).disableAnimations) return widget.child;
+
+    return AnimatedBuilder(
+      animation: _curve,
+      child: widget.child,
+      builder: (context, child) => Transform.translate(
+        offset: Offset(0, -8 * _curve.value),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _PrimaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final bool? loading;
+
+  const _PrimaryButton({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.loading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoading = loading ?? false;
+    final radius = BorderRadius.circular(18);
+
+    return Semantics(
+      button: true,
+      enabled: !isLoading,
+      label: label,
+      excludeSemantics: true,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 56,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          color: _FnlColors.violet,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: isLoading ? null : onTap,
+            child: Center(
+              child: isLoading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(_FnlColors.white),
+                      ),
+                    )
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            label,
+                            overflow: TextOverflow.ellipsis,
+                            style: _FnlText.button(),
+                          ),
+                        ),
+                        if (icon != null) ...[
+                          const SizedBox(width: 8),
+                          Icon(icon, size: 20, color: _FnlColors.white),
+                        ],
+                      ],
+                    ),
             ),
           ),
         ),
-        SizedBox(height: buttonSpacing),
+      ),
+    );
+  }
+}
 
-        // Botón de compartir
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _shareCertificate,
-            icon: Icon(Icons.share,
-                color: const Color(0xFF6D4BD8), size: buttonIconSize),
-            label: Text(
-              'Compartir',
-              style: TextStyle(
-                fontSize: buttonTextSize,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF6D4BD8),
-                fontFamily: 'Inter',
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              padding: EdgeInsets.symmetric(vertical: buttonPadding),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(borderRadius),
-              ),
-              side: const BorderSide(color: Color(0xFF6D4BD8), width: 2),
+class _SecondaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final bool? loading;
+
+  const _SecondaryButton({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.loading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoading = loading ?? false;
+    final radius = BorderRadius.circular(18);
+
+    return Semantics(
+      button: true,
+      enabled: !isLoading,
+      label: label,
+      excludeSemantics: true,
+      child: Container(
+        height: 52,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: _FnlColors.lavender,
+          borderRadius: radius,
+          border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: isLoading ? null : onTap,
+            child: Center(
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: _FnlColors.violet,
+                      ),
+                    )
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (icon != null) ...[
+                          Icon(icon, size: 20, color: _FnlColors.violet),
+                          const SizedBox(width: 8),
+                        ],
+                        Flexible(
+                          child: Text(
+                            label,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.manrope(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: _FnlColors.violet,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
         ),
-        SizedBox(height: buttonSpacing),
+      ),
+    );
+  }
+}
 
-        // Botón de volver al inicio
-        TextButton(
-          onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => HomeScreen()),
-              (route) => false,
-            );
-          },
-          style: TextButton.styleFrom(
-            padding: EdgeInsets.symmetric(
-              vertical: isDesktop ? 16 : 12,
-              horizontal: isDesktop ? 24 : 16,
-            ),
-          ),
-          child: Text(
-            'Volver al inicio',
-            style: TextStyle(
-              fontSize: textButtonSize,
-              color: const Color(0xFF757575),
-              fontWeight: FontWeight.w500,
-              fontFamily: 'Inter',
-            ),
-          ),
+class _TextAction extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _TextAction({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        minimumSize: const Size.fromHeight(44),
+        foregroundColor: _FnlColors.violet,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.manrope(
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+          color: _FnlColors.label,
         ),
-      ],
+      ),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../services/google_play_verification_service.dart';
 import '../services/subscription_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 
 class _FnlColors {
@@ -472,6 +473,71 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
   }
 
+  static const String _loginRoute = '/login';
+
+  Future<void> _confirmLogout() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: _FnlColors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: _FnlColors.bubbleBorder, width: 2),
+        ),
+        title: Text('¿Cerrar sesión?', style: _FnlText.h1(22)),
+        content: Text(
+          'Tendrás que iniciar sesión de nuevo para volver a entrar.',
+          style: _FnlText.body(),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              'Cancelar',
+              style: _FnlText.button(color: _FnlColors.body)
+                  .copyWith(fontSize: 15),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _FnlColors.violet,
+              foregroundColor: _FnlColors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child:
+                Text('Cerrar sesión', style: _FnlText.button().copyWith(fontSize: 15)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    await _logout();
+  }
+
+  Future<void> _logout() async {
+    _log('Cerrando sesión');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+    } catch (e, st) {
+      _log('❌ Error al limpiar la sesión: $e');
+      _log('$st');
+    }
+
+    if (!mounted) return;
+    Navigator.of(context)
+        .pushNamedAndRemoveUntil(_loginRoute, (route) => false);
+  }
+
   static const List<Map<String, dynamic>> _features = [
     {'icon': Icons.psychology_rounded, 'text': 'Acceso ilimitado al chat de IA'},
     {'icon': Icons.insights_rounded, 'text': 'Análisis detallados de estrés'},
@@ -547,6 +613,54 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
+  Widget _buildTopBar() {
+    return Row(
+      children: [
+        _buildBackButton(),
+        const Spacer(),
+        _buildLogoutButton(),
+      ],
+    );
+  }
+
+  Widget _buildLogoutButton() {
+    return Semantics(
+      button: true,
+      label: 'Cerrar sesión',
+      excludeSemantics: true,
+      child: Material(
+        color: _FnlColors.white,
+        shape: const StadiumBorder(
+          side: BorderSide(color: _FnlColors.bubbleBorder, width: 2),
+        ),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: _confirmLogout,
+          child: Container(
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.logout_rounded,
+                    size: 18, color: _FnlColors.violet),
+                const SizedBox(width: 6),
+                Text(
+                  'Cerrar sesión',
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: _FnlColors.violet,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // Móvil y tablet vertical: contenido con scroll + barra inferior fija
   Widget _buildSingleColumn(
       BoxConstraints constraints, bool isTablet, bool isSmallHeight) {
@@ -562,10 +676,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       children: [
         Padding(
           padding: EdgeInsets.fromLTRB(hPad, _FnlSpace.sm, hPad, _FnlSpace.xs),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: _buildBackButton(),
-          ),
+          child: _buildTopBar(),
         ),
         Expanded(
           child: Center(
@@ -614,10 +725,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(
               _FnlSpace.lg, _FnlSpace.sm, _FnlSpace.lg, 0),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: _buildBackButton(),
-          ),
+          child: _buildTopBar(),
         ),
         Expanded(
           child: Center(
@@ -658,7 +766,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
-  // Funcy con halo + título + subtítulo
+  // Funcy con halo + título + subtítulo + nivel de estrés
   Widget _buildHeader(double mascotSize, bool isTablet) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -753,7 +861,61 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           textAlign: TextAlign.center,
           style: _FnlText.body(size: isTablet ? 18 : 16),
         ),
+        const SizedBox(height: 12),
+        _buildStressLevel(isTablet),
       ],
+    );
+  }
+
+  Widget _buildStressLevel(bool isTablet) {
+    final fontSize = isTablet ? 15.0 : 14.0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: _FnlColors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: _FnlColors.border, width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: _FnlColors.border,
+            offset: Offset(0, 3),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.insights_rounded,
+              size: 18, color: _FnlColors.violet),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text.rich(
+              TextSpan(children: [
+                TextSpan(
+                  text: 'Nivel de estrés: ',
+                  style: GoogleFonts.manrope(
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w700,
+                    color: _FnlColors.body,
+                  ),
+                ),
+                TextSpan(
+                  text: 'Moderado',
+                  style: GoogleFonts.manrope(
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w800,
+                    color: _FnlColors.violet,
+                  ),
+                ),
+              ]),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -148,6 +148,11 @@ class _IndexScreenState extends State<IndexScreen> {
   bool _loadingLevels = false;
   int? _levelsAreaId;
 
+  static const int _generalCompanyId = 8;
+  static const int _generalHierarchicalLevelId = 109;
+  static const int _generalBranchId = 9;
+  bool _isGeneralUser = false;
+
   // Recognizers de los enlaces legales (se crean una vez y se liberan en dispose)
   late final TapGestureRecognizer _privacyTap;
   late final TapGestureRecognizer _termsTap;
@@ -373,6 +378,21 @@ class _IndexScreenState extends State<IndexScreen> {
     }
   }
 
+  Future<int> _fetchCompanyId() async {
+    final response = await widget.apiServiceWithToken.get('users/form-config');
+    if (response.statusCode != 200) {
+      throw Exception(
+          'users/form-config returned HTTP status ${response.statusCode}');
+    }
+
+    final body = json.decode(response.body);
+    final companyId = int.tryParse('${body['data']?['company_id']}');
+    if (companyId == null) {
+      throw const FormatException('users/form-config returned no company_id');
+    }
+    return companyId;
+  }
+
   Future<void> fetchQuestions() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -389,9 +409,11 @@ class _IndexScreenState extends State<IndexScreen> {
       keys.add(_QuestionKey.ageRange);
       keys.add(_QuestionKey.gender);
 
-      // TODO modificar el backend para que el endpoint /users/login devuelva
-      // company_id en .data.user
-      final isNaturalUser = prefs.getInt('company_id') == 8;
+      // company_id viene del backend (validado por el token del usuario)
+      final companyId = await _fetchCompanyId();
+      await prefs.setInt('company_id', companyId); // compatibilidad con el resto de la app
+      final isNaturalUser = companyId == _generalCompanyId;
+      _isGeneralUser = isNaturalUser;
 
       if (!isNaturalUser) {
         if (userId == null) {
@@ -483,10 +505,12 @@ class _IndexScreenState extends State<IndexScreen> {
       'age_range_id': ageRangeId,
       'gender_id': genderId,
       'responsability_level_id': responsabilityLevelId,
-      // null si company_id es 8 (General)
-      'hierarchical_level_id':
-          selectedAnswerByKey[_QuestionKey.hierarchicalLevel],
-      'branch_id': selectedAnswerByKey[_QuestionKey.branch],
+      'hierarchical_level_id': _isGeneralUser
+          ? _generalHierarchicalLevelId
+          : selectedAnswerByKey[_QuestionKey.hierarchicalLevel],
+      'branch_id': _isGeneralUser
+          ? _generalBranchId
+          : selectedAnswerByKey[_QuestionKey.branch],
     };
     _log('Data to send: $dataToSend');
 
@@ -505,7 +529,9 @@ class _IndexScreenState extends State<IndexScreen> {
         await prefs.setBool('userresponsebool', true);
 
         // Guardar branch_id en SharedPreferences para uso posterior
-        final branchId = selectedAnswerByKey[_QuestionKey.branch];
+        final branchId = _isGeneralUser
+            ? _generalBranchId
+            : selectedAnswerByKey[_QuestionKey.branch];
         if (branchId != null) {
           await prefs.setInt('branch_id', branchId);
           _log('branch_id guardado en SharedPreferences: $branchId');
@@ -529,9 +555,6 @@ class _IndexScreenState extends State<IndexScreen> {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // UI
-  // ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     Widget content;

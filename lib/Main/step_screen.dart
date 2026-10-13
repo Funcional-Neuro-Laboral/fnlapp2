@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart' show GoogleFonts;
 import 'package:fnlapp/Main/finalstepscreen.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:http/http.dart' as http;
@@ -7,6 +8,67 @@ import '../Util/translations.dart';
 import '../config.dart';
 import 'completed_dia_screen.dart';
 import 'dart:async';
+
+class _FnlColors {
+  static const blue = Color(0xFF0B1457);
+  static const violet = Color(0xFF6428E8);
+  static const violetSecondary = Color(0xFF814CF4);
+  static const lavender = Color(0xFFF4F1FF);
+  static const lavenderDeep = Color(0xFFEAE4FC);
+  static const canvas = Color(0xFFFCFBFF);
+  static const body = Color(0xFF70779C);
+  static const label = Color(0xFF5F668B);
+  static const border = Color(0xFFD9DCEF);
+  static const bubbleBorder = Color(0xFFDCD3FA);
+  static const white = Color(0xFFFFFFFF);
+}
+
+class _FnlSpace {
+  static const double xs = 8;
+  static const double sm = 16;
+  static const double md = 24;
+  static const double lg = 32;
+}
+
+class _FnlText {
+  static TextStyle h1(double size) => GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        color: _FnlColors.blue,
+        height: 1.2,
+      );
+
+  static TextStyle h2(double size) => GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        color: _FnlColors.blue,
+        height: 1.25,
+      );
+
+  static TextStyle body({
+    double size = 16,
+    Color color = _FnlColors.body,
+    FontWeight weight = FontWeight.w400,
+  }) =>
+      GoogleFonts.roboto(
+        fontSize: size,
+        fontWeight: weight,
+        color: color,
+        height: 1.5,
+      );
+
+  static TextStyle label({
+    double size = 14,
+    Color color = _FnlColors.label,
+    double letterSpacing = 0,
+  }) =>
+      GoogleFonts.manrope(
+        fontSize: size,
+        fontWeight: FontWeight.w700,
+        color: color,
+        letterSpacing: letterSpacing,
+      );
+}
 
 class StepScreen extends StatefulWidget {
   final List<String> steps;
@@ -71,10 +133,10 @@ class _StepScreenState extends State<StepScreen> {
     switch (deviceType) {
       case DeviceType.mobile:
         return ResponsiveDimensions(
-          padding: 16.0,
-          imageHeight: size.height * 0.35,
+          padding: 20.0,
+          imageHeight: (size.height * 0.30).clamp(180.0, 300.0).toDouble(),
           fontSize: 16.0,
-          titleFontSize: 17.0,
+          titleFontSize: 20.0,
           iconSize: 24.0,
           buttonWidth: size.width * 0.25,
           buttonHeight: 60.0,
@@ -82,25 +144,25 @@ class _StepScreenState extends State<StepScreen> {
         );
       case DeviceType.tablet:
         return ResponsiveDimensions(
-          padding: 24.0,
-          imageHeight: size.height * 0.4,
+          padding: 28.0,
+          imageHeight: (size.height * 0.35).clamp(240.0, 400.0).toDouble(),
           fontSize: 18.0,
-          titleFontSize: 20.0,
+          titleFontSize: 22.0,
           iconSize: 28.0,
           buttonWidth: size.width * 0.2,
-          buttonHeight: 70.0,
-          maxContentWidth: size.width * 0.8,
+          buttonHeight: 64.0,
+          maxContentWidth: (size.width * 0.8).clamp(0.0, 640.0).toDouble(),
         );
       case DeviceType.desktop:
         return ResponsiveDimensions(
           padding: 32.0,
           imageHeight: size.height * 0.45,
           fontSize: 20.0,
-          titleFontSize: 24.0,
+          titleFontSize: 26.0,
           iconSize: 32.0,
           buttonWidth: 140.0,
-          buttonHeight: 80.0,
-          maxContentWidth: 800.0,
+          buttonHeight: 64.0,
+          maxContentWidth: 1200.0,
         );
     }
   }
@@ -135,7 +197,6 @@ class _StepScreenState extends State<StepScreen> {
     commentController.dispose();
     super.dispose();
   }
-
 
   Uri? _parseTtsUri(int index) {
     if (index < 0 || index >= widget.ttsUrls.length) return null;
@@ -474,17 +535,19 @@ class _StepScreenState extends State<StepScreen> {
 
     try {
       if (mounted) {
-        final String apiUrl = "${Config.apiUrl2}/users/daily-activities?userId=${widget.userId}";
+        final String apiUrl =
+            "${Config.apiUrl2}/users/daily-activities?userId=${widget.userId}";
 
         final response = await http.get(Uri.parse(apiUrl));
 
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
-          final userProgramas = List<Map<String, dynamic>>.from(data['userProgramas']);
+          final userProgramas =
+              List<Map<String, dynamic>>.from(data['userProgramas']);
 
           // Buscar el programa del día actual
           final currentProgram = userProgramas.firstWhere(
-                (programa) => programa['dia'] == widget.dia,
+            (programa) => programa['dia'] == widget.dia,
             orElse: () => {},
           );
 
@@ -561,243 +624,403 @@ class _StepScreenState extends State<StepScreen> {
     }
   }
 
+  void _toggleMute() {
+    setState(() {
+      isMuted = !isMuted;
+      // Ajustar volumen del AudioPlayer actual
+      currentPlayer?.setVolume(isMuted ? 0.0 : 1.0);
+    });
+  }
+
+  // ============================================================
+  // UI
+  // ============================================================
+
   @override
   Widget build(BuildContext context) {
     final dimensions = _getResponsiveDimensions(context);
     final deviceType = _getDeviceType(MediaQuery.of(context).size.width);
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: deviceType == DeviceType.desktop
-            ? _buildDesktopLayout(dimensions)
-            : _buildMobileTabletLayout(dimensions, deviceType),
-      ),
-    );
-  }
-
-  Widget _buildDesktopLayout(ResponsiveDimensions dimensions) {
-    return Row(
-      children: [
-        // Panel izquierdo con imagen
-        Expanded(
-          flex: 2,
-          child: Container(
-            padding: EdgeInsets.all(dimensions.padding),
-            child: Column(
-              children: [
-                _buildHeader(dimensions),
-                const SizedBox(height: 24),
-                Expanded(
-                  child: _buildImageSection(dimensions),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // Panel derecho con contenido y controles
-        Expanded(
-          flex: 3,
-          child: Container(
-            padding: EdgeInsets.all(dimensions.padding),
-            child: Column(
-              children: [
-                _buildProgressIndicator(dimensions),
-                const SizedBox(height: 24),
-                Expanded(
-                  child: _buildTextContent(dimensions),
-                ),
-                _buildControls(dimensions),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMobileTabletLayout(ResponsiveDimensions dimensions, DeviceType deviceType) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: dimensions.maxContentWidth),
-        child: Column(
+      backgroundColor: _FnlColors.canvas,
+      body: SizedBox.expand(
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            _buildHeader(dimensions),
-            _buildProgressIndicator(dimensions),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: dimensions.padding),
-                child: Column(
-                  children: [
-                    _buildImageSection(dimensions),
-                    SizedBox(height: dimensions.padding),
-                    _buildTextSizeControl(dimensions),
-                    SizedBox(height: dimensions.padding),
-                    Container(
-                      height: 1,
-                      width: double.infinity,
-                      color: Colors.black,
-                    ),
-                    SizedBox(height: dimensions.padding),
-                    _buildStepText(dimensions),
-                  ],
-                ),
-              ),
+            // Círculos decorativos
+            const Positioned(
+              top: -70,
+              right: -70,
+              child: IgnorePointer(child: _DecorCircle(size: 220)),
             ),
-            _buildControls(dimensions),
+            const Positioned(
+              bottom: -90,
+              left: -90,
+              child: IgnorePointer(child: _DecorCircle(size: 240)),
+            ),
+            SafeArea(
+              child: deviceType == DeviceType.desktop
+                  ? _buildDesktopLayout(dimensions)
+                  : _buildMobileTabletLayout(dimensions, deviceType),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(ResponsiveDimensions dimensions) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-          horizontal: dimensions.padding,
-          vertical: dimensions.padding * 0.75
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: dimensions.iconSize + 8,
-            height: dimensions.iconSize + 8,
-            child: IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: Icon(
-                Icons.arrow_back_ios_new,
-                color: Colors.black,
-                size: dimensions.iconSize * 0.8,
-              ),
-              padding: EdgeInsets.zero,
-            ),
-          ),
-          Expanded(
-            child: Center(
-              child: Text(
-                'Día ${widget.dia.toString().padLeft(2, '0')}',
-                style: TextStyle(
-                  color: const Color(0xFF4320AD),
-                  fontSize: dimensions.fontSize + 2,
-                  fontFamily: 'Inter',
-                  fontWeight: FontWeight.w600,
+  Widget _buildDesktopLayout(ResponsiveDimensions dimensions) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: dimensions.maxContentWidth),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Panel izquierdo: encabezado + imagen
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: EdgeInsets.all(dimensions.padding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildHeader(dimensions),
+                    const SizedBox(height: _FnlSpace.md),
+                    Expanded(
+                      child: _buildImageSection(dimensions, fill: true),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
-          SizedBox(width: dimensions.iconSize + 8),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildProgressIndicator(ResponsiveDimensions dimensions) {
-    return Container(
-      margin: EdgeInsets.all(dimensions.padding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
+            // Panel derecho: información, texto y controles
+            Expanded(
+              flex: 3,
+              child: Padding(
+                padding: EdgeInsets.all(dimensions.padding),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.access_time,
-                          size: dimensions.fontSize,
-                          color: const Color(0xFF212121),
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          '10 min',
-                          style: TextStyle(
-                            color: const Color(0xFF212121),
-                            fontSize: dimensions.fontSize * 0.85,
-                            fontFamily: 'Inter',
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Container(
-                          width: 7,
-                          height: 7,
-                          decoration: const ShapeDecoration(
-                            color: Color(0xFFB7B7B7),
-                            shape: OvalBorder(),
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            traducirTipoTecnica(widget.tecnicaTipo),
-                            style: TextStyle(
-                              color: const Color(0xFF212121),
-                              fontSize: dimensions.fontSize * 0.85,
-                              fontFamily: 'Inter',
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        ),
-                      ],
+                    _buildTechniqueInfo(dimensions),
+                    const SizedBox(height: _FnlSpace.sm),
+                    _buildProgress(),
+                    const SizedBox(height: _FnlSpace.sm),
+                    _buildTextSizeControl(dimensions),
+                    const SizedBox(height: _FnlSpace.sm),
+                    Expanded(
+                      child: _buildStepText(dimensions, scrollable: true),
                     ),
-                    SizedBox(height: 12),
-                    Text(
-                      widget.tecnicaNombre,
-                      style: TextStyle(
-                        color: const Color(0xFF5027D0),
-                        fontSize: dimensions.titleFontSize,
-                        fontFamily: 'Inter',
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(height: _FnlSpace.sm),
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 440),
+                        child: _buildControlsContent(dimensions),
                       ),
                     ),
                   ],
                 ),
               ),
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0x28000000),
-                      blurRadius: 5,
-                      offset: const Offset(0, 4),
-                      spreadRadius: 0,
-                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileTabletLayout(
+      ResponsiveDimensions dimensions, DeviceType deviceType) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: dimensions.maxContentWidth),
+        child: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                  dimensions.padding, _FnlSpace.xs + 4, dimensions.padding, 0),
+              child: _buildHeader(dimensions),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  dimensions.padding,
+                  _FnlSpace.sm,
+                  dimensions.padding,
+                  _FnlSpace.sm,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildTechniqueInfo(dimensions),
+                    const SizedBox(height: _FnlSpace.sm),
+                    _buildProgress(),
+                    const SizedBox(height: _FnlSpace.sm),
+                    _buildImageSection(dimensions),
+                    const SizedBox(height: _FnlSpace.sm),
+                    _buildTextSizeControl(dimensions),
+                    const SizedBox(height: _FnlSpace.sm),
+                    _buildStepText(dimensions),
                   ],
                 ),
-                child: IconButton(
-                  onPressed: () {
-                    setState(() {
-                      isMuted = !isMuted;
-                      // Ajustar volumen del AudioPlayer actual
-                      currentPlayer?.setVolume(isMuted ? 0.0 : 1.0);
-                    });
-                  },
-                  icon: Icon(
-                    isMuted ? Icons.volume_off : Icons.volume_up,
-                    size: dimensions.iconSize,
-                    color: Colors.black,
-                  ),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    padding: EdgeInsets.all(dimensions.padding * 0.5),
+              ),
+            ),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.fromLTRB(
+                dimensions.padding,
+                _FnlSpace.sm,
+                dimensions.padding,
+                _FnlSpace.sm,
+              ),
+              decoration: const BoxDecoration(
+                color: _FnlColors.canvas,
+                border: Border(
+                  top: BorderSide(color: _FnlColors.lavenderDeep, width: 2),
+                ),
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: _buildControlsContent(dimensions),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Encabezado: volver, título del día y silenciar.
+  Widget _buildHeader(ResponsiveDimensions dimensions) {
+    return Row(
+      children: [
+        _RoundIconButton(
+          icon: Icons.arrow_back_ios_new_rounded,
+          tooltip: 'Volver',
+          onTap: () => Navigator.pop(context),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'FUNCY · PRÁCTICA',
+                style: _FnlText.label(
+                  size: 12,
+                  color: _FnlColors.violet,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Semantics(
+                header: true,
+                child: Text(
+                  'Día ${widget.dia.toString().padLeft(2, '0')}',
+                  style: _FnlText.h2(22),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        _RoundIconButton(
+          icon: isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+          tooltip: isMuted ? 'Activar sonido' : 'Silenciar',
+          onTap: _toggleMute,
+        ),
+      ],
+    );
+  }
+
+  /// Duración, tipo de técnica y nombre.
+  Widget _buildTechniqueInfo(ResponsiveDimensions dimensions) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const _InfoPill(icon: Icons.access_time_rounded, text: '10 min'),
+            const SizedBox(width: 8),
+            Flexible(
+              child: _InfoPill(text: traducirTipoTecnica(widget.tecnicaTipo)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Semantics(
+          header: true,
+          child: Text(
+            widget.tecnicaNombre,
+            style: _FnlText.h1(dimensions.titleFontSize + 6),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgress() {
+    final total = widget.steps.isEmpty ? 1 : widget.steps.length;
+    final factor = ((currentStep + 1) / total).clamp(0.0, 1.0).toDouble();
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+
+    return Semantics(
+      label: 'Paso ${currentStep + 1} de $total',
+      excludeSemantics: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'PASO ${currentStep + 1} DE $total',
+                style: _FnlText.label(
+                  size: 12,
+                  color: _FnlColors.violet,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              Text(
+                '${(factor * 100).round()}%',
+                style: _FnlText.label(size: 12, color: _FnlColors.body),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              height: 8,
+              width: double.infinity,
+              color: _FnlColors.lavenderDeep,
+              alignment: Alignment.centerLeft,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween<double>(end: factor),
+                duration:
+                    reduceMotion ? Duration.zero : const Duration(milliseconds: 350),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, _) => FractionallySizedBox(
+                  widthFactor: value.clamp(0.0, 1.0).toDouble(),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _FnlColors.violet,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
                 ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageSection(ResponsiveDimensions dimensions,
+      {bool fill = false}) {
+    return Container(
+      width: double.infinity,
+      height: fill ? null : dimensions.imageHeight,
+      decoration: BoxDecoration(
+        color: _FnlColors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: _FnlColors.bubbleBorder,
+            offset: Offset(0, 6),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(26),
+        child: Image.network(
+          _getImageUrlByDay(),
+          fit: BoxFit.cover,
+          excludeFromSemantics: true,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              color: _FnlColors.lavender,
+              child: const Center(
+                child: SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: _FnlColors.violet,
+                  ),
+                ),
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: _FnlColors.lavender,
+              child: Icon(
+                Icons.image_not_supported_rounded,
+                size: dimensions.iconSize * 2,
+                color: _FnlColors.body,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextSizeControl(ResponsiveDimensions dimensions) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      decoration: BoxDecoration(
+        color: _FnlColors.lavender,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'TAMAÑO DE TEXTO',
+            style: _FnlText.label(
+              size: 12,
+              color: _FnlColors.body,
+              letterSpacing: 0.6,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _SizeButton(
+                icon: Icons.text_decrease_rounded,
+                tooltip: 'Reducir texto',
+                onTap: () {
+                  setState(() {
+                    if (textSize > 18.0) {
+                      textSize = textSize == 22.0 ? 20.0 : 18.0;
+                    }
+                  });
+                },
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: _buildTextSizeSlider()),
+              const SizedBox(width: 12),
+              _SizeButton(
+                icon: Icons.text_increase_rounded,
+                tooltip: 'Aumentar texto',
+                onTap: () {
+                  setState(() {
+                    if (textSize < 22.0) {
+                      textSize = textSize == 18.0 ? 20.0 : 22.0;
+                    }
+                  });
+                },
               ),
             ],
           ),
@@ -806,238 +1029,189 @@ class _StepScreenState extends State<StepScreen> {
     );
   }
 
-  Widget _buildImageSection(ResponsiveDimensions dimensions) {
+  Widget _buildTextSizeSlider() {
+    const double thumb = 22;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final travel = (width - thumb).clamp(1.0, double.infinity).toDouble();
+        final factor = ((textSize - 18.0) / 4.0).clamp(0.0, 1.0).toDouble();
+
+        void update(double dx) {
+          final percentage = ((dx - thumb / 2) / travel).clamp(0.0, 1.0);
+          final newSize = 18.0 + (percentage * 4.0);
+          setState(() {
+            if (newSize <= 19.0) {
+              textSize = 18.0;
+            } else if (newSize <= 21.0) {
+              textSize = 20.0;
+            } else {
+              textSize = 22.0;
+            }
+          });
+        }
+
+        return Semantics(
+          label: 'Tamaño de texto',
+          value: '${textSize.toInt()}',
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (d) => update(d.localPosition.dx),
+            onHorizontalDragUpdate: (d) => update(d.localPosition.dx),
+            child: SizedBox(
+              height: 36,
+              child: Stack(
+                alignment: Alignment.centerLeft,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: _FnlColors.lavenderDeep,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  Container(
+                    height: 8,
+                    width: travel * factor + thumb / 2,
+                    decoration: BoxDecoration(
+                      color: _FnlColors.violet,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  Positioned(
+                    left: travel * factor,
+                    child: Container(
+                      width: thumb,
+                      height: thumb,
+                      decoration: BoxDecoration(
+                        color: _FnlColors.violet,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: _FnlColors.white, width: 3),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: _FnlColors.bubbleBorder,
+                            blurRadius: 6,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStepText(ResponsiveDimensions dimensions,
+      {bool scrollable = false}) {
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+
+    final text = AnimatedSwitcher(
+      duration: reduceMotion ? Duration.zero : const Duration(milliseconds: 250),
+      child: Align(
+        key: ValueKey<int>(currentStep),
+        alignment: Alignment.centerLeft,
+        child: Text(
+          widget.steps[currentStep],
+          textAlign: TextAlign.left,
+          style: _FnlText.body(
+            size: textSize,
+            color: _FnlColors.blue,
+          ).copyWith(height: 1.6),
+        ),
+      ),
+    );
+
     return Container(
       width: double.infinity,
-      height: dimensions.imageHeight,
+      padding: const EdgeInsets.all(_FnlSpace.md),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
+        color: _FnlColors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            color: _FnlColors.bubbleBorder,
+            offset: Offset(0, 6),
+            blurRadius: 0,
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Image.network(
-          _getImageUrlByDay(),
-          fit: BoxFit.cover,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return Container(
-              color: Colors.grey[200],
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
-            );
-          },
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: Colors.grey[200],
-              child: Icon(
-                Icons.image_not_supported,
-                size: dimensions.iconSize * 2,
-                color: Colors.grey,
-              ),
-            );
-          },
-        ),
-      ),
+      child: scrollable ? SingleChildScrollView(child: text) : text,
     );
   }
 
-  Widget _buildTextContent(ResponsiveDimensions dimensions) {
-    return Column(
-      children: [
-        _buildTextSizeControl(dimensions),
-        SizedBox(height: dimensions.padding),
-        Container(
-          height: 1,
-          width: double.infinity,
-          color: Colors.black,
-        ),
-        SizedBox(height: dimensions.padding),
-        Expanded(
-          child: _buildStepText(dimensions),
-        ),
-      ],
-    );
-  }
+  Widget _buildControlsContent(ResponsiveDimensions dimensions) {
+    final isLastStep = currentStep == widget.steps.length - 1;
 
-  Widget _buildTextSizeControl(ResponsiveDimensions dimensions) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Tamaño de texto',
-            style: TextStyle(
-              color: const Color(0xFF212121),
-              fontSize: dimensions.fontSize * 0.85,
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          child: _isInDelay
+              ? Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Center(
+                    child: _InfoPill(
+                      icon: _isPaused
+                          ? Icons.pause_circle_outline_rounded
+                          : Icons.timer_outlined,
+                      text: _isPaused
+                          ? 'En pausa'
+                          : 'Siguiente paso en $_remainingSeconds s',
+                    ),
+                  ),
+                )
+              : const SizedBox(width: double.infinity),
         ),
-        SizedBox(height: 12),
         Row(
           children: [
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  if (textSize > 18.0) {
-                    textSize = textSize == 22.0 ? 20.0 : 18.0;
-                  }
-                });
-              },
-              child: Container(
-                width: dimensions.iconSize + 8,
-                height: dimensions.iconSize + 8,
-                child: Icon(
-                  Icons.remove,
-                  size: dimensions.iconSize,
-                  color: Colors.black,
-                ),
-              ),
-            ),
-            SizedBox(width: 12),
             Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return Container(
-                    height: 8,
-                    child: Stack(
-                      children: [
-                        Container(
-                          width: double.infinity,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFCECECE),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        FractionallySizedBox(
-                          widthFactor: (textSize - 18.0) / 4.0,
-                          child: Container(
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF4320AD),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          left: ((textSize - 18.0) / 4.0) * constraints.maxWidth - 6,
-                          top: -2,
-                          child: GestureDetector(
-                            onPanUpdate: (details) {
-                              double percentage = (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0);
-                              setState(() {
-                                double newSize = 18.0 + (percentage * 4.0);
-                                if (newSize <= 19.0) {
-                                  textSize = 18.0;
-                                } else if (newSize <= 21.0) {
-                                  textSize = 20.0;
-                                } else {
-                                  textSize = 22.0;
-                                }
-                              });
-                            },
-                            child: Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF4320AD),
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+              flex: 1,
+              child: _buildControlButton(
+                icon: Icons.skip_previous_rounded,
+                label: 'Paso anterior',
+                onPressed: currentStep > 0 ? _handlePreviousStep : null,
+                dimensions: dimensions,
               ),
             ),
-            SizedBox(width: 12),
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  if (textSize < 22.0) {
-                    textSize = textSize == 18.0 ? 20.0 : 22.0;
-                  }
-                });
-              },
-              child: Container(
-                width: dimensions.iconSize + 8,
-                height: dimensions.iconSize + 8,
-                child: Icon(
-                  Icons.add,
-                  size: dimensions.iconSize,
-                  color: Colors.black,
-                ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: _buildControlButton(
+                icon: _getPlayButtonIcon(),
+                label: _getPlayButtonIcon() == Icons.pause
+                    ? 'Pausar'
+                    : 'Reproducir',
+                onPressed: _getPlayButtonAction(),
+                isPrimary: true,
+                dimensions: dimensions,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 1,
+              child: _buildControlButton(
+                icon: isLastStep
+                    ? Icons.check_rounded
+                    : Icons.skip_next_rounded,
+                label: isLastStep ? 'Finalizar' : 'Siguiente paso',
+                onPressed: isLoading ? null : _handleNextStep,
+                isLoading: isLoading,
+                dimensions: dimensions,
               ),
             ),
           ],
         ),
       ],
-    );
-  }
-
-  Widget _buildStepText(ResponsiveDimensions dimensions) {
-    return SingleChildScrollView(
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          widget.steps[currentStep],
-          style: TextStyle(
-            fontSize: textSize,
-            color: const Color(0xFF212121),
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w400,
-          ),
-          textAlign: TextAlign.left,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildControls(ResponsiveDimensions dimensions) {
-    return Container(
-      padding: EdgeInsets.all(dimensions.padding),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _buildControlButton(
-            icon: Icons.skip_previous,
-            onPressed: currentStep > 0 ? _handlePreviousStep : null,
-            isSecondary: true,
-            dimensions: dimensions,
-          ),
-          SizedBox(width: dimensions.padding),
-          _buildControlButton(
-            icon: _getPlayButtonIcon(),
-            onPressed: _getPlayButtonAction(),
-            isPrimary: true,
-            dimensions: dimensions,
-          ),
-          SizedBox(width: dimensions.padding),
-          _buildControlButton(
-            icon: currentStep == widget.steps.length - 1
-                ? Icons.check
-                : Icons.skip_next,
-            onPressed: isLoading ? null : _handleNextStep,
-            isSecondary: true,
-            isLoading: isLoading,
-            dimensions: dimensions,
-          ),
-        ],
-      ),
     );
   }
 
@@ -1117,34 +1291,183 @@ class _StepScreenState extends State<StepScreen> {
 
   Widget _buildControlButton({
     required IconData icon,
+    required String label,
     required VoidCallback? onPressed,
     bool isPrimary = false,
-    bool isSecondary = false,
     bool isLoading = false,
     required ResponsiveDimensions dimensions,
   }) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: isPrimary ? const Color(0xFF8A6FE0) : const Color(0xFFCCCCCC),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+    final radius = BorderRadius.circular(18);
+    final enabled = onPressed != null;
+    final fg = isPrimary ? _FnlColors.white : _FnlColors.violet;
+
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: label,
+      excludeSemantics: true,
+      child: Opacity(
+        opacity: (enabled || isLoading) ? 1 : 0.45,
+        child: Container(
+          height: isPrimary ? 60 : 56,
+          decoration: BoxDecoration(
+            color: isPrimary ? _FnlColors.violet : _FnlColors.lavender,
+            borderRadius: radius,
+            border: isPrimary
+                ? null
+                : Border.all(color: _FnlColors.bubbleBorder, width: 2),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: radius,
+              onTap: onPressed,
+              child: Center(
+                child: isLoading
+                    ? SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(fg),
+                        ),
+                      )
+                    : Icon(icon, size: 30, color: fg),
+              ),
+            ),
+          ),
         ),
-        minimumSize: Size(dimensions.buttonWidth, dimensions.buttonHeight),
       ),
-      child: isLoading
-          ? SizedBox(
-        width: dimensions.iconSize * 0.75,
-        height: dimensions.iconSize * 0.75,
-        child: const CircularProgressIndicator(
-          strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+    );
+  }
+}
+
+class _DecorCircle extends StatelessWidget {
+  final double size;
+  const _DecorCircle({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: _FnlColors.lavenderDeep,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+class _RoundIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _RoundIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        label: tooltip,
+        excludeSemantics: true,
+        child: Material(
+          color: _FnlColors.lavender,
+          shape: const CircleBorder(
+            side: BorderSide(color: _FnlColors.bubbleBorder, width: 2),
+          ),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Icon(icon, size: 20, color: _FnlColors.violet),
+            ),
+          ),
         ),
-      )
-          : Icon(
-        icon,
-        size: dimensions.iconSize * 1.5,
-        color: isPrimary ? Colors.white : Colors.black,
+      ),
+    );
+  }
+}
+
+class _SizeButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _SizeButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        label: tooltip,
+        excludeSemantics: true,
+        child: Material(
+          color: _FnlColors.white,
+          shape: const CircleBorder(
+            side: BorderSide(color: _FnlColors.bubbleBorder, width: 2),
+          ),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: Icon(icon, size: 20, color: _FnlColors.violet),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoPill extends StatelessWidget {
+  final IconData? icon;
+  final String text;
+
+  const _InfoPill({this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: _FnlColors.lavender,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: _FnlColors.bubbleBorder, width: 2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 16, color: _FnlColors.violet),
+            const SizedBox(width: 6),
+          ],
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: _FnlText.label(size: 13, color: _FnlColors.violet),
+            ),
+          ),
+        ],
       ),
     );
   }

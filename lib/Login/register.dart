@@ -31,10 +31,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
   }
 
-  // ---------------------------------------------------------------------
-  // Lógica de negocio (sin cambios funcionales respecto a la versión original)
-  // ---------------------------------------------------------------------
-
   Future<void> _register(BuildContext context) async {
     if (_formKey.currentState == null || !_formKey.currentState!.validate())
       return;
@@ -143,7 +139,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final companyId = user['company_id']; // Puede ser string o int
       final isDay21Completed = data['isDay21Completed'] ?? false;
 
-      // Extraer permisos directamente de la respuesta del login
       final responsebool = data['responsebool'] ?? false;
       final testresresponsebool = data['testresresponsebool'] ?? false;
       final permisopoliticas = data['permisopoliticas'] ?? false;
@@ -168,7 +163,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           }
         }
 
-        // Inicializar el servicio de renovación de tokens
         await TokenService.instance.initializeTokenRefresh();
 
         _showSnackBar(context, 'Registro exitoso. Sesión iniciada.',
@@ -187,7 +181,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
 
-      // Guardar permisos usando los nombres que ya tienes en tu app
       await prefs.setBool('userresponsebool', responsebool);
       await prefs.setBool('testestresbool', testresresponsebool);
       await prefs.setBool('permisopoliticas', permisopoliticas);
@@ -241,10 +234,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // UI
-  // ---------------------------------------------------------------------
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -262,8 +251,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
           return Stack(
             children: [
-              // Mismo fondo del login: claro, con formas suaves en las
-              // esquinas, en vez del wallpaper morado a pantalla completa.
               Positioned(
                 top: -60,
                 right: -60,
