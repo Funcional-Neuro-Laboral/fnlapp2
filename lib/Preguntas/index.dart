@@ -15,24 +15,37 @@ class IndexScreen extends StatefulWidget {
   final String username;
   final ApiService apiServiceWithToken;
 
-  IndexScreen({required this.username, required this.apiServiceWithToken});
+  const IndexScreen({super.key, required this.username, required this.apiServiceWithToken});
 
   @override
-  _IndexScreenState createState() => _IndexScreenState();
+  State<IndexScreen> createState() => _IndexScreenState();
 }
 
-class _IndexScreenState extends State<IndexScreen> {
-  Map<String, List<Map<String, dynamic>>> questionCategories = {
-    'age_range': [],
-    'level': [],
-    'area': [],
-    'sede': [],
-    'responsability_level': [],
-    'gender': []
-  };
-  Map<int, dynamic> selectedAnswers = {};
+enum _QuestionKey {
+  ageRange,
+  gender,
+  area,
+  hierarchicalLevel,
+  responsabilityLevel,
+  branch,
+}
 
-  int currentQuestionIndex = 0;
+typedef _QuestionAnswer = ({int value, String label});
+
+class _IndexScreenState extends State<IndexScreen> {
+  static const Map<_QuestionKey, String> questionByKey = {
+    _QuestionKey.ageRange: '¿Cuál es tu rango de edad?',
+    _QuestionKey.gender: '¿Cuál es tu género?',
+    _QuestionKey.area: '¿Cuál es tu área?',
+    _QuestionKey.hierarchicalLevel: '¿Cuál es tu posición en la organización?',
+    _QuestionKey.responsabilityLevel: '¿Cuál es tu nivel de responsabilidad en tu organización?',
+    _QuestionKey.branch: '¿A que sede perteneces?',
+  };
+  Map<_QuestionKey, List<_QuestionAnswer>> answersByKey = {};
+  Map<_QuestionKey, int> selectedAnswerByKey = {};
+  List<_QuestionKey> usedKeys = [];
+  int currentKeyIndex = 0;
+
   bool loading = true;
   bool agreedToTerms = false;
   bool acceptedProcessing = false;
@@ -41,17 +54,7 @@ class _IndexScreenState extends State<IndexScreen> {
   bool agreedToAll = false;
   int? selectedAreaId;
   int? userId;
-  String? selectedOption;
-
-  String _getOptionText(Map<String, dynamic> question) {
-    return question['age_range']?.toString() ??
-        question['area']?.toString() ??
-        question['level']?.toString() ??
-        question['gender']?.toString() ??
-        question['responsability_level']?.toString() ??
-        question['sede']?.toString() ??
-        'Valor no disponible';
-  }
+  int? selectedOption;
 
   @override
   void initState() {
@@ -88,9 +91,9 @@ class _IndexScreenState extends State<IndexScreen> {
       bool testestresbool = prefs.getBool('testestresbool') ?? false;
 
       if (!agreedToTerms) {
-        currentQuestionIndex = -1;
+        currentKeyIndex = -1;
       } else if (!userresponsebool) {
-        currentQuestionIndex = 0;
+        currentKeyIndex = 0;
       } else if (!testestresbool) {
         Navigator.pushReplacement(
           context,
@@ -183,37 +186,33 @@ class _IndexScreenState extends State<IndexScreen> {
     }
   }
 
+  Future<List<_QuestionAnswer>> fetchQuestionEndpoint(
+      final String endpoint,
+      final String valueName,
+      final String labelName
+  ) async {
+    final response = await widget.apiServiceWithToken.get(endpoint);
+    if (response.statusCode != 200) {
+      throw Exception('Endpoint $endpoint returned HTTP status ${response.statusCode}');
+    }
+
+    final data = json.decode(response.body) as List<dynamic>;
+    if (data.isEmpty) {
+      throw Exception('Endpoint $endpoint returned empty data');
+    }
+
+    return data
+      .map((item) => (value: item[valueName] as int, label: item[labelName] as String))
+      .toList();
+  }
+
   Future<void> fetchHierarchicalLevel(int areaId) async {
     try {
-      final queryParams = {
-        'areaId': areaId.toString(),
-      };
-
-      final uri = Uri.parse('general/hierarchical-levels/by-area')
-          .replace(queryParameters: queryParams);
-
-      final response = await widget.apiServiceWithToken.get(uri.toString());
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-
-        if (data.isNotEmpty) {
-          final hierarchicalLevels =
-              data.map((item) => Map<String, dynamic>.from(item)).toList();
-
-          if (!mounted) return;
-          setState(() {
-            questionCategories['level'] = hierarchicalLevels;
-          });
-
-          print(
-              'Niveles jerárquicos cargados correctamente (${hierarchicalLevels.length}).');
-        } else {
-          print('No se encontraron niveles jerárquicos para el área $areaId.');
-        }
-      } else {
-        print('Error al cargar niveles jerárquicos: ${response.statusCode}');
-      }
+      answersByKey[_QuestionKey.hierarchicalLevel] =
+        await fetchQuestionEndpoint('general/hierarchical-levels/by-area?areaId=$areaId', 'id', 'level');
+      setState(() {
+        answersByKey[_QuestionKey.hierarchicalLevel];
+      });
     } catch (e, stackTrace) {
       print('Excepción al cargar niveles jerárquicos: $e');
       print(stackTrace);
@@ -221,100 +220,48 @@ class _IndexScreenState extends State<IndexScreen> {
   }
 
   Future<void> fetchQuestions() async {
+    if (!mounted) return;
     try {
-      userId = await getUserId();
-
-      final queryParamsSedes = {
-        'iduser': userId.toString(),
-      };
-
-      final uriSede = Uri.parse('general/branches/by-user')
-          .replace(queryParameters: queryParamsSedes);
-
-      final response = await widget.apiServiceWithToken.get(uriSede.toString());
-
-      if (response.statusCode == 200) {
-        final List<dynamic> sedesData = json.decode(response.body);
-
-        if (sedesData.isNotEmpty) {
-          if (!mounted) return;
-          setState(() {
-            questionCategories['sede'] = sedesData
-                .map((item) => Map<String, dynamic>.from(item))
-                .toList();
-          });
-          print('Sedes Body: ${response.body}');
-          print('Sedes cargadas correctamente (${sedesData.length}).');
-        } else {
-          print('No se encontraron sedes para el usuario $userId.');
-        }
-      } else {
-        print('Error al cargar sedes: ${response.statusCode}');
+      final prefs = await SharedPreferences.getInstance();
+      answersByKey[_QuestionKey.ageRange] =
+        await fetchQuestionEndpoint('general/age-ranges', 'id', 'age_range');
+      answersByKey[_QuestionKey.gender] =
+        await fetchQuestionEndpoint('general/gender/all', 'id', 'gender');
+      usedKeys.add(_QuestionKey.ageRange);
+      usedKeys.add(_QuestionKey.gender);
+      // TODO modificar el backend para que el endpoint /users/login devuelva company_id en .data.user
+      final areaData = await
+          fetchQuestionEndpoint('general/area/by-user?iduser=$userId', 'id', 'area');
+      final isNaturalUser = areaData.length == 1 && areaData[0].value == 25;
+      if (!isNaturalUser) {
+        answersByKey[_QuestionKey.area] = areaData;
+        answersByKey[_QuestionKey.hierarchicalLevel] = [];
+        usedKeys.add(_QuestionKey.area);
+        usedKeys.add(_QuestionKey.hierarchicalLevel);
       }
 
-      var queryParams = {
-        'iduser': userId.toString(),
-      };
-
-      var uriArea = Uri.parse('general/area/by-user')
-          .replace(queryParameters: queryParams);
-      var areasResponse =
-          await widget.apiServiceWithToken.get(uriArea.toString());
-
-      var areasData = json.decode(areasResponse.body);
-      var areas = areasData as List;
-
-      if (areas.isNotEmpty) {
-        if (!mounted) return;
-        setState(() {
-          questionCategories['area'] =
-              areas.map((item) => Map<String, dynamic>.from(item)).toList();
-        });
-
-        print('Áreas cargadas correctamente.');
-      }
-
-      var endpoints = [
-        'general/age-ranges',
-        'general/responsibility-levels/all',
-        'general/gender/all',
-      ];
-
-      var responses = await Future.wait(
-        endpoints.map((endpoint) => widget.apiServiceWithToken.get(endpoint)),
-      );
-
-      for (var i = 0; i < responses.length; i++) {
-        var data = json.decode(responses[i].body);
-
-        if (data != null && data is List) {
-          var category =
-              data.map((item) => Map<String, dynamic>.from(item)).toList();
-
-          if (i == 0) {
-            questionCategories['age_range'] = category;
-          } else if (i == 1) {
-            questionCategories['responsability_level'] = category;
-          } else if (i == 2) {
-            questionCategories['gender'] = category;
-          }
-        }
+      answersByKey[_QuestionKey.responsabilityLevel] =
+        await fetchQuestionEndpoint('general/responsibility-levels/all', 'id', 'responsability_level');
+      usedKeys.add(_QuestionKey.responsabilityLevel);
+      if (!isNaturalUser) {
+        answersByKey[_QuestionKey.branch] = await fetchQuestionEndpoint('general/branches/by-user?iduser=$userId', 'id', 'sede');
+        usedKeys.add(_QuestionKey.branch);
       }
 
       setState(() {
+        answersByKey;
         loading = false;
       });
-
-      print('Las preguntas se cargaron correctamente.');
     } catch (e) {
       setState(() {
         loading = false;
       });
+      
       print('Error al cargar preguntas: $e');
     }
   }
 
-  void selectOption(String option) {
+  void selectOption(int option) {
     setState(() {
       selectedOption = option;
     });
@@ -322,62 +269,37 @@ class _IndexScreenState extends State<IndexScreen> {
 
   void goToNextQuestion() {
     if (selectedOption != null) {
-      selectedAnswers[currentQuestionIndex] = selectedOption;
+      final questionKey = usedKeys[currentKeyIndex];
+      selectedAnswerByKey[questionKey] = selectedOption!;
       setState(() {
         selectedOption = null;
-        currentQuestionIndex++;
+        currentKeyIndex++;
       });
     }
   }
 
   void goToPreviousQuestion() {
-    if (currentQuestionIndex > 0) {
+    if (currentKeyIndex > 0) {
       setState(() {
-        currentQuestionIndex--;
-        selectedOption = selectedAnswers[currentQuestionIndex] ?? null;
+        currentKeyIndex--;
+        final questionKey = usedKeys[currentKeyIndex];
+        selectedOption = selectedAnswerByKey[questionKey];
       });
     }
   }
 
   Future<void> saveResponses() async {
-    print('Selected Answers: $selectedAnswers');
-
-    if (selectedAnswers[5] == null) {
-      if (selectedOption != null) {
-        selectedAnswers[currentQuestionIndex] = selectedOption;
-      }
-    }
-
     String? token = await getToken();
-
-    // Convertir todos los valores a int (pueden ser String desde la UI)
-    int? ageRangeId = selectedAnswers[0] is String
-        ? int.tryParse(selectedAnswers[0])
-        : selectedAnswers[0];
-    int? genderId = selectedAnswers[1] is String
-        ? int.tryParse(selectedAnswers[1])
-        : selectedAnswers[1];
-    int? hierarchicalLevelId = selectedAnswers[3] is String
-        ? int.tryParse(selectedAnswers[3])
-        : selectedAnswers[3];
-    int? responsabilityLevelId = selectedAnswers[4] is String
-        ? int.tryParse(selectedAnswers[4])
-        : selectedAnswers[4];
-    int? branchId = selectedAnswers[5] is String
-        ? int.tryParse(selectedAnswers[5])
-        : selectedAnswers[5];
-
-    final Map<String, dynamic> dataToSend = {
-      "userId": userId,
-      "age_range_id": ageRangeId,
-      "hierarchical_level_id": hierarchicalLevelId,
-      "responsability_level_id": responsabilityLevelId,
-      "gender_id": genderId,
-      "branch_id": branchId,
+    Map<String, int?> dataToSend = {
+      'userId': userId!,
+      'age_range_id': selectedAnswerByKey[_QuestionKey.ageRange]!,
+      'gender_id': selectedAnswerByKey[_QuestionKey.gender]!,
+      'responsability_level_id': selectedAnswerByKey[_QuestionKey.responsabilityLevel]!,
+      // null si company_id es 8 (General)
+      'hierarchical_level_id': selectedAnswerByKey[_QuestionKey.hierarchicalLevel],
+      'branch_id': selectedAnswerByKey[_QuestionKey.branch],
     };
-
     print('Data to send: $dataToSend');
-
     try {
       var response = await http.post(
         Uri.parse('${Config.apiUrl2}/users/save-responses'),
@@ -393,9 +315,10 @@ class _IndexScreenState extends State<IndexScreen> {
         await prefs.setBool('userresponsebool', true);
 
         // Guardar branch_id en SharedPreferences para uso posterior
+        final branchId = selectedAnswerByKey[_QuestionKey.branch];
         if (branchId != null) {
-          await prefs.setInt('branch_id', branchId);
-          print('branch_id guardado en SharedPreferences: $branchId');
+            await prefs.setInt('branch_id', branchId);
+            print('branch_id guardado en SharedPreferences: $branchId');
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -705,7 +628,7 @@ class _IndexScreenState extends State<IndexScreen> {
                               _handleAcceptAll();
                               setState(() {
                                 agreedToTerms = true;
-                                currentQuestionIndex = 0;
+                                currentKeyIndex = 0;
                               });
                             }
                           : null,
@@ -844,61 +767,17 @@ class _IndexScreenState extends State<IndexScreen> {
                 ? 24.0
                 : 20.0;
 
-        String currentCategoryKey;
-        switch (currentQuestionIndex) {
-          case 0:
-            currentCategoryKey = 'age_range';
-            break;
-          case 1:
-            currentCategoryKey = 'gender';
-            break;
-          case 2:
-            currentCategoryKey = 'area';
-            break;
-          case 3:
-            currentCategoryKey = 'level';
-            break;
-          case 4:
-            currentCategoryKey = 'responsability_level';
-            break;
-          case 5:
-            currentCategoryKey = 'sede';
-            break;
-          default:
-            currentCategoryKey = 'age_range';
-        }
+        final currentKey = usedKeys[currentKeyIndex];
+        final currentKeyAnswers = answersByKey[currentKey];
 
-        var currentCategoryQuestions = questionCategories[currentCategoryKey];
-
-        if (currentCategoryQuestions == null ||
-            currentCategoryQuestions.isEmpty) {
-          return Center(
+        if (currentKeyAnswers == null ||
+            currentKeyAnswers.isEmpty) {
+          return const Center(
             child: Text("No se encontraron preguntas para esta categoría."),
           );
         }
 
-        String preguntaTexto = '';
-        switch (currentQuestionIndex) {
-          case 0:
-            preguntaTexto = '¿Cuál es tu rango de edad?';
-            break;
-          case 1:
-            preguntaTexto = '¿Cuál es tu género?';
-            break;
-          case 2:
-            preguntaTexto = '¿Cuál es tu Área?';
-            break;
-          case 3:
-            preguntaTexto = '¿Cuál es tu posición en la organización?';
-            break;
-          case 4:
-            preguntaTexto =
-                '¿Cuál es tu nivel de responsabilidad en tu organización?';
-            break;
-          case 5:
-            preguntaTexto = '¿A que sede perteneces?';
-            break;
-        }
+        String preguntaTexto = questionByKey[currentKey]!;
 
         return SafeArea(
           child: Align(
@@ -921,7 +800,7 @@ class _IndexScreenState extends State<IndexScreen> {
                         Row(
                           children: [
                             // Icono de retroceder (solo visible si no es la primera pregunta)
-                            if (currentQuestionIndex > 0)
+                            if (currentKeyIndex > 0)
                               GestureDetector(
                                 onTap: goToPreviousQuestion,
                                 child: Container(
@@ -943,7 +822,7 @@ class _IndexScreenState extends State<IndexScreen> {
                               child: Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
-                                children: List.generate(6, (index) {
+                                children: List.generate(usedKeys.length, (index) {
                                   return Expanded(
                                     child: Container(
                                       margin: EdgeInsets.symmetric(
@@ -952,7 +831,7 @@ class _IndexScreenState extends State<IndexScreen> {
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(
                                             isTablet ? 4.0 : 3.0),
-                                        color: index <= currentQuestionIndex
+                                        color: index <= currentKeyIndex
                                             ? const Color(0xFF6D4BD8)
                                             : const Color(0xFFE0E0E0),
                                       ),
@@ -968,7 +847,7 @@ class _IndexScreenState extends State<IndexScreen> {
 
                         // Contador de preguntas
                         Text(
-                          'Pregunta ${currentQuestionIndex + 1} de 6',
+                          'Pregunta ${currentKeyIndex + 1} de ${usedKeys.length}',
                           style: TextStyle(
                             color: Color(0xFF212121),
                             fontSize: questionCounterFontSize,
@@ -1002,7 +881,7 @@ class _IndexScreenState extends State<IndexScreen> {
                       padding:
                           EdgeInsets.symmetric(horizontal: horizontalPadding),
                       child: _buildQuestionField(
-                        currentCategoryQuestions,
+                        currentKeyAnswers,
                         optionFontSize,
                         verticalPadding,
                         isTablet,
@@ -1020,18 +899,19 @@ class _IndexScreenState extends State<IndexScreen> {
                     ),
                     child: Builder(
                       builder: (context) {
-                        final bool isNextEnabled = selectedOption != null ||
-                            selectedAnswers.containsKey(currentQuestionIndex);
-                        final String nextLabel = currentQuestionIndex < 5
+                        final bool isNextEnabled = selectedOption != null;
+                        final String nextLabel = currentKeyIndex + 1 < usedKeys.length
                             ? 'Siguiente'
                             : 'Continuar';
 
                         return GestureDetector(
                           onTap: isNextEnabled
                               ? () {
-                                  if (currentQuestionIndex < 5) {
+                                  if (currentKeyIndex + 1 < usedKeys.length) {
                                     goToNextQuestion();
                                   } else {
+                                    final currentKey = usedKeys[currentKeyIndex];
+                                    selectedAnswerByKey[currentKey] = selectedOption!;
                                     // Navegar a la pantalla de resumen
                                     Navigator.push(
                                       context,
@@ -1107,7 +987,7 @@ class _IndexScreenState extends State<IndexScreen> {
   }
 
   Widget _buildQuestionField(
-    List<Map<String, dynamic>> questions,
+    List<_QuestionAnswer> questions,
     double fontSize,
     double verticalPadding,
     bool isTablet,
@@ -1127,7 +1007,7 @@ class _IndexScreenState extends State<IndexScreen> {
                   MediaQuery.of(context).size.width * (isTablet ? 0.9 : 0.85),
               child: OutlinedButton(
                 style: OutlinedButton.styleFrom(
-                  backgroundColor: selectedOption == question['id'].toString()
+                  backgroundColor: selectedOption == question.value
                       ? const Color(0x515027D0)
                       : Colors.transparent,
                   side: BorderSide(
@@ -1144,16 +1024,16 @@ class _IndexScreenState extends State<IndexScreen> {
                 ),
                 onPressed: () {
                   setState(() {
-                    selectedOption = question['id'].toString();
+                    selectedOption = question.value;
                   });
 
-                  if (currentQuestionIndex == 2) {
-                    int areaId = question['id'];
+                  if (usedKeys[currentKeyIndex] == _QuestionKey.area) {
+                    int areaId = question.value;
                     fetchHierarchicalLevel(areaId);
                   }
                 },
                 child: Text(
-                  _getOptionText(question),
+                  question.label,
                   style: TextStyle(
                     fontSize: fontSize,
                     fontWeight: FontWeight.w600,

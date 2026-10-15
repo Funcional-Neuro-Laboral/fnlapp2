@@ -456,6 +456,7 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
           return;
         }
 
+        await _updateTestEstresBool();
         print('Registro de nivel de estrés creado correctamente.');
 
         // Verificar si el usuario pertenece a la empresa 8 (General)
@@ -488,7 +489,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
               if (result == true) {
                 // Suscripción exitosa, generar programa
                 await _generateProgram(userProfile, totalScore);
-                await _updateTestEstresBool();
 
                 Navigator.pushReplacement(
                   context,
@@ -524,7 +524,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
           } else {
             // Usuario tiene acceso (ya suscrito)
             await _generateProgram(userProfile, totalScore);
-            await _updateTestEstresBool();
 
             Navigator.pushReplacement(
               context,
@@ -543,7 +542,6 @@ class _TestEstresQuestionScreenState extends State<TestEstresQuestionScreen> {
           // Usuario NO es de company_id 8 (empresas con suscripción corporativa)
           // Generar programa directamente sin verificar suscripción individual
           await _generateProgram(userProfile, totalScore);
-          await _updateTestEstresBool();
 
           Navigator.pushReplacement(
             context,
