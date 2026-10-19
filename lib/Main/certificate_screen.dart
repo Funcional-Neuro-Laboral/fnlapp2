@@ -383,6 +383,70 @@ class _CertificateScreenState extends State<CertificateScreen>
     }
   }
 
+  Future<void> _sendCertificateByEmail() async {
+    try {
+      String? token = await getToken();
+
+      if (token == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Error: No se encontró token de autenticación'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Generando certificado...'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Generar certificado usando el endpoint del backend
+      final response = await http.post(
+        Uri.parse('${Config.apiUrl2}/certificates/send-by-email'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'userName':
+              certificateData?['username'] ?? widget.username ?? 'Usuario',
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('HTTP status not 400');
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Certificado enviado a su correo'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error al generar certificado: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al generar certificado: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
   /// Descarga el PDF en web usando blob URL
   Future<void> _downloadPdfWeb(List<int> pdfBytes, String fileName) async {
     if (kIsWeb) {
@@ -880,6 +944,13 @@ class _CertificateScreenState extends State<CertificateScreen>
               icon: Icons.download_rounded,
               loading: _isGenerating == true,
               onTap: _downloadCertificate,
+            ),
+            const SizedBox(height: 12),
+            _PrimaryButton(
+              label: 'Enviar certificado por correo',
+              icon: Icons.mail_rounded,
+              loading: _isGenerating == true,
+              onTap: _sendCertificateByEmail,
             ),
             const SizedBox(height: 12),
             _SecondaryButton(

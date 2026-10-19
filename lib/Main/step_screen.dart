@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fnlapp/SharedPreferences/sharedpreference.dart';
 import 'package:google_fonts/google_fonts.dart' show GoogleFonts;
 import 'package:fnlapp/Main/finalstepscreen.dart';
 import 'package:just_audio/just_audio.dart';
@@ -80,6 +81,7 @@ class StepScreen extends StatefulWidget {
   final int tecnicaId;
   final String url_img;
   final int sessionId;
+  final bool isLastProgram;
 
   const StepScreen({
     Key? key,
@@ -92,6 +94,7 @@ class StepScreen extends StatefulWidget {
     required this.tecnicaId,
     required this.url_img,
     required this.sessionId,
+    this.isLastProgram = false,
   }) : super(key: key);
 
   @override
@@ -535,10 +538,11 @@ class _StepScreenState extends State<StepScreen> {
 
     try {
       if (mounted) {
-        final String apiUrl =
-            "${Config.apiUrl2}/users/daily-activities?userId=${widget.userId}";
-
-        final response = await http.get(Uri.parse(apiUrl));
+        final apiUrl = '${Config.apiUrl2}/users/daily-activities?userId=${widget.userId}';
+        final token = await getToken();
+        final response = await http.get(Uri.parse(apiUrl), headers: {
+          'Authorization': 'Bearer $token',
+        });
 
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
@@ -558,7 +562,8 @@ class _StepScreenState extends State<StepScreen> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => CompletedDiaScreen(),
+                builder: (context) =>
+                  CompletedDiaScreen(isLastProgram: widget.isLastProgram),
               ),
             );
           } else {
@@ -570,6 +575,7 @@ class _StepScreenState extends State<StepScreen> {
                   userId: widget.userId,
                   tecnicaId: widget.tecnicaId,
                   sessionId: widget.sessionId,
+                  isLastProgram: widget.isLastProgram,
                 ),
               ),
             );
