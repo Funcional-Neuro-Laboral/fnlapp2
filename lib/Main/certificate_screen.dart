@@ -255,10 +255,6 @@ class _CertificateScreenState extends State<CertificateScreen>
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: json.encode({
-          'userName':
-              certificateData?['username'] ?? widget.username ?? 'Usuario',
-        }),
       );
 
       print('🎓 Generate Certificate Response: ${generateResponse.statusCode}');
@@ -415,10 +411,6 @@ class _CertificateScreenState extends State<CertificateScreen>
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: json.encode({
-          'userName':
-              certificateData?['username'] ?? widget.username ?? 'Usuario',
-        }),
       );
 
       if (response.statusCode != 200) {
@@ -472,10 +464,6 @@ class _CertificateScreenState extends State<CertificateScreen>
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: json.encode({
-          'userName':
-              certificateData?['username'] ?? widget.username ?? 'Usuario',
-        }),
       );
 
       final contentType = generateResponse.headers['content-type'] ?? '';
