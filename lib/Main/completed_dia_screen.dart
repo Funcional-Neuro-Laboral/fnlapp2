@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:fnlapp/Main/ExitTest/exit_test_screen.dart';
 
 class CompletedDiaScreen extends StatelessWidget {
+  final bool isLastProgram;
+  
+  const CompletedDiaScreen({super.key, this.isLastProgram = false});
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -70,12 +75,21 @@ class CompletedDiaScreen extends StatelessWidget {
                       ),
                       child: ElevatedButton(
                         onPressed: () {
-                          Navigator.pushNamed(context, '/home');
+                          if (isLastProgram) {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ExitTestScreen()
+                              ),
+                            );
+                          } else {
+                            Navigator.pushNamed(context, '/home');
+                          }
                         },
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
                           child: Text(
-                            'Regresar',
+                            isLastProgram ? 'Cuestionario final' : 'Regresar',
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,

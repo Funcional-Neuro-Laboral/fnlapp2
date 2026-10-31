@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:google_fonts/google_fonts.dart' show GoogleFonts;
 import 'package:fnlapp/Main/home.dart';
+import 'package:fnlapp/Main/ExitTest/exit_test_screen.dart';
 import '../Util/api_service.dart';
 
 class _FnlColors {
@@ -56,12 +57,14 @@ class FinalStepScreen extends StatefulWidget {
   final int userId;
   final int tecnicaId;
   final int sessionId;
+  final bool isLastProgram;
 
   const FinalStepScreen({
     Key? key,
     required this.userId,
     required this.tecnicaId,
     required this.sessionId,
+    this.isLastProgram = false,
   }) : super(key: key);
 
   @override
@@ -177,11 +180,18 @@ class _FinalStepScreenState extends State<FinalStepScreen>
 
     _navTimer = Timer(const Duration(seconds: 1), () {
       if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => HomeScreen()),
-        (Route<dynamic> route) => false,
-      );
+      if (widget.isLastProgram) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ExitTestScreen()),
+        );
+      } else {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => HomeScreen()),
+          (Route<dynamic> route) => false,
+        );
+      }
     });
   }
 
@@ -606,7 +616,7 @@ class _FinalStepScreenState extends State<FinalStepScreen>
                       !_isLoading &&
                       !_submitted;
                   return _PrimaryButton(
-                    label: 'Enviar',
+                    label: widget.isLastProgram ? 'Cuestionario final' : 'Enviar',
                     icon: Icons.arrow_forward_rounded,
                     loading: _isLoading || _submitted,
                     enabled: canSubmit,

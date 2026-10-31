@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:collection/collection.dart';
 import 'package:fnlapp/Util/enums.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:convert';
@@ -116,6 +117,7 @@ class Programa {
   final dynamic guia;
   final dynamic ttsUrls; // URLs de audio TTS (relación por índice con guia)
   final bool unlocked;
+  final bool isLast;
 
   Programa({
     this.startDate,
@@ -131,9 +133,10 @@ class Programa {
     this.guia,
     this.ttsUrls,
     this.unlocked = false,
+    this.isLast = false,
   });
 
-  factory Programa.fromMap(Map<String, dynamic> map) {
+  factory Programa.fromMap(Map<String, dynamic> map, {bool isLastProgram = false} ) {
     return Programa(
       startDate: map['start_date'],
       completedDate: map['completed_date'],
@@ -149,6 +152,7 @@ class Programa {
       guia: map['guia'],
       ttsUrls: map['tts_urls'] ?? map['ttsUrls'],
       unlocked: map['unlocked'] ?? false,
+      isLast: isLastProgram,
     );
   }
 
@@ -473,7 +477,8 @@ class _PlanScreenState extends State<PlanScreen> {
   List<Programa> get _parsedProgramas {
     return widget.programas
         .where((p) => (p['nombre_tecnica']?.toString() ?? '').isNotEmpty)
-        .map((p) => Programa.fromMap(p))
+        .mapIndexed((index, p) => Programa.fromMap(p,
+          isLastProgram: index + 1 == widget.programas.length))
         .toList();
   }
 
@@ -1065,6 +1070,7 @@ class _PlanScreenState extends State<PlanScreen> {
           tecnicaId: programa.id,
           url_img: programa.urlImg ?? '',
           sessionId: programa.id, // Usar id como sessionId
+          isLastProgram: programa.isLast,
         ),
       ),
     );
